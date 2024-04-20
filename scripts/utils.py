@@ -71,7 +71,11 @@ def preprocess_dataset(csv_path, vectorizer_save_path, tfidf_save_path):
     # Vectorize the dataset
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform(dataset['processed'])
-    print(f'Saved preprocessed dataset back to {csv_path}.')
+    
+    # Save all files
+    preprocessed_data_path = csv_path[:-4] + '_preprocessed.csv'
+    dataset.to_csv(preprocessed_data_path, index=False)
+    print(f'Saved preprocessed dataset to {preprocessed_data_path}.')
     with open(vectorizer_save_path, 'wb') as file:
         pickle.dump(vectorizer, file)
     print(f'Saved TFIDF Vectorizer to {vectorizer_save_path}.')
