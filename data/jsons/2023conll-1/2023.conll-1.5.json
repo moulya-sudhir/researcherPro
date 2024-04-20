@@ -1,0 +1,531 @@
+{
+    "title": "Humans and language models diverge when predicting repeating text",
+    "authors": "Aditya R Vaidya; Javier Turek; Alexander G Huth; U T Austin",
+    "pub_date": "",
+    "abstract": "Language models that are trained on the nextword prediction task have been shown to accurately model human behavior in word prediction and reading speed. In contrast with these findings, we present a scenario in which the performance of humans and LMs diverges. We collected a dataset of human next-word predictions for five stimuli that are formed by repeating spans of text. Human and GPT-2 LM predictions are strongly aligned in the first presentation of a text span, but their performance quickly diverges when memory (or in-context learning) begins to play a role. We traced the cause of this divergence to specific attention heads in a middle layer. Adding a power-law recency bias to these attention heads yielded a model that performs much more similarly to humans. We hope that this scenario will spur future work in bringing LMs closer to human behavior. 1  ",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Transformer-based language models (LMs) are neural networks that are trained to predict upcoming words from their preceding context. These models flexibly retrieve and combine information across a context that might span thousands of words, enabling them to learn from in-context examples (Dai et al., 2022;Xie et al., 2022;Olsson et al., 2022), tell coherent stories (Lee et al., 2022), and perform many other advanced language tasks (Tiedemann and Thottingal, 2020;Brown et al., 2020).",
+                "These abilities far surpass any previous computational models or linguistic theories (Yang and Piantadosi, 2022), leading many to use LMs as models of human cognition. For example, LM surprisal-a measure of how well it can predict the next word-has been found to be highly correlated with both how long humans spend reading each word (Goodkind and Bicknell, 2018;Hao et al., 2020;Wilcox et al., 2020) and the accuracy of human next-word predictions (Goldstein et al., 2021;Jacobs and McCarthy, 2020). These results suggest that LMs and humans might be using similar mechanisms to structure and recall information from memory. However, these seeming parallels have not gone unchallenged. Oh and Schuler (2023), for example, showed that LM surprisal and human reading time become decorrelated as models grow in size and power, suggesting a more superficial relationship than previously thought.",
+                "In this work we test whether apparent similarities between LM and human next-word prediction accuracy reflect true similarities in memory mechanisms. To accomplish this we introduce a new task that combines memory with next-word prediction using repeating natural text stimuli. Comparing human behavioral performance with an LM, we found that LM surprisal decorrelates from human predictions in this scenario. While human performance improves modestly with each repetition, the transformer-based LM GPT-2 (Radford et al., 2019) reaches near-perfect performance after just one presentation. To better understand this behavior, we examined the patterns of memory access (via attention) in the model, revealing how the model solves this task. We then showed that the model can be made to perform more like the humans by adjusting these patterns to mimic human memory (Donkin and Nosofsky, 2012).",
+                "This work demonstrates an important way in which human and LM memory mechanisms diverge, casting doubt on the use of existing LMs as a model of human cognition. However, the framework we developed for making the model more human-like also provides a potential way forward. Directly optimizing LMs for human-like behaviorincluding but not limited to memory tasks like that used here-could lead to much better computational models of human cognition and memory. It is also possible that investigating the relationship between human and model memory could provide guidance for developing better, more efficient neural network models."
+            ],
+            "publication_ref": [
+                "b6",
+                "b29",
+                "b16",
+                "b26",
+                "b30",
+                "b28",
+                "b11",
+                "b24",
+                "b9"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related works",
+            "text": [
+                "Human performance on recall tasks, like the experiment we propose here, is primarily limited by shortterm memory (Baddeley, 1992). In these tasks, humans show both recency biases (i.e. better recall for the most recent items) and primacy biases (better for the first items) (Tzeng, 1973;Jefferies et al., 2004). Recall tasks often show repetition effects; presenting a stimulus multiple times successively decreases the recall error rate (Kintsch, 1965;Baddeley and Ecob, 1973;Amlund et al., 1986). Some have suggested a link between language deficits and the number of presentations needed to reach perfect verbatim sentence recall (Miles et al., 2006). Many studies have also shown that human memory decay follows a power law (Donkin and Nosofsky, 2012), where, for example, the number of items accurately recalled from a list will decrease over time t proportional to t \u2212d for some constant decay rate d.",
+                "Transformers neural networks, in contrast with humans, can attend to exact token identities hundreds or thousands of tokens in the past at no additional cost, subject only to the context length. One limitation of the standard attention implementation is that memory and runtime scale quadratically with the number of tokens, making longer inputs prohibitively expensive. Recently, significant work has gone into extending the maximum context length for transformers while avoiding these computational issues. Transformer-XL caches hidden states to allow attention to tokens beyond the immediate input (Dai et al., 2019). FlashAttention is an optimized attention algorithm that exploits the hardware architecture to train models with context lengths up to 64K tokens (Dao et al., 2022). The ALiBi method (Press et al., 2022) replaces sinusoidal positional embeddings with a recency bias on the attention scores, such that closer query-key pairs are weighted higher than more distant pairs. Using ALiBi necessitates retraining a model with the new attention mechanism, though once trained it can generalize to longer lengths."
+            ],
+            "publication_ref": [
+                "b2",
+                "b27",
+                "b12",
+                "b14",
+                "b3",
+                "b0",
+                "b19",
+                "b9",
+                "b7",
+                "b8",
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Human behavioral study",
+            "text": [
+                "We first designed an experiment to evaluate human memory in a next-word prediction task with repeated word sequences. We then compared the humans against an LM on the same stimuli to evaluate the LM's memory."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Setup for humans",
+            "text": [
+                "We collected human next-word predictions on repeating stimuli from a corpus of spoken story transcripts (LeBel et al., 2023). To construct the stimuli, we chose five phrase-aligned spans of between 40 and 100 words (without punctuation) from the corpus and repeated each span between one and three times, for a total of between 2 and 4 presentations of the span. One span was repeated once; three spans were repeated twice; and one span was repeated three times. The stimuli can be seen in Section A in the Appendix. Subjects were presented words one-at-a-time via rapid serial visual presentation (RSVP; Potter, 1984) at a fixed duration of 400 ms per word, with 1.5 s pauses at the end of each presentation. At predetermined moments, subjects were prompted to predict the next word given the previous 10 words. Prompts appeared roughly every 13 words, giving the subjects time to process the story naturally between interruptions. Figure 1 shows the presentation of the stimuli and an example prompt screen.",
+                "To ensure that we could measure memory effects robustly, 50% of a given subject's prompts were at the same position in all presentations of a stimulus, while the other 50% were only prompted on a single presentation. Within each presentation, prompts were selected by taking a weighted random sample of the words to provide a balanced selection of low-and high-frequency words. Weights were calculated as the average of two values: the complement of the unigram probability and the reciprocal of the unigram probability. Both weights were normalized to sum over words to 1 before being averaged. Subjects were told at the beginning of the experiment that the word sequences will repeat, but were not told where. Human performance P human (correct) was calculated as the proportion of participants whose responses exactly match the ground-truth next word, ignoring case and leading or trailing whitespace.",
+                "In total, 100 online participants were recruited through Prolific (www.prolific.co). Subjects were required to be fluent in English and were given G iv e n t h e c o n t e x t : P r e d ic t t h e n e x t w o r d :",
+                "e v e r y th in g w a it in g fo r th e li g h t to c h a n g e w e 'r e a t th is",
+                "we're at this farmhouse and it was like a scene out of a big buffet and everything [...] waiting for the light to change we're at this farmhouse and it was like a scene out of a big buffet and everything [...] waiting for the light to change we're at this farmhouse and it was like a scene out of a big buffet and everything [...]   performance-based bonus compensation. The online experiment was constructed using the Gorilla Experiment Builder (www.gorilla.sc). The experimental protocol was approved by the Institutional Review Board at The University of Texas at Austin. Written consent was obtained from all subjects."
+            ],
+            "publication_ref": [
+                "b22"
+            ],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Setup for language models",
+            "text": [
+                "We used a pre-trained GPT-2 Small (Radford et al., 2019) model, which we fine-tuned to change its tokenization from BPE (Sennrich et al., 2016) to word-level (i.e., whitespace-delimited) so that its tokenization scheme would match the experimental protocol for the human participants. We used nonrepeating story transcripts as training data for finetuning and excluded the stories used to construct the behavioral stimuli. To get model prediction probabilities for comparison with the human data, we fed the entire repeating stimulus into the model and calculated the top-1 accuracy for each token."
+            ],
+            "publication_ref": [
+                "b24",
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Behavioral study results",
+            "text": [
+                "Figure 2a shows human performance on one text span; as they are shown more words, human accuracy generally increases. Many stop words are predicted well even during the first presentation, while non-stop words improve more linearly with the number of presentations. Humans consistently improve as they are shown more presentations of the same text span, as seen in Figure 2b. While the model accuracy is similar to humans on the first presentation, it quickly jumps to a much higher level thereafter.",
+                "A more detailed view appears in Figure 2c, where we show accuracy for both model and human on each probe word. GPT-2 accuracy is strongly correlated with human accuracy for the initial presentation of this span (r = 0.87), replicating earlier findings (Goldstein et al., 2021). However, model and human accuracies markedly diverge thereafter, with the correlation dropping to r = 0.24 in the second presentation and r = 0.05 in the third.",
+                "These results provide a potent counterexample to previous claims of alignment: Humans and LMs only seem to behave similarly in the initial presentation of a stimulus, but produce uncorrelated behavior once short-term memory comes into play. This suggests that the model and humans are exploiting very different memory mechanisms to solve this task. The humans must rely on lossy short-term memory, while the model can leverage in-context learning to provide super-human, near-perfect recall. While earlier reports suggested that such detailed recall might mimic human working memory (Armeni et al., 2022), these results suggest that the models go well beyond human capabilities."
+            ],
+            "publication_ref": [
+                "b11",
+                "b1"
+            ],
+            "figure_ref": [
+                "fig_1",
+                "fig_1",
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Patterns in model attention",
+            "text": [
+                "Our behavioral results show that human and LM next-word prediction diverge sharply when short- term memory is involved, suggesting that the two systems use substantially different memory mechanisms. To gain insight into the cause of these differences, we next sought to understand how exactly the model was able to achieve such high performance on this task. \"Memory\" in transformer models is implemented by using dot-product attention over previous words. Each of the 12 layers in this model contains 12 attention heads, each of which looks for specific features in the content or location of previous words. The action of each attention head can be summarized in an attention matrix, A, which shows how much attention token i is paying to token j for all j < i. Attention weights are normalized so that each row A i of the attention matrix sums to 1. The values in the attention matrix can thus show us how and where the model is \"recalling\" past information.",
+                "Previous work on simplified transformer models has identified the emergence of specific attention heads that recognize patterns in the input and produce outputs that complete those patterns (Elhage et al., 2021;Olsson et al., 2022). These induction heads specifically attend to the token after the previous presentation of the current (input) token, essentially allowing the model to read out the completion from a previous instance of the same pattern. For inputs that are constructed from repeating sequences-like those used in our behavioral experiment-induction heads should thus produce a highly stereotypical attention matrix: If a stimulus consists of repeating spans of length k, the head attends to the token k \u2212 1 tokens in the past.",
+                "We examined the attention matrices of GPT-2 Small for our stimuli and found multiple heads across many layers that exhibit induction behavior. Figure 3a depicts example attention matrices for four heads in layer 6. While attention values are non-negative and sum to 1 in each row, we use log-scaled values here to highlight subtle effects. For this test the stimulus consisted of three presentations of a 65-word span, so an induction head should attend to the word appearing 64 positions ago, which is exactly the word that the model should output at each point. This should manifest as strong diagonals in the attention matrix. This is exactly the pattern that we see for attention heads 1 and 2. Further, when processing tokens in the third presentation, these heads attend to previous instances in both of the first two presentations (64 and 129 tokens in the past). To illustrate that this pattern is not found everywhere in the model, we also show two other attention heads (3 and 4) from the same layer, which exhibit no induction-like behavior, but instead attend to recent words.",
+                "To more efficiently find induction-like behavior in the model, we can summarize how well the attention matrix for each head matches a few different patterns. For each layer, we quantified the average probability mass attributable to the heads attending to:",
+                "\u2022 the first token in the input, often thought to represent a sort of \"default\" attention state (Olsson et al., 2022),",
+                "\u2022 the 5 most recent tokens (likely capturing local syntactic effects),",
+                "\u2022 the current token,",
+                "\u2022 past instances of the current token,",
+                "\u2022 the token after each past instance of the current token (induction), and",
+                "\u2022 all other tokens.",
+                "Figure 3b shows the probability mass given to each attention pattern in each layer, averaged across all 12 heads. We see that the induction attention pattern arises sharply and specifically in layer 6 and continues through the output layer (layer 12). These results suggest that these layers-and especially layer 6-have a causal role in copying words from previous repetitions of the text span, and thus may be the source of the divergence in human-LM accuracy. In the next section, we test this hypothesis by selectively disrupting each layer in an attempt to make the model more human-like."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2",
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Attention optimization",
+            "text": [
+                "Our previous results showed that human and LM next-word prediction accuracy diverge when shortterm memory comes into play, suggesting that human and model memory mechanisms behave very differently. We then showed this divergence might be caused by the model's induction heads, which we hypothesized enable it to identify and recall patterns with superhuman accuracy. We next asked if it is possible to modify the model so that its memory behaves more like the human. Because the LM is superhuman, such a modification will selectively hurt the LM's performance.",
+                "Since memory in this model is implemented through attention, we approached this problem by modifying the attention matrices of the model. We learn an additive bias B h for the attention matrix of each head h in one layer such that adding this bias to the pre-softmax attention weights will produce outputs that are more human-like. Namely, we modify the attention mechanism in the model to be",
+                "Attn(Q, K, V ) = softmax QK T \u221a d +B h V (1)",
+                "Each stimulus consists of an S-token span presented R times, for a total stimulus length T = SR. Human and model top-1 accuracy for prompted word i is denoted P human (correct i ) and P model (correct i ), respectively, and N i is the number of participants that responded to that prompt. Let B h \u2208 R T \u00d7T be the additive bias for head h, and H = 12 be the number of attention heads in each layer of GPT-2. We optimize over {B 1 , . . . , B H } to minimize the mean squared error (MSE) between P human (correct) and P model (correct), weighted by the number of subjects who responded to each prompt (N i ). W is the number of words that were prompted for at least one subject.",
+                "min",
+                "{B 1 ,...,B H } 1 W W i=1 N i P human (correct i )\u2212 P model (correct i ) 2 (2)",
+                "What form should B h take? The model is superhuman in its long-distance memory, so we sought to reduce the impact of long-distance attention by giving the model a recency bias. Much earlier work has shown that human memory tends to decay as a power law with time (Donkin and Nosofsky, 2012). A similar form of decay is also seen in mutual information between words as a function of their separation (Lin and Tegmark, 2017), and this has been previously exploited in designing efficient language models (Mahto et al., 2020). To capture this type of behavior, we parameterized B h with \u03b1 h , \u03b2 h \u2208 R:",
+                "B h = T \u22121 k=0 diag k (\u03b1 h \u2022 k \u2212 exp(\u03b2 h ) )(3)",
+                "where diag k (d) constructs a T \u00d7 T matrix that places the scalar d along the k-th diagonal below the main diagonal. Figure 4a shows an example matrix with this form. This form of B h is advantageous because the effect of \u03b1 h , \u03b2 h can be evaluated on stimuli of any form or length, including those that are non-repeating. We initialize \u03b1 h , \u03b2 h by sampling from a standard normal distribution. We optimize the attention matrix biases B h to match human data from one stimulus over 2000 epochs via gradient descent with the Adam optimizer (Kingma and Ba, 2017), and then evaluated human-model similarity with the other four stim-uli. For each training stimulus, we repeated this procedure with five initializations using different random seeds. We set the learning rate to 5 \u00d7 10 \u22123 ."
+            ],
+            "publication_ref": [
+                "b9",
+                "b17",
+                "b18"
+            ],
+            "figure_ref": [
+                "fig_3"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Optimization results",
+            "text": [
+                "Because the long-range copying behavior seems to initiate in layer 6 (Figure 3b), we began by only optimizing the attention bias for that layer.",
+                "We first examine the post-optimization timecourse of P model (correct) by averaging the held-out accuracies for a single stimulus (Figure 4b). While the model's predictions are largely unchanged in the initial presentation, performance significantly deviates toward human values in later presentations. This is summarized in Figure 4c, where the model's average performance within the later presentations is closer to humans after optimization. Importantly, this optimization procedure produces B h that generalize across stimuli because we do not fit on the human data for the held-out stimulus.",
+                "Additionally, these B h generalize within the stimulus. To measure within-stimulus generalization, we randomly selected 30% of the prompts from each presentation of the span and calculated the MSE on this subset separately from the rest of the stimulus. Figure 4d shows the training and heldout (validation) loss curves for the train stimulus, averaged across all five stimuli and five random initializations. Training loss decreases on average 52.9%, while validation loss decreases 40.4%; most of the improvement for held-out prompts occurs in the first 1000 epochs.",
+                "We next examined the effects of the layer 6 intervention on the summarized attention patterns of each layer, similar to Figure 3b. Figure 4e shows the log-ratio of post-and pre-optimization probability mass for each attention pattern, averaged across all held-out stimuli. The learned bias increases attention on the current token at the expense of all other measured patterns in layer 6, including (importantly) the induction pattern that would directly copy the correct token from a previous presentation. Even though we only intervened in layer 6, the induction pattern is weaker in all following layers, and the model is attending more to the current and recent tokens.",
+                "Finally, we repeated the entire optimization procedure independently on each layer and evaluated the change in human-LM correlation. We had hypothesized that our intervention should only work to create human-like behavior when applied to lay-ers 6-12, which contained induction heads. However, the intervention improved model-human correlation on repeated spans regardless of the layer on which optimization was performed (Figure 4f, brown line). Effects were strongest for layers 4-9, but small improvements were seen in every layer. This might suggest that induction heads are not the only important memory mechanism for this problem, or that the same effects can be achieved by modifying the inputs to induction heads.",
+                "Our results show that the recency bias intervention was effective at rescuing the divergence between human and model performance, but it is possible that this improvement comes at the cost of much worse model performance in other ways. For example, it could reduce the high correlation between human and model in scenarios lacking short-term memory, or make the model worse overall at next-word prediction. To test for the first effect, we computed the human-model correlation for the first presentation of each held-out stimulus (Figure 4f, orange line). We found that the correlation did fall, but by a much smaller amount than the correlation on subsequent presentations improved. For example, in layer 6 human-model correlation on the first presentation decreased by about 0.03, but the correlation on later presentations increased by 0.2.",
+                "We also tested whether our intervention increased LM perplexity on an unseen set of nonrepeating text from the story corpus in order to measure how general LM abilities change due to the intervention. No stories that were used for finetuning or constructing the repeating stimuli were used to measure perplexity. We computed the average perplexity for the modified and un-modified model, and reported their ratio (Figure 4f, blue line). We found that perplexity did increase due to the intervention, meaning that it generally harmed next-word prediction performance. However, the degree of increase varied substantially depending on which layer was modified, with the largest effect found in layer 6 (a more than 40% increase) and smaller effects in the earliest and latest layers (roughly 10% increase). This suggests that at least part of the model's general next-word prediction performance stems from its superhuman recall, and not its ability to mimic human cognition. Taking these three results together, we would suggest that the best layer to modify actually appears to be layer 9, which yields the largest improvement in human-model correlation with memory, a modest decline in human-model correlation without memory, and only a roughly 15% increase in overall model perplexity."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2",
+                "fig_3",
+                "fig_3",
+                "fig_3",
+                "fig_2",
+                "fig_3",
+                "fig_3",
+                "fig_3",
+                "fig_3"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusions",
+            "text": [
+                "Despite widely published results showing that human and LM prediction performance is comparable, we have found a scenario wherein humans and GPT-2 show a substantial divergence. By examining the model's attention maps for non-initial presentations, we identify specific attention heads and layers that attend across presentation boundaries to copy the next token. We finally demonstrate a procedure that augments these heads' attention maps with a recency bias, disrupting their copying behavior. The intervention reliably improves human-LM similarity across held-out stimuli in later presentations, at the cost of increased perplexity.",
+                "With the behavioral data we collected, we have used an LM to build an explicit model of human memory. Our findings here show that human memory has a stronger recency bias than GPT-2, and in the future we hope to use this model to learn more about human memory. Additionally, it suggests that attending over long distances may result in diminishing returns-an alternate form of attention may be able to exploit this phenomenon for increased efficiency.",
+                "Further work must be done to describe the change in model states during repeated presentations of a stimulus. Characterizing this experiment as a test of in-context learning (ICL), we may be able to exploit recent work (Dai et al., 2022) that suggests ICL is analogous to finetuning model weights. "
+            ],
+            "publication_ref": [
+                "b6"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Stimuli",
+            "text": [
+                "Below are the stimuli in their entirety. Bolded words are those which at least one subject is asked to predict, given the previous ten words. Presentation boundaries are marked with //, but this token is never presented to the subject or LM. Stimulus 1 (3 presentations of a 65-word span): we start to trade stories about our lives we're both from up north we're both kind of newish to the neighborhood this is in florida we both went to college not great colleges but man we graduated and i'm actually finding myself a little jealous of her because she has this really cool job washing dogs she had horses back home and she really loves // we start to trade stories about our lives we're both from up north we're both kind of newish to the neighborhood this is in florida we both went to college not great colleges but man we graduated and i'm actually finding myself a little jealous of her because she has this really cool job washing dogs she had horses back home and she really loves // we start to trade stories about our lives we're both from up north we're both kind of newish to the neighborhood this is in florida we both went to college not great colleges but man we graduated and i'm actually finding myself a little jealous of her because she has this really cool job washing dogs she had horses back home and she really loves Stimulus 2 (3 presentations of a 61-word span): get out to the hamptons and we're at this farmhouse and it was like a scene out of christopher isherwood the berlin stories all these blonde boys about ten of us running around doing push ups so that our muscles would swell and in and out of the pool and a big buffet and everything waiting for the light to change // get out to the hamptons and we're at this farmhouse and it was like a scene out of christopher isherwood the berlin stories all these blonde boys about ten of us running around doing push ups so that our muscles would swell and in and out of the pool and a big buffet and everything waiting for the light to change // get out to the hamptons and we're at this farmhouse and it was like a scene out of christopher isherwood the berlin stories all these blonde boys about ten of us running around doing push ups so that our muscles would swell and in and out of the pool and a big buffet and everything waiting for the light to change year during the seventies my four aunts would take me and my two cousins on their dream vacation a rented beach house in hyannis on the very cove sharing beachfront with the kennedy compound every day for an entire week my aunt pat would roll up her sisters' hair my aunts would apply sunscreen to the back of their necks the backs of the hands and the tops of their feet and then they would drag their beach chairs down to the beach and they would set them up perfectly not facing the water not into the sun for tanning but perfectly for spying on the kennedys // year during the seventies my four aunts would take me and my two cousins on their dream vacation a rented beach house in hyannis on the very cove sharing beachfront with the kennedy compound every day for an entire week my aunt pat would roll up her sisters' hair my aunts would apply sunscreen to the back of their necks the backs of the hands and the tops of their feet and then they would drag their beach chairs down to the beach and they would set them up perfectly not facing the water not into the sun for tanning but perfectly for spying on the kennedys pastor was this forty something british guy and he really wanted to attract twenty somethings so we were a hot commodity we were right in the demographic and we started to get promoted up into higher and higher echelons of leadership so we were invited to the leadership team meeting and then the core leadership team meeting // pastor was this forty something british guy and he really wanted to attract twenty somethings so we were a hot commodity we were right in the demographic and we started to get promoted up into higher and higher echelons of leadership so we were invited to the leadership team meeting and then the core leadership team meeting // pastor was this forty something british guy and he really wanted to attract twenty somethings so we were a hot commodity we were right in the demographic and we started to get promoted up into higher and higher echelons of leadership so we were invited to the leadership team meeting and then the core leadership team meeting // pastor was this forty something british guy and he really wanted to attract twenty somethings so we were a hot commodity we were right in the demographic and we started to get promoted up into higher and higher echelons of leadership so we were invited to the leadership team meeting and then the core leadership team meeting"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Additional GPT-2 experiments",
+            "text": [
+                "Our human-LM comparisons were limited by the amount of data we could collect from our behavioral experiment, but GPT-2 has no such limitation.",
+                "We further tested the LM on 100 random, nonphrase-aligned spans of text of different lengths (10 to 570 words, in increments of 40) from the corpus of annotated spoken narratives (LeBel et al., 2023). For each text span, we form a stimulus by repeating the span 15 times, or until the resulting text exceeds the maximum input length of the modelin this case, 1024 tokens for GPT-2.",
+                "We feed each stimulus into the model and calculate the perplexity for every token in the input. For each span length, we average the perplexity across the 100 random spans, yielding a single perplexity measure per token position. We finally average the perplexity within the tokens of each presentation."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.1 Results",
+            "text": [
+                "Figure 5 shows results for the repeated span experiment for GPT-2. GPT-2's perplexity on the initial presentation improves with longer spans. After only a few presentations, however, the perplexity for GPT-2 quickly plateaus to near-perfect performance. The model effectively memorizes the span, and has learned when to regurgitate the previously seen tokens. These results confirm the observations in Figure 2 on a significantly larger set of stimuli. For smaller spans at higher repeats, though the mean perplexity across spans remains stable with more presentations, the standard deviation increases substantially.",
+                "These results extend the findings for LMs in Figure 2 to more presentations. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4",
+                "fig_1",
+                "fig_1"
+            ],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Repetitive Reading and Recall of Expository Text",
+            "journal": "",
+            "year": "1986",
+            "authors": "Jeanne T Amlund; Anne M Kardash; Raymond W Kulhavy"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Characterizing Verbatim Short-Term Memory in Neural Language Models",
+            "journal": "",
+            "year": "2022",
+            "authors": "Kristijan Armeni; Christopher Honey; Tal Linzen"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Working memory",
+            "journal": "Science",
+            "year": "1992",
+            "authors": "Alan Baddeley"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Reaction time and short-term memory: Implications of repetition effects for the high-speed exhaustive scan hypothesis",
+            "journal": "Quarterly Journal of Experimental Psychology",
+            "year": "1973",
+            "authors": "Alan D Baddeley; Russell J Ecob"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Natural Language Processing with Python",
+            "journal": "",
+            "year": "2009",
+            "authors": "Steven Bird; Ewan Klein; Edward Loper"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Ilya Sutskever, and Dario Amodei. 2020. Language Models are Few-Shot Learners",
+            "journal": "",
+            "year": "",
+            "authors": "Tom B Brown; Benjamin Mann; Nick Ryder; Melanie Subbiah; Jared Kaplan; Prafulla Dhariwal; Arvind Neelakantan; Pranav Shyam; Girish Sastry; Amanda Askell; Sandhini Agarwal; Ariel Herbert-Voss; Gretchen Krueger; Tom Henighan; Rewon Child; Aditya Ramesh; Daniel M Ziegler; Jeffrey Wu; Clemens Winter; Christopher Hesse; Mark Chen; Eric Sigler; Mateusz Litwin"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Why Can GPT Learn In-Context? Language Models Secretly Perform Gradient Descent as Meta-Optimizers",
+            "journal": "",
+            "year": "2022",
+            "authors": "Damai Dai; Yutao Sun; Li Dong; Yaru Hao; Zhifang Sui; Furu Wei"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context",
+            "journal": "",
+            "year": "2019",
+            "authors": "Zihang Dai; Zhilin Yang; Yiming Yang; Jaime Carbonell; Quoc V Le; Ruslan Salakhutdinov"
+        },
+        {
+            "ref_id": "b8",
+            "title": "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+            "journal": "",
+            "year": "2022",
+            "authors": "Tri Dao; Daniel Y Fu; Stefano Ermon; Atri Rudra; Christopher R\u00e9"
+        },
+        {
+            "ref_id": "b9",
+            "title": "A Power-Law Model of Psychological Memory Strength in Short-and Long-Term Recognition",
+            "journal": "Psychological Science",
+            "year": "2012",
+            "authors": "Chris Donkin; Robert M Nosofsky"
+        },
+        {
+            "ref_id": "b10",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Nelson Elhage; Neel Nanda; Catherine Olsson; Tom Henighan; Nicholas Joseph; Ben Mann; Amanda Askell; Yuntao Bai; Anna Chen; Tom Conerly; Nova Dassarma"
+        },
+        {
+            "ref_id": "b11",
+            "title": "",
+            "journal": "",
+            "year": "2021",
+            "authors": "Ariel Goldstein; Zaid Zada; Eliav Buchnik; Mariano Schain; Amy Price; Bobbi Aubrey; Samuel A Nastase; Amir Feder; Dotan Emanuel; Alon Cohen; Aren Jansen; Harshvardhan Gazula; Gina Choe; Aditi Rao; Catherine Se; Colton Kim; Lora Casto; Werner Fanda; Daniel Doyle; Patricia Friedman; Lucia Dugan; Roi Melloni; Sasha Reichart;  Devore"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Automatic and controlled processing in sentence recall: The role of long-term and working memory",
+            "journal": "Journal of Memory and Language",
+            "year": "2004",
+            "authors": "Elizabeth Jefferies; Matthew A Lambon Ralph; Alan D Baddeley"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Adam: A Method for Stochastic Optimization",
+            "journal": "",
+            "year": "2017",
+            "authors": "P Diederik; Jimmy Kingma;  Ba"
+        },
+        {
+            "ref_id": "b14",
+            "title": "The effects of repetition on the short-term memory function",
+            "journal": "Psychonomic Science",
+            "year": "1965",
+            "authors": "Walter Kintsch"
+        },
+        {
+            "ref_id": "b15",
+            "title": "2023. A natural language fMRI dataset for voxelwise encoding models",
+            "journal": "Scientific Data",
+            "year": "",
+            "authors": "Amanda Lebel; Lauren Wagner; Shailee Jain; Aneesh Adhikari-Desai; Bhavin Gupta; Allyson Morgenthal; Jerry Tang; Lixiang Xu; Alexander G Huth"
+        },
+        {
+            "ref_id": "b16",
+            "title": "CoAuthor: Designing a Human-AI Collaborative Writing Dataset for Exploring Language Model Capabilities",
+            "journal": "",
+            "year": "2022",
+            "authors": "Mina Lee; Percy Liang; Qian Yang"
+        },
+        {
+            "ref_id": "b17",
+            "title": "",
+            "journal": "Critical Behavior in Physics and Probabilistic Formal Languages. Entropy",
+            "year": "2017",
+            "authors": "Henry Lin; Max Tegmark"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Multi-timescale Representation Learning in LSTM Language Models",
+            "journal": "",
+            "year": "2020",
+            "authors": "Shivangi Mahto; Ai Vy; Javier S Vo; Alexander Turek;  Huth"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Verbatim and gist recall of sentences by dyslexic and non-dyslexic adults",
+            "journal": "Dyslexia",
+            "year": "2006",
+            "authors": "T R Miles; Guillaume Thierry; Judith Roberts; Josie Schiffeldrin"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Why Does Surprisal From Larger Transformer-Based Language Models Provide a Poorer Fit to Human Reading Times?",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Doh Byung-; William Oh;  Schuler"
+        },
+        {
+            "ref_id": "b21",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Catherine Olsson; Nelson Elhage; Neel Nanda; Nicholas Joseph; Nova Dassarma; Tom Henighan; Ben Mann; Amanda Askell; Yuntao Bai; Anna Chen; Tom Conerly; Dawn Drain; Deep Ganguli; Zac Hatfield-Dodds; Danny Hernandez"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Rapid Serial Visual Presentation (RSVP): A Method for Studying Language Processing",
+            "journal": "",
+            "year": "1984",
+            "authors": "Mary C Potter"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Train Short, Test Long: Attention with Linear Biases Enables Input Length Extrapolation",
+            "journal": "",
+            "year": "2022",
+            "authors": "Ofir Press; Noah Smith; Mike Lewis"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Language Models are Unsupervised Multitask Learners",
+            "journal": "",
+            "year": "2019",
+            "authors": "Alec Radford; Jeffrey Wu; Rewon Child; David Luan; Dario Amodei; Ilya Sutskever"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Neural Machine Translation of Rare Words with Subword Units",
+            "journal": "Long Papers",
+            "year": "2016",
+            "authors": "Rico Sennrich; Barry Haddow; Alexandra Birch"
+        },
+        {
+            "ref_id": "b26",
+            "title": "OPUS-MT -Building open translation services for the World",
+            "journal": "European Association for Machine Translation",
+            "year": "2020",
+            "authors": "J\u00f6rg Tiedemann; Santhosh Thottingal"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Positive recency effect in a delayed free recall",
+            "journal": "Journal of Verbal Learning and Verbal Behavior",
+            "year": "1973",
+            "authors": "J L Ovid;  Tzeng"
+        },
+        {
+            "ref_id": "b28",
+            "title": "On the Predictive Power of Neural Language Models for Human Real-Time Comprehension Behavior",
+            "journal": "",
+            "year": "2020",
+            "authors": "Ethan Gotlieb Wilcox; Jon Gauthier; Jennifer Hu; Peng Qian; Roger Levy"
+        },
+        {
+            "ref_id": "b29",
+            "title": "An Explanation of In-context Learning as Implicit Bayesian Inference",
+            "journal": "",
+            "year": "2022",
+            "authors": "Sang Michael Xie; Aditi Raghunathan; Percy Liang; Tengyu Ma"
+        },
+        {
+            "ref_id": "b30",
+            "title": "One model for the learning of language",
+            "journal": "Proceedings of the National Academy of Sciences",
+            "year": "2022",
+            "authors": "Yuan Yang; Steven T Piantadosi"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Paradigm for collecting human next-word predictions. A span of text is presented three times without break. Each presentation of the stimulus is denoted with a different color. Subjects are shown words one-at-a-time with RSVP. When prompted to predict the next word, subjects are shown the previous 10 words and are given 10 seconds to type their prediction. After submitting a response, presentation of the stimulus resumes. If incorrect, they are first shown the correct word and must acknowledge before continuing.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure 2: Behavioral and model results. (a) Human next-word prediction accuracy for one stimulus. Prompted words are split into stop words and non-stop words using the stop word list from NLTK (Bird et al., 2009). Dotted vertical lines indicate the boundaries between presentations. (b) Human and model performance, averaged within each presentation, for three different stimuli. Stimuli 1 and 2 were presented three times, while Stimulus 5 was presented four times. Both model and human accuracy improve over presentations, but model performance improves much faster and reaches a higher level. (c) Timecourse for human (green) and model (purple) performance for the stimulus from (a).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :3Figure 3: Attention patterns. (a) Attention matrices for four heads in layer 6 for Stimulus 1 (65-word span presented 3 times). Plotted is the log-attention. Dotted gray lines indicate boundaries between presentations. Strong diagonals demonstrating induction from previous presentations are present in heads 1 and 2, but not 3 and 4. (b) Summarized attention patterns across layers. Probability mass of each category is averaged across all tokens, all heads for the given layer, and all stimuli. Induction-like attention emerges sharply at layer 6 and is present in each subsequent layer.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 4 :4Figure 4: Attention bias optimization. (a) An example bias matrix that would give the attention head a recency bias (\u03b1 h = 0.373, \u03b2 h = 0.0049). (b) Example timecourse that shows human performance (green), original model performance (purple), and post-optimization held-out model performance (pink). Error bars indicate SEM across initializations. (c) Human and model performance, averaged within presentations, for the same stimulus. (d) Average training and validation curves. The validation curve is the MSE on a randomly selected, held-out subset of the prompts of the training stimulus. Error bars show standard error of the mean (SEM) across training stimuli and initializations. (e) Change in mass of each attention category. (f) Change in correlation with human predictions and LM perplexity on unseen text. After optimization, human-model correlation increases after the first presentation of the stimulus (brown), but slightly decreases in the initial presentation (orange). Perplexity (blue), plotted here as the ratio of post-and pre-optimization performance, is hurt most in the middle layers.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 5 :5Figure 5: Model results for GPT-2. (a) shows the average perplexity for each presentation. (b) changes the x-axis to show the total number of tokens.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "waiting for the light to change",
+            "figure_data": "Presentation 1Presentation 2w e 'r ea tth isfa r m h o u s eth eli g h ttoc h a n g ew e 'r ea tth is1000 ms400 ms400 ms1.9 s400 ms10 sTime"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Stimulus 3 (3 presentations of a 52-word span): nine hours i find myself nine hours later back in the situation room looking through the glass window at the operations people hoping this works when i see people start cheering and erupting in cheers and excited and i hear alice bowman's voice over the intercom we are back on the prime // nine hours i find myself nine hours later back in the situation room looking through the glass window at the operations people hoping this works when i see people start cheering and erupting in cheers and excited and i hear alice bowman's voice over the intercom we are back on the prime // nine hours i find myself nine hours later back in the situation room looking through the glass window at the operations people hoping this works when i see people start cheering and erupting in cheers and excited and i hear alice bowman's voice over the intercom we are back on the prime Stimulus 4 (2 presentations of a 107-word span):",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "Attn(Q, K, V ) = softmax QK T \u221a d +B h V (1)",
+            "formula_coordinates": [
+                5.0,
+                313.26,
+                729.46,
+                211.88,
+                27.87
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "{B 1 ,...,B H } 1 W W i=1 N i P human (correct i )\u2212 P model (correct i ) 2 (2)",
+            "formula_coordinates": [
+                6.0,
+                86.21,
+                642.26,
+                203.66,
+                51.87
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "B h = T \u22121 k=0 diag k (\u03b1 h \u2022 k \u2212 exp(\u03b2 h ) )(3)",
+            "formula_coordinates": [
+                6.0,
+                343.68,
+                557.16,
+                181.46,
+                33.98
+            ]
+        }
+    ],
+    "doi": "10.2307/747959"
+}

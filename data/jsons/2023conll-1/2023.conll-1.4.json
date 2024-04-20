@@ -1,0 +1,1189 @@
+{
+    "title": "On the Effects of Structural Modeling for Neural Semantic Parsing",
+    "authors": "Xiang Zhang; Shizhu He; Kang Liu; Jun Zhao; Mohammad Kaiser; Clemens Bavarian; Philippe Winter; Felipe Petroski Tillet; Dave Such; Matthias Cum- Mings; Fotios Plappert; Eliza- Beth Chantzis; Ariel Barnes; William Hebgen Herbert-Voss; Alex Guss; Alex Nichol; Nikolas Paino; Jie Tezak; Igor Tang; Suchir Babuschkin; Shantanu Balaji; William Jain; Christopher Saunders; Andrew N Hesse; Jan Carr; Josh Leike; Vedant Achiam; Evan Misra; Alec Morikawa; Matthew Radford; Miles Knight; Mira Brundage; Katie Murati; Peter Mayer; Bob Welinder; Dario Mcgrew; Sam Amodei; Ilya Mccandlish; Wojciech Sutskever;  2021 Zaremba; David Chiang; Jacob Andreas; Daniel Bauer; Karl Moritz; Bevan Jones; De Gruyter; Mouton Kevin Clark; Minh-Thang Luong; Quoc V Le; Christopher D 2020 Manning;  Electra",
+    "pub_date": "",
+    "abstract": "Semantic parsing aims to map natural language sentences to predefined formal languages, such as logic forms and programming languages, as the semantic annotation. From the theoretic views of linguistic and programming language, structures play an important role in both languages, which had motivated semantic parsers since the task was proposed in the beginning. But in the neural era, semantic parsers treating both natural and formal language as sequences, such as Seq2Seq and LLMs, have got more attentions. On the other side, lots of neural progress have been made for grammar induction, which only focuses on natural languages. Although closely related in the sense of structural modeling, these techniques hadn't been jointly analyzed on the semantic parsing testbeds. To gain the better understanding on structures for semantic parsing, we design a taxonomy of structural modeling methods, and evaluate some representative techniques on semantic parsing, including both compositional and i.i.d. generalizations. In addition to the previous opinion that structures will help in general, we find that (1) structures must be designed for the specific dataset and generalization level, and ( 2) what really matters is not the structure choice of either source or target side, but the choice combination of both sides. Based on the finding, we further propose a metric that can evaluate the structure choice, which we believe can boost the automation of grammar designs for specific datasets and domains.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Semantic parsing is the task to transduce source sentences in natural languages (NL), into the target representations, which are usually artificial formal languages (FL), such as Lisp, \u03bb-calculus, and SQL. Theoretically natural languages are processed in structures (Chomsky, 2009), and the formal languages are also defined to have a context-free syntax (Linz and Rodger, 2022). Therefore inevitably semantic parsers such as the CCG-based are aware of source structures, and adopt the compositional semantics 1 of the targets. But they usually parse to \u03bb-calculus (Venant and Koller, 2019)  In the neural era, Seq2Seq based parsers add supports to any sequential languages, but they can make grammar errors despite the effectiveness. Grammar-based parsers are proposed to ensure the grammatical correctness by decoding the rule sequences of the target AST. Recently, the development of the Text-to-SQL has motivated specialized parsers to support the SQL language. But the NL structures on the source side are seldom handled and left to pretrained large models.",
+                "On the contrary, NL structures are the key issues of treebanks like PTB and supervised parsers. The grammar induction field has also invented many methods to induce grammars with restricted forms from unsupervised training data. These parsers can infer trees for new sentences, but don't process the semantic annotations obviously.",
+                "Unfortunately, no investigations had been conducted on the combination of the success of the two fields. Our research question (RQ) is thus as follows: Is structural modeling of the natural language or the formal language useful for neural semantic parsing? To answer the question, we use the encoder-decoder architecture with the attention mechanism to connect structures of two sides, due to its success of modeling token-level correlations. Our investigations are kept diverse in several important factors, such as the dataset variety, categories of structures, and generalization levels (I.I.D., compositional, or zero-shot). Under every possible combination of these factors, results are believed more faithful than single datasets (Finegan-Dollak et al., 2018).",
+                "Our evaluations add new knowledge to prior insights (Oren et al., 2020). We find it's not safe to claim the effectiveness for specific structural models for either NL or FL. The structures of NL and FL must be evaluated as a whole, and their effects even vary across datasets and generalization levels. Therefore, we make the conclusion that the combination of structural choices are more important than the structural choice on either the source or target side. The result is consistent with the one of the findings from Guo et al. (2020) in that different grammars, leading to different tree structures, have significantly different performance when keeping the same semantic representations and datasets.",
+                "These arguments in total suggest we can expect improvements from searching for better structural combinations on specific application domains. However, grammar search is not trivial but can be highly expensive. Inspired by the recent works in Large Language Models (LLMs) which can handle the code inputs well, we propose the metric, Dis-Struct, for evaluating the structural combination of the source and target sides based on the representations given by the LLMs and the optimal transport. The metric can be interpreted as the discrepancy between the specific training and testing splits under the structural choices. The metric is shown negatively correlated with the parser performance. It thus will help the automation of the grammar search theoretically.",
+                "In summary, we make three contributions as:",
+                "\u2022 We're the first to classify and compare representative structural models for neural semantic parsing, to our best knowledge.",
+                "\u2022 By evaluating the models against a few diverse testbeds, we find that structural combinations are more important than structural choice of either the natural or formal languages.",
+                "\u2022 We propose a metric of the structural combinations that is negatively correlated with the model performance which can speed up the structure searching.",
+                "2 Evaluation Framework"
+            ],
+            "publication_ref": [
+                "b41",
+                "b53",
+                "b16",
+                "b43",
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Datasets",
+            "text": [
+                "As suggested by Finegan-Dollak et al. (2018), we conduct the experiments on a variety of datasets, which are different in sizes, anonymized query amounts, nested query depths, and involved SQL table amounts. We use the ATIS, GEO, Scholar, Advising (Oren et al., 2020), COGS (Kim and Linzen, 2020), and SMCalFlow-CS (Yin et al., 2021). The selection also covers several semantic representations. eralization levels, three have been proposed for the Question Answering task, i.e., the I.I.D., compositional, and zero-shot generalization (Gu et al., 2021). For semantic parsing, usually only the first two levels are considered. The I.I. "
+            ],
+            "publication_ref": [
+                "b16",
+                "b43",
+                "b32",
+                "b64",
+                "b22"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Problem Formalization",
+            "text": [
+                "We are focusing on encoder-decoder models to map a source sentence X into the target formal language Y . Basic forms of X, Y are provided as linear sequences, i.e. X = (x 1 , x 2 , . . . , x n ) and Y = (y 1 , y 2 , . . . , y m ), where each x i and y j are tokens.",
+                "Trees of source and target sides are denoted as S, T with respectively X and Y as their leaf nodes. For both S, T , three structural choices are available: absent, latent, and given. An absent structure is a pure sequence. Latent structure means the tree is not observed and jointly learned from the training data. Given structures rely on external parsers. The combination of choices of S, T yields a total of 9 probabilistic models as in Table 2. Note we only consider the deterministic parsers instead of the generative ones. The models must predict at least one variable of the target side, given at least one variable of the source side. We've noticed several works using generative grammars (Qiu et al., 2021;Kim, 2021;Shaw et al., 2021) based on the notions of synchronized and quasisynchronized CFGs. Due to the prevalence of deterministic semantic parsers, we leave generative models in the future work."
+            ],
+            "publication_ref": [
+                "b46",
+                "b33"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3"
+            ]
+        },
+        {
+            "heading": "Selected Structural Models",
+            "text": [
+                "We briefly list the concrete models for structural choices in Table 3. The implementations and hyperparameters are left in the Appendix. Referring the original papers is also recommended for details.  Among the S choices, PnP gives a latent dependency tree, while others including the Berkeley Parser (Kitaev et al., 2019;Kitaev and Klein, 2018) produce constituency trees. For the T choices, all methods are focusing on constituency trees because formal languages have been defined with CFGs."
+            ],
+            "publication_ref": [
+                "b36",
+                "b37"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "S Model",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Absent",
+            "text": [
+                "Note if T is given, we manually construct the grammar for COGS and SMCalFlow-CS, and use the grammar induced by Oren et al. (2020) for other datasets 3 . We use a parser generator to load grammars and follow the grammar-based parsing (Krishnamurthy et al., 2017;Yin and Neubig, 2018) to use LSTM to model the production rule sequence."
+            ],
+            "publication_ref": [
+                "b43",
+                "b38",
+                "b66"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation Method",
+            "text": [
+                "We use the Exact Match (EM) to measure accuracies. For absent and latent T choices, the generation target must be the same tokens as Y . When the oracle T is given, the model must similarly generate the same rule sequences of that T .",
+                "We have to report the aggregated results because the experiment number is proportional to #datasets \u00d7 #generalization-levels \u00d7 #S-models \u00d7 #T -models \u00d7 #random-seeds 4 . The merit of results aggregation is its robustness. For example, once we find the ON-LSTM as the decoder useful, it is expected to generalize and work well under a variety of settings. Winning or losing on one setting is not critical.",
+                "For analysis, we assign each experiment result with factor labels, and the results will be aggregated under the perspective of factors. The factors we considered are representation types, S-choices, T-choices, and syntactic tree types. For example, when focusing on T-choices, we can compare accuracies of the 3 labels on a specific dataset and split. Each number is mean-aggregated over all S models, like the \"GROUP BY\" in SQL. The aggregation view will help us focus on what we're interested in and not get lost in enormous results."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results Analysis",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Lateral Structural Modeling",
+            "text": [
+                "We first focus on aggregations for single factors on compositional generalization (CG). Each factor label corresponds to aggregated accuracies on 9 datasets, which are plotted as a single box.  Figure 2 shows the absent S structure outperforms others, followed with given S then the latent. The constituency trees are also better than dependency trees. On the target side, the latent T is on a par with absent T , beating the given T by a large margin. Results on both sides suggest no structural bias is the best choice. Furthermore, when we zoom in the aggregation as in Figure 3, it's clearly the low performance of the latent S is caused by many poor latent models. Incredibly, among the latent S, the ON-LSTM works even as well as the Electra, and only falls behind BERT perhaps due to the parameter scales.",
+                "Takeaway Structural modeling CAN be useful. But finding a good discrete structure is not trivial. While handcrafted grammars of formal languages can be harmful, supervised parsers for natural languages are not that bad. Overall, a latent structural bias like ON-LSTM is the most promising. We further analyze results of each S and T choice combination in Figure 4. The accuracy relations are similar to the S and T choices in Figure 2, with a few exceptions. First, when T structure is given, there's not much difference between the given and latent S choices. Therefore, the handcrafted grammars (the given T) are proven poor such that no trivial structural bias for the NL can be found to cooperate with it. Only with absent S structures can the performance be improved at this time. Second, when S is the latent dependency tree, the latent T is the worst, contrary to the right boxplot in Fig- ure 2. This suggests that a latent dependency tree for S and a latent constituency tree for T are not compatible."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0",
+                "fig_1",
+                "fig_2",
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Combinations of Source and Target",
+            "text": [
+                "Takeaway Some incompatible combinations of the source and target choices of structural biases can lead to a performance below the average of any choice on its own."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Latent Source Structures",
+            "text": [
+                "Section 3.1 shows that there're big discrepancies among the latent S models. We first compare the PCFGs in Figure 5. The Compound PCFG (Kim et al., 2019a) and TD-PCFG (Yang et al., 2021) are chosen as two basic PCFG variants. In addition, we build a reduced version for each of them by summing out the non-terminals at each cell in the parsing chart with a learnt prior, such that the cell will only store the representation of a span, instead of the representations of a span of every possible non-terminal. This trick can reduce the chart size from O(n 2 K) to O(n 2 ), where K is the number of nonterminals. Appendix A lists more details. In general, the full rank C-PCFG performs better than its counterpart TD-PCFG with decomposed and less parameters. The reduced PCFGs can also outperform the basic ones. With latent and given T choices the C-PCFG works also well, but is not as good as the reduced version. This suggests a less constrained structural bias like the reduced PCFGs not storing non-terminals in the chart can be much better than the fully-fledged PCFGs. We therefore only evaluates the reduced PCFGs on other datasets because they have higher accuracies and less memory consumption.",
+                "Figure 6 shows only the performance of latent S models against different T choices. The ON-LSTM clearly beats other encoders, followed by  the DIORA encoder. Altogether with the Figure 5, we can make some interesting conclusions. First, by summing out non-terminals, reduced PCFGs have outperformed the basic models. Then, the DIORA discards non-terminals in its parameterization, and only considers compositions over spans with a chart-based parsing and an inside-outside algorithm. And it has beaten the PCFGs, Finally, the ON-LSTM which does not forcing syntactic trees being of Chomsky Normal Form, has achieved the best performance.",
+                "Takeaway Latent structural biases with less constraints would be better choices. Enforcing syntactic categories may not be suitable for neural semantic parsing."
+            ],
+            "publication_ref": [
+                "b34",
+                "b62"
+            ],
+            "figure_ref": [
+                "fig_3",
+                "fig_4",
+                "fig_3"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Differences between Accuracies",
+            "text": [
+                "The above findings tell us we have to find the compatible structural biases in general. In this section we compare the structural choices among different datasets. We focusing on the T choices and do not aggregate results of datasets and S choices. Specifically, we subtract the number of absent and latent T accuracies with the number of given T accuracies. As long as the differences are positive, the absent and latent T will be considered outperforming the given T that is constructed from handcrafted grammars. For the latent T, we only consider the best 3 models from previous analysis, i.e., the ON-LSTM, DIORA, and PnP. We consider both the I.I.D. and compositional generalizations, as shown in Figure 7.",
+                "The most intuitive result in Figure 7 is that among various datasets the given T is not consistently bad. On the SMCalFlow, the given T is outperformed by the absent and latent T , but the margins are not that large on other datasets in the  I.I.D. setting. For the compositional generalization (the lower subfigure), we can even see the given T has not been outperformed on ATIS and GEO, but is poor on Advising and Scholar. Moreover, on the same dataset like ATIS and GEO, the handcrafted grammar is harmful on I.I.D. but useful on C.G. Also, the results on T choices are slightly different under different S choices, which again supports the compatibility argument in previous sections.",
+                "Takeaway Grammars of the formal languages can't be simply classified as useful or not. There must be an optimal grammar, depending on the datasets and generalization levels."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_5",
+                "fig_5"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Discussions",
+            "text": [
+                "After analyzing the structural modeling methods in different views, we're trying to answer our basic research question (RQ) based on the findings to make the answers and even the question itself much clearer. RQ: Is structural modeling of the natural language or the formal language useful for neural semantic parsing? Yes AND no. It depends on the models. In general we find that models with-out structures (BERT) and with latent structures (ON-LSTM) are better for the natural language, but other structures are not useful. Specifically, the ON-LSTM is even better than the finetuned Electra as the encoder. For the formal languages, we find the latent structural model (ON-LSTM) is much better, but the handcrafted grammar-based decoding is poor (Section 3.1).",
+                "Why are the structural models that different? We hypothesize that the differences are rooted in the strictness of structural constraints of the models. For constituency trees, we find the more structural restrictions required by the model, the worse performance it would be (Section 3.3). Among these models, ON-LSTM neither differentiates syntactic categories, nor requires the Chomsky Norm Form tree, and has outperformed other models.",
+                "Since the ON-LSTM is proven effective, can we use it all the time? No. We're not recommending ON-LSTM for all situations. Because the compatibility of structural choices is more important. If the encoder is a structural model based on dependency trees, the ON-LSTM decoder will not perform well neither. What is really crucial is the encoder-decoder choices combined as a whole (Section 3.2).",
+                "Shall we use the best combination, the ON-LSTM for both the encoder and decoder? Not always. We further find the same structural combination could be not the same effective on all datasets and all generalization levels (Section 3.4). On the GEO with the compositional generalization, ON-LSTM performs worse than handcrafted grammars. In fact, the absent T can be seen a special structure, the right-branching tree with autoregressive decoders like RNNs. For example, an SQL query sequence is equivalent to the tree like (SELECT (* (FROM (tableA (WHERE (...))))). Therefore, the question is in fact asking what kind of trees are better, for the natural and formal languages, combined as a whole, under a specific dataset and a generalization level. We're going to handle this in Section 4. But, if the datasets and generalizations are not our concerns, the BERT or ON-LSTM as the encoder with the ON-LSTM decoder is recommended according to the above findings."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Metric for Structural Evaluation",
+            "text": [
+                "Taking sequences as the right-branching trees, the models we've discussed can all parse an example (x, y) to its structures (s(x), t(y)). But the gener-alization performance is not only determined by some smart structural choices. It also depends on the dataset and the generalization level. However, it's expensive to manually design good structures, or to optimize a parameterized structural policy. Because on one hand we have to train and then evaluate a parser every time we need to confirm the effectiveness of that policy. On the other hand, even a parser jointly learning mappings and latent structures may work poorly according to above findings.",
+                "Inspired by the recent success on large language models (LLMs) (Sun et al., 2022) such as the Codex (Chen et al., 2021) which can read and write programming source codes well, we propose a learning-free metric for the structures based on the representations generated by LLMs, such that it's correlated with the performance.",
+                "Specifically, to evaluate a pair of structural models (s, t) for a dataset D = (x, y) i , we first define the distance between a parallel sequence (x, y), e x , e y =LLM (x), LLM (y)",
+                "(1) e s , e t =f (s(x), e x ), f (t(y), e y )",
+                "(2)",
+                "d s,t,D =E (x,y)\u2208D [emd(u s , u t , cost(e s , e t ))] (3)",
+                "where e x \u2208 R n\u00d7k , e y \u2208 R m\u00d7k are the kdimensional representations generated by some LLM that can understand both natural and formal languages, s(\u2022), t(\u2022) are the parsers or policies that output tree structures for x, y, and the f computes the representation of each tree node. We define the leaf nodes have the same representations in e x , e y , and internal nodes get their representations by mean-pooling of its children nodes. u s \u2208 R l and u t \u2208 R r are discrete uniform distributions, where l, r are node numbers of s(x), t(y) respectively. The emd function returns the Earth Moving Distance (Peyr\u00e9 et al., 2019) of u s , u t under the cost matrix defined by euclidean distances of e s , e t . d s,t,D is the minimal transport cost from X to Y for the entire dataset D. We utilize the POT toolbox (Flamary et al., 2021) to compute the optimal transport. Then given the training and testing sets D train , D test , the DisStruct metric is defined as",
+                "M (s, t) = |E[d s,t,D train ] \u2212 E[d s,t,Dtest ]| \u03c3[d s,t,D train ]\u03c3[d s,t,Dtest ](4)",
+                "where the expectation E and standard deviation \u03c3 are implemented by re-running with a few random seeds. In our evaluation, we sample 50 examples for the expectation in Eq.( 3), and rerun 10 times for Eq.( 4). Intuitively, given structural choices (s, t), the DisStruct evaluates the distances of x and y of a single example, and computes the distance discrepancies between D train , D test . Therefore, we can expect higher performance by finding lower metric values from some (s, t) pair. Figure 8 illustrates the correlations. Although every (s, t) can yield a metric value, we plot only two kinds of pairs (absent, absent) and (absent, given) and investigate whether the metric can tell apart the differences between the grammar-based and the sequence-based structures. With three recent LLMs 5 that we can load with less than 24GB GPU, the metrics are shown all negatively correlated with the performance as expected.",
+                "Since each fitted linear model has a low R 2 value (i.e., plots far from the fitted line), we examine the results by datasets. As long as the metric can indicate performance for datasets, it'll be possible to probe or search structural choices for a specific dataset we're interested in. For each dataset under a generalization level, we only have 2 points. We computed the slope of the line determined by the two points, and plot the histogram of the slopes in Figure 9. Hopefully, the slopes are negative at more than 50% times, and are also relatively small even it's positive. We also find the metrics based on ChatGLM-6B and Falcon-7B are more ideal than Baichuan-7B."
+            ],
+            "publication_ref": [
+                "b51",
+                "b42",
+                "b45"
+            ],
+            "figure_ref": [
+                "fig_6",
+                "fig_7"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Works",
+            "text": [
+                "Many representations have been used for semantic parsing. Popular representations include semantic roles, FOL or \u03bb-calculus (Zettlemoyer andCollins, 2005, 2007;Wong and Mooney, 2007), \u03bb-DCS (Liang et al., 2013), FunQL (Kate et al., 2005;Guo et al., 2020), application-specialized query graphs (Yih et al., 2015;Chen et al., 2018;Hu et al., 2018), and programming languages like SQL (Xu et al., 2018), Java (Iyer et al., 2018;Alon et al., 2020), and Python (Yin and Neubig, 2017;Rabinovich et al., 2017). Linguists also design meaning representations such as AMR (Banarescu et al., 2013), ERS (Flickinger et al., 2014), and UMR (Van Gysel et al., 2021). Abend and Rappoport (2017) had reviewed many semantic representations in a linguistic-centric perspective, and Li et al. (2022) had proposed a metric to evaluate different representations. Our discussions are not at representation level (only the lispress, \u03bb-calculus, and SQL are used), but on structure effects under maybe a fixed representation. Classic semantic parsers used to assign categories to linguistic or semantic fragments, and com-pose them in a bottom-up fashion. Some typical implementations are based on CCG (Zettlemoyer and Collins, 2005), SCFG (Wong andMooney, 2006), Hyperedge Replacement Grammar (Chiang et al., 2013), and AM Algebra (Groschwitz et al., 2017(Groschwitz et al., , 2018;;Wei\u00dfenhorn et al., 2022). Other parsers do not define linguistic categories, but use feature engineering or types to guide composing algorithms (Liang et al., 2013;Pasupat and Liang, 2015).",
+                "Neural parsers like Seq2Seq (Xiao et al., 2016) adopt end-to-end mappings but can make grammar errors. Seq2Tree (Dong and Lapata, 2016) is then proposed to generate grammatically valid trees for untyped \u03bb-calculus. Grammar-based decoding (Krishnamurthy et al., 2017;Yin and Neubig, 2018) turns to generate rule sequences converted from the target AST. Some parsers design intermediate patterns for an easier abstraction over the targets (Zhang et al., 2017;Dong and Lapata, 2018;Guo et al., 2019;Ding et al., 2019;Iyer et al., 2019;Choi et al., 2021;Chen et al., 2020). The abstraction layer can be seen as handcrafted structures for the targets. We only consider CFG-based structures due to their generality. Similarly, graph-based targets and parsers are also beyond our discussing. LLMs as semantic parsers (Qiu et al., 2022;Zhuo et al., 2023) are found not performing well on the COGS dataset before structural discussions. We leave some results and discussions in Appendix C.",
+                "Recently the compositional generalization has attracted much focus (Jambor and Bahdanau, 2022;Liu et al., 2021;Herzig and Berant, 2021). But they either devise special parsers other than the encoder-decoder architecture, or handle representations like FunQL, therefore not direct applicable to other general parsers. Zheng and Lapata (2022) reports the entanglement problem where Seq2Seq models entangle irrelevant semantic factors during generation. Yin et al. (2021) induces token and span level alignments. Our structural discussions are orthogonal to their model improving works."
+            ],
+            "publication_ref": [
+                "b58",
+                "b40",
+                "b23",
+                "b63",
+                "b5",
+                "b26",
+                "b61",
+                "b28",
+                "b2",
+                "b65",
+                "b48",
+                "b3",
+                "b19",
+                "b0",
+                "b39",
+                "b68",
+                "b20",
+                "b21",
+                "b55",
+                "b40",
+                "b44",
+                "b60",
+                "b10",
+                "b38",
+                "b66",
+                "b69",
+                "b11",
+                "b24",
+                "b9",
+                "b27",
+                "b4",
+                "b29",
+                "b42",
+                "b25",
+                "b70",
+                "b64"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "By evaluations on a variety of settings, we find the structural modeling is not guaranteed to give better performance. We conclude that structural biases for sources and targets must be chosen as a whole, and that choices also depend on the specific dataset and generalization level. We propose the DisStruct metric to facilitate structure finding, which is negatively correlated with the performance."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "We've discussed a variety of structural models, but may lack the tuning of hyperparameters for each model to work at its best. For example, the number of nonterminals and preterminals are important for PCFGs, but we use a small number compared with the grammar induction task on PTB due to our small dataset size. Also, it is a reasonable guess that BERT and ELECTRA as encoders are inferior than large language models such as T5, Falcon, and ChatGPT. We have not conduct experiments on datasets simply because of limited computation resources. Also we note that LLMs can be used as the decoder-only models, and generate targets via in-context learning or zero-shot prompts. We left the results in the Appendix C because structural models or representations we concerning are not involved in the paradigm.",
+                "Furthermore, our study is all English-based datasets. Considering the large differences between language families, the structure model of constituency and dependency trees in our study may have different effects. Universal structures such as the Universal Dependencies (de Marneffe et al., 2021) may be considered for future research.",
+                "Finally, DIORA and PCFGs in our study require approximately 4 times more GPU memories than other encoders (excluding the BERT and ELEC-TRA of course). This may be caused by the CKYstyle computation which is O(n 3 s 2 ) in time where n is the sentence length and s is the number of syntactic categories. This will leads to more GPU consumption to compute the tensor graph. We're also wondering if a sample-based learning algorithm could work instead of the inside algorithm."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethics Statement",
+            "text": [
+                "Since our study is objective, we have reviewed our datasets. The contents of the datasets are publicly available for years and obtainable without checking the membership of any group. In addition, some datasets had adopted careful preprocessing such as anonymization which replaced real-world entity names with placeholders. The dependent code resources are managed in public repositories. And so will ours. So far we believe our work does not have ethical concerns.",
+                "Terry Yue Zhuo, Zhuang Li, Yujin Huang, Fatemeh Shiri, Weiqing Wang, Gholamreza Haffari, and Yuan-Fang Li. 2023. On robustness of prompt-based semantic parsing with large pre-trained language model: An empirical study on codex. In Proceedings of the 17th Conference of the European Chapter of the Association for Computational Linguistics, pages 1090-1102, Dubrovnik, Croatia. Association for Computational Linguistics."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Structure Modeling",
+            "text": [
+                "We'll make extensions for Seq2Seq models. In the classical Seq2Seq, the encoder module is in charge of encoding source input X = {x i } n i=1 and prepares for the attention mechanism a memory H = {h i } n i=1 of states, where each h i are usually aligned to each input token x i . The decoder is obliged to generate tokens Y = {y j } m j=1 by referring the memory H for each y j . The last state h n in memory is usually chosen to initialize autoregressive decoders. We will explain how H is constructed for encoders, and how Y is chosen for decoders."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1 Encoders",
+            "text": [
+                "If the source structure is Absent, we take the input X as a plain sequence and choose the BiLSTM as the encoder. Due to their impressive performance, we also use the BERT (Devlin et al., 2019) and ELECTRA (Clark et al., 2020) language models from the Transformers library (Wolf et al., 2020). The encoder memory H is then the encoder outputs of each word in X.",
+                "If the source structure is Given, we use Berkeley Parser to get the constituency tree T of X. After removing the POS tags, T consists of words x i as leaf nodes and the syntactic categories as internal nodes, such as NP, PP, and WHNP. We use twolayer GCN to encode nodes following the structure, and collect all the node hidden states as the attention memory H.",
+                "For latent structures, we choose representative grammar induction methods, namely ONL-STM (Shen et al., 2019), DIORA (Drozdov et al., 2019), PCFGs (Kim et al., 2019a;Yang et al., 2021), and Perturb-and-Parse (Corro and Titov, 2019b) Both constituency and dependency trees are considered. And most latent structures are learnt in two ways, by relaxation or sampling (Wu, 2022), where the former is usually optimized by maximizing the marginal probability of X as Eq.5, and the latter is optimized by sampling a structure S and passing to the downstream decoders (Eq.6). max \u03b8 P \u03b8 (X) = S P \u03b8 (S, X)",
+                "(5)",
+                "max \u03b8 P \u03b8 (Y | X) = E S\u2208P (S|X) P (Y | S, X) (6)",
+                "To wrap these up, the Perturb-and-Parse will give a sampling-based dependency trees, while others are the relaxation-based constituency trees.",
+                "ONLSTM Specifically, ONLSTM 6 shares the interface with classical RNNs, and invents the ordered neuron that can be interpreted as hierarchical structures. So we use it just as the replacement for BiLSTM. The memory H is also the states of sequence X, and the optimization only uses gradients from the decoders.",
+                "DIORA DIORA 7 aims to learn latent binary trees following the inside-outside algorithm. Embeddings of X are composed bottom-up for filling the inside chart with inside states. The composition c ijk of two sub-span states h(x i:j ) and h(x j:k ) is parameterized by an MLP f h . Every possible composition is scored with another MLP f s . As DIORA falls into the relaxation-based category, each span state is a summation (Eq. 7) of all possible compositions with the normalized scores (Eq. 8).",
+                "h in (x i:k ) = j s ik j f h h in (x i:j ), h in (x j:k ) (7)",
+                "s ik j = sof tmax f s h in (x i:j ), h in (x j:k ) j (8)",
+                "where sof tmax(\u2022) j means the j-th normalized score after the softmax function. Similarly, the outside pass will fill the outside chart to given any span x j:k an outside state h out (x i:k ), which is composed by each possible parent and sibling span and summed up with the normalized score. The outside composer and scorer are different MLPs. The attention memory H for DIORA encoders is full of representations of X, where each word is represented by the concatenation of inside and outside states as",
+                "h i = [h in (x i:i+1 ); h out (x i:i+1 )],",
+                "where the inside state of one-word spans h(x i:i+1 ) are actually the word embeddings. Note that DIORA comes up with its own training objective, which maximizes the reconstruction probabilities from each one-word span as Eq.9.",
+                "max \u03b8 L diora = i log P \u03b8 (x i |h out (x i:i+1 )) (9)",
+                "PCFGs Two notable modern PCFGs 8 are C-PCFG (Kim et al., 2019a) and TD-PCFG (Yang et al., 2021). Rules are restricted to Chomsky normal form, including S \u2192 A, A \u2192 BC, and P \u2192 x, where S is the fixed start token, A is a nonterminal, P generating a single terminal word x is called a preterminal, and B, C can be either nonterminal or preterminal. Embeddings and neural networks are used to parameterize the rule distributions as \u03c0 S\u2192A , \u03c0 P \u2192x , \u03c0 A\u2192BC . C-PCFG adopted a novel variational model to infer a global state z of X, and let the neural nets predict \u03c0 by concatenation z to each symbol embeddings. We use BiLSTM for the variational model. And TD-PCFG decomposed the large tensor of \u03c0 A\u2192BC into the sum of products of lower rank tensors, largely extending the number of nonterminals and preterminals.",
+                "To use PCFGs as encoders, we first build up the PCFG models on the source sequence X. Since C-PCFG is built with a variational inference model, the loss involves a reconstruction loss as Eq.5 and a KL divergence. The former with a summation can be computed efficiently by the inside algorithm, and the latter is easy to obtain because the prior of z is kept Gaussian.",
+                "We choose to include all the span representations h i:k in the attention memory H. The representations are computed similar to the bottom-up inside algorithm. The algorithm fills an inside chart with probability scores s ikA . = P (x i:k | A) for every span x i:k with each nonterminal A.",
+                "s ikA = B C j w ijkABC(10)",
+                "w ijkABC = \u03c0 A\u2192BC \u2022 s ijB \u2022 s jkA(11)",
+                "Similarly, the span representation h i:k is also a weighted sum (Eq.12) of all h ijkABC , which means the compositional representation for span x i:k as the category A, split at the point j, with left and right sub-spans being categories B and C.",
+                "h i:k = A,B,C,j h ijkABC \u2022 w ijkABC \u2022 \u03c0 s (A) (12)",
+                "8 https://github.com/sustcsonglin/TN-PCFG Note that we uses \u03c0 s , s \u2208 N as a prior to sum over A, which can be interpreted as treating the span x i:k as a valid sentence.",
+                "To compute compositions of span h i:j and h j:k , Instead of concatenating embeddings of A, B, C, h i:j , h j:k and transforming with an MLP, we factorize the computation of h ijkABC with different MLPs to avoid broadcasting to the unrelated dimensions as Eq.13.",
+                "h ijkABC = f h (A) + f ls (B) + f rs (C) + f l (h i:j ) + f r (h j:k )(13)",
+                "Note that we can rearrange Eq.12 and Eq.13 jointly to save up space, by moving items together and summing out irrelevant dimensions in advance. And for TD-PCFG which decomposes the tensor",
+                "\u03c0 A\u2192BC = l u l A \u2022 v l B \u2022 w l C",
+                ", the similar form of Eq.12 and Eq.13 and the efficiency trick can also be adopted. Formulae related to TD-PCFG are omitted here to save up space.",
+                "Perturb-and-Parse The model (abbr. PnP) focuses on sampling trees from the distribution of dependency structures. Words embeddings e(X) \u2208 R n\u00d7d of X \u2208 R n are transformed to arc weights as Eq. 14, from which the Eisner's algorithm (Eisner, 1996) infers the tree S. The gumbel-softmax trick is adopted for differentiable sampling (Eq.15), and the argmax operation in Eisner's algorithm is replaced with the softmax following Corro and Titov (2019a). In this way, during training the output of Eisner's algorithm is not yet a valid but soft dependency tree, indicating the probabilities that there's an arc between two words x i and x j . But we switch to the default argmax during testing.",
+                "W = f head (e(X)) \u2022 f tail (e(X)) T (14) Z \u223c G(0, 1) (15) S = Eisner(W + Z)(16)",
+                "After the source tree S is inferred, we use two GCN layers to pass messages among nodes following the structures, where each node is a word in X. We use all the node representations to build the attention memory H. The PnP model is simply trained with the downstream tasks (Corro and Titov, 2019b)."
+            ],
+            "publication_ref": [
+                "b8",
+                "b56",
+                "b50",
+                "b12",
+                "b34",
+                "b62",
+                "b59",
+                "b34",
+                "b62",
+                "b15"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.2 Decoders",
+            "text": [
+                "If the target structure is Absent, we simply model it with an LSTM. And we do not use any pretrained language model as the decoder. For datasets with very long targets and slow for training, such as I.I.D. setting, we find this performance not acceptable. We have sampled and analyzed the errors of ChatGLM, and there're some typical errors, such as (1) missing declarations of a variable; (2) output too long sequences which can be over ten times than the gold target;",
+                "(3) inventing undefined the neo-davidsonian predicates; (4) misunderstanding the passive and active roles. We hypothesize that LLMs must be finetuned on these unseen representations like neo-davidsonian \u03bb-calculus. And at least there're still much study to do before discussing the structural biases for LLMs."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "D Accuracies for Model Combinations",
+            "text": [
+                "We list the complete accuracies for each encoder and decoder combinations in Table 5 and Table 6.",
+                "For the encoders, rcpcfg and rtdpcfg are the reduced version of C-PCFG and TD-PCFG respectively. The pnp is the Perturb-and-Parse model. The syn-parser is the supervised Berkeley Parser with a GCN to encode. For the decoders, the seq denotes an LSTM as the decoder, and the prod denotes the grammar-based decoding of rule sequences modeled by an LSTM. Please refer to Appendix A and Section 2 for an introduction. We've defined several S and T choices. For encoders, the bilstm, bert, and electra are absent S. The ON-LSTM, DIORA, R-C-PCFG, R-TD-PCFG, and PnP are latent S. And only the synparser belongs to given S. For decoders, the seq, ON-LSTM, and prod represent the absent, latent, and given T, respectively."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_9",
+                "tab_10"
+            ]
+        },
+        {
+            "heading": "E EBNF Grammar for SQL",
+            "text": [
+                "For grammar-based decoding, AST parses of SQLs are required. We use the Lark Python package which is a parser generator like the classical flex and bison. We use the grammar induced by Oren et al. (2020) and manually convert it to the Lark format, which is an implementation of EBNF. Other grammars from MySQL and SQLite are not used in this work.",
+                "The lexer definitions we use are as follows. "
+            ],
+            "publication_ref": [
+                "b43"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgements",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "",
+            "text": [
+                "the ATIS and Advising, we use the Transformer decoder instead of LSTM.",
+                "For latent target structures, we only use ONL-STM as the source side because it shares the same interface with RNNs. Other extensive works are not tested, because the SQLs are usually much longer than the natural language, and the grammar induction works are seldom evaluated on such long sentences (Drozdov et al., 2019). Furthermore, semantic representations are born with well-defined structures, it's not intuitive to learn latent structures from data.",
+                "For target structures that are given, we use the grammar induced by Oren et al. (2020) as discussed in Section 2. We manually convert the grammar into ENBF form and use the parser generator Lark to parse SQLs in the dataset. After that, we follow the order of left-most derivation to traverse the AST parses of SQLs as in TranX (Yin and Neubig, 2018), and the rule sequences are modeled by an LSTM. We denoted this method as Grammar-based Decoders as Oren et al. (2020).",
+                "Although the models above are enough to fulfill the taxonomy in Section 2, we've also tried but failed to use C-PCFG and RNNG (Dyer et al., 2016) as decoders. The generative RNNG is such expressive that make SQL grammar errors often, like a WHERE clause followed by another. URNNG (Kim et al., 2019b) requires an external (UCB Parser specifically) inference model to constrain the expressive power of RNNG. For C-PCFG, we hypothesize lacking of attention mechanism is crucial. We hypothesize the execution guided decoding might be helpful and necessary, but it's beyond our discussion in structures."
+            ],
+            "publication_ref": [
+                "b12",
+                "b43",
+                "b66",
+                "b43",
+                "b14",
+                "b35"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Experiment Hyperparameters",
+            "text": [
+                "We explain the details of models and hyperparameters here. We use the same setting for all datasets, and keep most parameters the same across models.",
+                "For hyperparameters applicable to all models, we use AdaBelief optimizer (Zhuang et al., 2020), and set the learning rate to 1e-3, and betas to 0.9 and 0.999. We do not use weight decays for all models. We fix the batch size to 16. The learning rate scheduler is based on NoamLR from the Al-lenNLP package, with the model size set to 400 and warmup steps to 50. We use the pretrained GloVe embeddings of 100 dimensions for the source side. For BERT hyperparameters, the learning rate is set 1e-5 and no LR schedulers.  We set the encoder hidden size to 300 for most models, except 150 for Diora and PnP, and 200 for PCFGs and Tree encoders. Sequence encoders and the inference model of C-PCFG are bidirectional (BiLSTM and ONLSTM). All encoders are 1-layer except the 2-layer GCN used for Tree and PnP encoders. Decoder is fixed to LSTM but Transformer for PCFGs/BERT/Electra. LSTM decoder is 1-layer and the hidden size is 200 for PCFGs models and 300 for others.The attention scores are computed by dot products. Transformer decoders are 2-layers and uses 300 for hidden size, and 10 for attention heads. All encoder dropout is 0 and decoder dropout is 0.5.",
+                "Training on GEO and Scholar uses 150 epochs for PCFGs and Tree encoders, 300 for tree encoders and 400 for others. All models trained for ATIS and Advising uses 30 epochs. On COGS and SMCalFlow-CS datasets, the models are trained for 15 epoches because of the large size. In practice, most models are trained in 4 to 12 hours, with an Xeon E5-2680 CPU and a single GeForce RTX 3090 GPU."
+            ],
+            "publication_ref": [
+                "b71"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Few-shot Parsing with LLMs",
+            "text": [
+                "We just use the LLMs on the I.I.D. generalization of COGS dataset. We first build an index on the natural language of the training set, and then search for the closest 10 examples (x \u2032 , y \u2032 ), with each testing x. The prompt is typically built as \"Input: x \u2032 . Output: y \u2032 .\" for each example (x \u2032 , y \u2032 ), appended by the testing example as \"Input: x. Output:\". In this way we're trying to utilize the in-context learning ability of LLMs for semantic parsing. and the accuracy is evaluated by Exact Match (EM) of the outputs against the gold targets. However, the performance is not ideal.",
+                "The lower two LLMs with the similar scale even have a pretty much performance difference. Note a plain Seq2Seq model can generalize well in the The parser definitions are as follows. We put values in the grammar definition follow-ing Oren et al. (2020). This good enough for our usage. Note in a formal SQL grammar, the values for entities, tables, and columns are usually included in the lexer definition and defined with regular expressions. We leave the other definitions in our code release because it's too long (hundreds of lines), including the nonterminals of value, COL_ALIAS, SUBQ_ALIAS, TABLE_NAME, and COLUMN_NAME."
+            ],
+            "publication_ref": [
+                "b43"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "F EBNF Grammar for COGS",
+            "text": [
+                "We list our handcrafted grammar for COGS here. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "G EBNF Grammar for Lispress",
+            "text": [
+                "We list our handcrafted grammar for SMCalFlow-CS, which uses the Lispress language. Although the Lispress has an official parser in Python, we still use a handcrafted grammar for consistency with our work.",
+                "VALID_CHAR: /[a-zA-Z\\d\\\"\\#\\(\\)\\+/ | /\\.\\:\\<\\>\\=\\?\\[\\]\\~]/ QUOTE: \"\\\"\" LPAR: \"(\" RPAR: \")\" LBRA: \"[\" RBRA: \"]\" COLON: \":\" DOT: \".\" LET: \"let\" DO: \"do\" META: \"^\" MACRO: \"#\" "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "The state of the art in semantic representation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2017",
+            "authors": "Omri Abend; Ari Rappoport"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Badreddine Noune, Baptiste Pannier, and Guilherme Penedo. 2023. Falcon-40B: an open large language model with state-of-the-art performance",
+            "journal": "",
+            "year": "",
+            "authors": "Ebtesam Almazrouei; Hamza Alobeidli; Abdulaziz Alshamsi; Alessandro Cappelli; Ruxandra Cojocaru; Merouane Debbah; Etienne Goffinet"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Structural language models of code",
+            "journal": "PMLR",
+            "year": "2020",
+            "authors": "Uri Alon; Roy Sadaka; Omer Levy; Eran Yahav"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Abstract Meaning Representation for sembanking",
+            "journal": "Association for Computational Linguistics",
+            "year": "2013",
+            "authors": "Laura Banarescu; Claire Bonial; Shu Cai; Madalina Georgescu; Kira Griffitt; Ulf Hermjakob; Kevin Knight; Philipp Koehn; Martha Palmer; Nathan Schneider"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Learning to map frequent phrases to sub-structures of meaning representation for neural semantic parsing",
+            "journal": "",
+            "year": "2020",
+            "authors": "Bo Chen; Xianpei Han; Ben He; Le Sun"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Sequenceto-action: End-to-end semantic graph generation for semantic parsing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Bo Chen; Le Sun; Xianpei Han"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Girish Sastry",
+            "journal": "",
+            "year": "",
+            "authors": "Mark Chen; Jerry Tworek; Heewoo Jun; Qiming Yuan; Henrique Ponde De Oliveira Pinto; Jared Kaplan; Harri Edwards; Yuri Burda; Nicholas Joseph; Greg Brockman; Alex Ray; Raul Puri; Gretchen Krueger; Michael Petrov; Heidy Khlaaf"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Universal Dependencies",
+            "journal": "Computational Linguistics",
+            "year": "2021",
+            "authors": "Marie-Catherine De Marneffe; Christopher D Manning; Joakim Nivre; Daniel Zeman"
+        },
+        {
+            "ref_id": "b8",
+            "title": "BERT: Pre-training of deep bidirectional transformers for language understanding",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Jacob Devlin; Ming-Wei Chang; Kenton Lee; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Leveraging frequent query substructures to generate formal queries for complex question answering",
+            "journal": "",
+            "year": "2019",
+            "authors": "Jiwei Ding; Wei Hu; Qixin Xu; Yuzhong Qu"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Language to logical form with neural attention",
+            "journal": "Long Papers",
+            "year": "2016",
+            "authors": "Li Dong; Mirella Lapata"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Coarse-to-fine decoding for neural semantic parsing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Li Dong; Mirella Lapata"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Unsupervised latent tree induction with deep inside-outside recursive auto-encoders",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Andrew Drozdov; Patrick Verga; Mohit Yadav; Mohit Iyyer; Andrew Mccallum"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Glm: General language model pretraining with autoregressive blank infilling",
+            "journal": "Long Papers",
+            "year": "2022",
+            "authors": "Zhengxiao Du; Yujie Qian; Xiao Liu; Ming Ding; Jiezhong Qiu; Zhilin Yang; Jie Tang"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Recurrent neural network grammars",
+            "journal": "Association for Computational Linguistics",
+            "year": "2016",
+            "authors": "Chris Dyer; Adhiguna Kuncoro; Miguel Ballesteros; Noah A Smith"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Three new probabilistic models for dependency parsing: An exploration",
+            "journal": "",
+            "year": "1996",
+            "authors": "Jason M Eisner"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Improving textto-SQL evaluation methodology",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Catherine Finegan-Dollak; Jonathan K Kummerfeld; Li Zhang; Karthik Ramanathan; Sesh Sadasivam; Rui Zhang; Dragomir Radev"
+        },
+        {
+            "ref_id": "b17",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "R\u00e9mi Flamary; Nicolas Courty; Alexandre Gramfort; Z Mokhtar; Aur\u00e9lie Alaya;  Boisbunon"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Pot: Python optimal transport",
+            "journal": "Journal of Machine Learning Research",
+            "year": "2021",
+            "authors": "T H Gayraud; Hicham Janati; Alain Rakotomamonjy; Ievgen Redko; Antoine Rolet; Antony Schutz; Vivien Seguy; Danica J Sutherland; Romain Tavenard; Alexander Tong; Titouan Vayer"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Towards an encyclopedia of compositional semantics: Documenting the interface of the English Resource Grammar",
+            "journal": "",
+            "year": "2014",
+            "authors": "Dan Flickinger; Emily M Bender; Stephan Oepen"
+        },
+        {
+            "ref_id": "b20",
+            "title": "A constrained graph algebra for semantic parsing with AMRs",
+            "journal": "",
+            "year": "2017",
+            "authors": "Jonas Groschwitz; Meaghan Fowlie; Mark Johnson; Alexander Koller"
+        },
+        {
+            "ref_id": "b21",
+            "title": "AMR dependency parsing with a typed semantic algebra",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Jonas Groschwitz; Matthias Lindemann; Meaghan Fowlie; Mark Johnson; Alexander Koller"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Beyond i.i.d.: Three levels of generalization for question answering on knowledge bases",
+            "journal": "",
+            "year": "2021",
+            "authors": "Yu Gu; Sue Kase; Michelle Vanni; Brian Sadler; Percy Liang; Xifeng Yan; Yu Su"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Benchmarking meaning representations in neural semantic parsing",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Jiaqi Guo; Qian Liu; Jian-Guang Lou; Zhenwen Li; Xueqing Liu; Tao Xie; Ting Liu"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Towards complex text-to-SQL in cross-domain database with intermediate representation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Jiaqi Guo; Zecheng Zhan; Yan Gao; Yan Xiao; Jian-Guang Lou; Ting Liu; Dongmei Zhang"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Spanbased semantic parsing for compositional generalization",
+            "journal": "Long Papers",
+            "year": "2021",
+            "authors": "Jonathan Herzig; Jonathan Berant"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Answering natural language questions by subgraph matching over knowledge graphs",
+            "journal": "IEEE Transactions on Knowledge and Data Engineering",
+            "year": "2018",
+            "authors": "S Hu; L Zou; J X Yu; H Wang; D Zhao"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Learning programmatic idioms for scalable semantic parsing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Srinivasan Iyer; Alvin Cheung; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Mapping language to code in programmatic context",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Srinivasan Iyer; Ioannis Konstas; Alvin Cheung; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b29",
+            "title": "LAGr: Label aligned graphs for better systematic generalization in semantic parsing",
+            "journal": "Long Papers",
+            "year": "2022",
+            "authors": "Dora Jambor; Dzmitry Bahdanau"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Learning to transform natural to formal languages",
+            "journal": "AAAI Press",
+            "year": "2005",
+            "authors": "J Rohit; Yuk Wah Kate; Raymond J Wong;  Mooney"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Measuring compositional generalization: A comprehensive method on realistic data",
+            "journal": "",
+            "year": "2020",
+            "authors": "Daniel Keysers; Nathanael Sch\u00e4rli; Nathan Scales; Hylke Buisman; Daniel Furrer; Sergii Kashubin; Nikola Momchev; Danila Sinopalnikov; Lukasz Stafiniak; Tibor Tihon; Dmitry Tsarkov; Xiao Wang; Olivier Marc Van Zee;  Bousquet"
+        },
+        {
+            "ref_id": "b32",
+            "title": "COGS: A compositional generalization challenge based on semantic interpretation",
+            "journal": "",
+            "year": "2020",
+            "authors": "Najoung Kim; Tal Linzen"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Sequence-to-sequence learning with latent neural grammars",
+            "journal": "Curran Associates, Inc",
+            "year": "2021",
+            "authors": "Yoon Kim"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Compound probabilistic context-free grammars for grammar induction",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Yoon Kim; Chris Dyer; Alexander Rush"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Unsupervised recurrent neural network grammars",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Yoon Kim; Alexander Rush; Lei Yu; Adhiguna Kuncoro; Chris Dyer; G\u00e1bor Melis"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Multilingual constituency parsing with self-attention and pre-training",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Nikita Kitaev; Steven Cao; Dan Klein"
+        },
+        {
+            "ref_id": "b37",
+            "title": "Constituency parsing with a self-attentive encoder",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Nikita Kitaev; Dan Klein"
+        },
+        {
+            "ref_id": "b38",
+            "title": "Neural semantic parsing with type constraints for semi-structured tables",
+            "journal": "",
+            "year": "2017",
+            "authors": "Jayant Krishnamurthy; Pradeep Dasigi; Matt Gardner"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Exploring the secrets behind the learning difficulty of meaning representations for semantic parsing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Zhenwen Li; Jiaqi Guo; Qian Liu; Jian-Guang Lou; Tao Xie"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Learning dependency-based compositional semantics",
+            "journal": "Computational Linguistics",
+            "year": "2013",
+            "authors": "Percy Liang; Michael I Jordan; Dan Klein"
+        },
+        {
+            "ref_id": "b41",
+            "title": "An introduction to formal languages and automata",
+            "journal": "Jones & Bartlett Learning",
+            "year": "2022",
+            "authors": "Peter Linz; H Susan;  Rodger"
+        },
+        {
+            "ref_id": "b42",
+            "title": "Learning algebraic recombination for compositional generalization",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Chenyao Liu; Shengnan An; Zeqi Lin; Qian Liu; Bei Chen; Jian-Guang Lou; Lijie Wen; Nanning Zheng; Dongmei Zhang"
+        },
+        {
+            "ref_id": "b43",
+            "title": "Improving compositional generalization in semantic parsing",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Inbar Oren; Jonathan Herzig; Nitish Gupta; Matt Gardner; Jonathan Berant"
+        },
+        {
+            "ref_id": "b44",
+            "title": "Compositional semantic parsing on semi-structured tables",
+            "journal": "Association for Computational Linguistics",
+            "year": "2015",
+            "authors": "Panupong Pasupat; Percy Liang"
+        },
+        {
+            "ref_id": "b45",
+            "title": "Computational optimal transport: With applications to data science. Foundations and Trends\u00ae in Machine Learning",
+            "journal": "",
+            "year": "2019",
+            "authors": "Gabriel Peyr\u00e9; Marco Cuturi"
+        },
+        {
+            "ref_id": "b46",
+            "title": "Improving compositional generalization with latent structure and data augmentation",
+            "journal": "CoRR",
+            "year": "2021",
+            "authors": "Linlu Qiu; Peter Shaw; Panupong Pasupat; Pawel Krzysztof Nowak; Tal Linzen; Fei Sha; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b47",
+            "title": "Evaluating the impact of model scale for compositional generalization in semantic parsing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Linlu Qiu; Peter Shaw; Panupong Pasupat; Tianze Shi; Jonathan Herzig; Emily Pitler; Fei Sha; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b48",
+            "title": "Abstract syntax networks for code generation and semantic parsing",
+            "journal": "Long Papers",
+            "year": "2017",
+            "authors": "Maxim Rabinovich; Mitchell Stern; Dan Klein"
+        },
+        {
+            "ref_id": "b49",
+            "title": "Compositional generalization and natural language variation: Can a semantic parsing approach handle both?",
+            "journal": "",
+            "year": "2021",
+            "authors": "Peter Shaw; Ming-Wei Chang; Panupong Pasupat; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b50",
+            "title": "Ordered neurons: Integrating tree structures into recurrent neural networks",
+            "journal": "",
+            "year": "2019",
+            "authors": "Yikang Shen; Shawn Tan; Alessandro Sordoni; Aaron Courville"
+        },
+        {
+            "ref_id": "b51",
+            "title": "Paradigm shift in natural language processing",
+            "journal": "Machine Intelligence Research",
+            "year": "2022",
+            "authors": "Tian-Xiang Sun; Xiang-Yang Liu; Xi-Peng Qiu; Xuan-Jing Huang"
+        },
+        {
+            "ref_id": "b52",
+            "title": "Vallejos, and Nianwen Xue. 2021. Designing a uniform meaning representation for natural language processing",
+            "journal": "KI -K\u00fcnstliche Intelligenz",
+            "year": null,
+            "authors": "Jens E L Van Gysel; Meagan Vigus; Jayeol Chun; Kenneth Lai; Sarah Moeller; Jiarui Yao; O' Tim; Andrew Gorman; William Cowell; Chu-Ren Croft;  Huang"
+        },
+        {
+            "ref_id": "b53",
+            "title": "Semantic expressive capacity with bounded memory",
+            "journal": "",
+            "year": "2019",
+            "authors": "Antoine Venant; Alexander Koller"
+        },
+        {
+            "ref_id": "b54",
+            "title": "Association for Computational Linguistics",
+            "journal": "",
+            "year": "",
+            "authors": "Italy Florence"
+        },
+        {
+            "ref_id": "b55",
+            "title": "Compositional generalization requires compositional parsers",
+            "journal": "",
+            "year": "2022",
+            "authors": "Pia Wei\u00dfenhorn; Yuekun Yao; Lucia Donatelli; Alexander Koller"
+        },
+        {
+            "ref_id": "b56",
+            "title": "Transformers: State-of-the-art natural language processing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Thomas Wolf; Lysandre Debut; Victor Sanh; Julien Chaumond; Clement Delangue; Anthony Moi; Pierric Cistac; Tim Rault; Remi Louf; Morgan Funtowicz; Joe Davison; Sam Shleifer; Clara Patrick Von Platen; Yacine Ma; Julien Jernite; Canwen Plu; Teven Le Xu; Sylvain Scao; Mariama Gugger; Quentin Drame; Alexander Lhoest;  Rush"
+        },
+        {
+            "ref_id": "b57",
+            "title": "Learning for semantic parsing with statistical machine translation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2006",
+            "authors": "Yuk Wah Wong; Raymond Mooney"
+        },
+        {
+            "ref_id": "b58",
+            "title": "Learning synchronous grammars for semantic parsing with lambda calculus",
+            "journal": "Association for Computational Linguistics",
+            "year": "2007",
+            "authors": "Yuk Wah Wong; Raymond Mooney"
+        },
+        {
+            "ref_id": "b59",
+            "title": "Learning with latent structures in natural language processing: A survey",
+            "journal": "",
+            "year": "2022",
+            "authors": "Zhaofeng Wu"
+        },
+        {
+            "ref_id": "b60",
+            "title": "Sequence-based structured prediction for semantic parsing",
+            "journal": "Long Papers",
+            "year": "2016",
+            "authors": "Chunyang Xiao; Marc Dymetman; Claire Gardent"
+        },
+        {
+            "ref_id": "b61",
+            "title": "Sqlnet: Generating structured queries from natural language without reinforcement learning",
+            "journal": "",
+            "year": "2018",
+            "authors": "Xiaojun Xu; Chang Liu; Dawn Song"
+        },
+        {
+            "ref_id": "b62",
+            "title": "PCFGs can do better: Inducing probabilistic contextfree grammars with many symbols",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Songlin Yang; Yanpeng Zhao; Kewei Tu"
+        },
+        {
+            "ref_id": "b63",
+            "title": "Semantic parsing via staged query graph generation: Question answering with knowledge base",
+            "journal": "Association for Computational Linguistics",
+            "year": "2015",
+            "authors": "Ming-Wei Wen-Tau Yih; Xiaodong Chang; Jianfeng He;  Gao"
+        },
+        {
+            "ref_id": "b64",
+            "title": "Compositional generalization for neural semantic parsing via spanlevel supervised attention",
+            "journal": "",
+            "year": "2021",
+            "authors": "Pengcheng Yin; Hao Fang; Graham Neubig; Adam Pauls; Yu Emmanouil Antonios Platanios; Sam Su; Jacob Thomson;  Andreas"
+        },
+        {
+            "ref_id": "b65",
+            "title": "A syntactic neural model for general-purpose code generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2017",
+            "authors": "Pengcheng Yin; Graham Neubig"
+        },
+        {
+            "ref_id": "b66",
+            "title": "TRANX: A transition-based neural abstract syntax parser for semantic parsing and code generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Pengcheng Yin; Graham Neubig"
+        },
+        {
+            "ref_id": "b67",
+            "title": "Online learning of relaxed CCG grammars for parsing to logical form",
+            "journal": "",
+            "year": "2007",
+            "authors": "Luke Zettlemoyer; Michael Collins"
+        },
+        {
+            "ref_id": "b68",
+            "title": "Learning to map sentences to logical form: Structured classification with probabilistic categorial grammars",
+            "journal": "AUAI Press",
+            "year": "2005",
+            "authors": "Luke S Zettlemoyer; Michael Collins"
+        },
+        {
+            "ref_id": "b69",
+            "title": "Macro grammars and holistic triggering for efficient semantic parsing",
+            "journal": "",
+            "year": "2017",
+            "authors": "Yuchen Zhang; Panupong Pasupat; Percy Liang"
+        },
+        {
+            "ref_id": "b70",
+            "title": "Disentangled sequence to sequence learning for compositional generalization",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Hao Zheng; Mirella Lapata"
+        },
+        {
+            "ref_id": "b71",
+            "title": "Adabelief optimizer: Adapting stepsizes by the belief in observed gradients. Advances in Neural Information Processing Systems",
+            "journal": "",
+            "year": "2020",
+            "authors": "Juntang Zhuang; Tommy Tang; Yifan Ding; C Sekhar; Nicha Tatikonda; Xenophon Dvornek; James Papademetris;  Duncan"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 2 :2Figure 2: Accuracies viewed in S and T choices. Each bar is a distribution across all 9 CG datasets.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 3 :3Figure 3: Accuracies viewed in S models. Each bar is the distribution of accuracies on 9 CG datasets.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 4 :4Figure 4: Accuracies viewed in combinations of each S and T choice, on 9 CG datasets.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 5 :5Figure 5: Accuracies for different PCFGs as encoders against different T choices on the GEO datasets with compositional generalization.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 6 :6Figure 6: Accuracies for latent S models with different target T choices. Each bar is the distribution of accuracies on 9 CG datasets.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 7 :7Figure 7: Differences subtracted the given T accuracies from the latent and absent T, under each dataset and each S-choice, with I.I.D. (Top) and compositional generalization (Down). Positive values mean that the latent or absent T outperforms the given T, while negative values suggest the given T is better.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 8 :8Figure8: Fitting the metrics of different (S, T) choices to the accuracies on different datasets and generalizations. We include the absent S and both absent and given T, showing whether the metric can reflect the differences between the grammar-based and the sequence-based structures of the formal languages. Metrics computed with 3 chosen LLMs are all shown negatively correlated with the performance.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "Figure 9 :9Figure9: On each dataset and generalization level (totally 13 here), we compute metrics for two pairs, i.e. (absent, absent) and (absent, given), corresponding to two points in Figure8. We plot the histogram for the slope of each line determined by the two points. The slopes are negative and are also low when positive, suggesting the metrics are possibly indicative for specific datasets and generalization level.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "and do not support programming languages.",
+            "figure_data": "Semantic ParsingEncoderDecoderMake me a meeting with( Yield :output ( Create-my team . We need a roomCommitEventWrapper :event ( \u2026Make meWe need\u2026Yield :outputa \u2026Create\u2026Grammar InductionFigure 1: Structural modeling in two tasks. We're goingto analyze how the progress in grammar induction couldhelp neural semantic parsing."
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Table 1 gives the statistics. For the gen-",
+            "figure_data": "DatasetSplit# Examples (train / dev / test)ATIS (SQL)I.I.D.3014 / 405 / 402ATIS (SQL)Program3061 / 375 / 373Advising (SQL)I.I.D.3440 / 451 / 446Advising (SQL)Program3492 / 421 / 414Geo (SQL)I.I.D.409 / 103 / 95Geo (SQL)Program424 / 91 / 91Scholar (SQL)I.I.D.433 / 111 / 105Scholar (SQL)Program454 / 97 / 98COGS (\u03bb-calculus)I.I.D.24160 / 3000 / 3000COGS (\u03bb-calculus) Linguistic 24160 / 3000 / 21000SMC16 (Lispress)Domain25424 / 1324 / 1325SMC32 (Lispress)Domain25440 / 1324 / 1325SMC64 (Lispress)Domain25472 / 1324 / 1325SMC128 (Lispress)I.I.D.25536 / 1324 / 1325SMC128 (Lispress)Domain25536 / 1324 / 1325Table 1: The number of examples in each dataset. Dif-ferent kinds of generalizations are explained in Sec-tion 2.1. SMCk denotes the SMCalFlow-CS datasetwith k few-shot examples added into the training set.We manually shuffle the SMC-128 to build an I.I.D. split.The representation of each dataset is in the parenthesis."
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "",
+            "figure_data": ": Probabilistic forms for all Seq2Seq-style mod-els in comparison. Structures of both side can be oneof three choices. If S is latent, training another modelP (S | X) is necessary to infer S."
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Models for corresponding S and T choices.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "The accuracies of each datasets on their compositional generalization levels. For the ATIS, GEO, Scholar and Advising, average results of 5 random seeds are reported.",
+            "figure_data": "encoderdecoder smc16 smc32 smc64 smc128 advising atis cogs geo scholarseq28.419.840.052.65.915.10.026.226.1bilstmonlstm28.226.234.748.25.215.37.422.925.7prod14.127.631.126.97.816.30.026.621.6seq32.132.520.252.36.822.86.225.931.0onlstmonlstm31.439.746.348.85.024.73.126.232.4prod9.727.332.731.36.322.23.030.827.4seq29.237.942.251.19.129.82.629.533.1bertonlstm27.342.044.855.89.819.30.035.833.3prod16.228.332.442.37.631.20.031.027.8seq29.437.750.041.74.729.00.023.721.0electraonlstm27.531.832.053.37.018.60.018.521.8prod13.118.225.436.76.030.90.925.517.5seq26.919.328.533.33.918.5 27.3 24.226.1dioraonlstm28.118.227.647.95.117.9 21.1 25.127.3prod8.521.822.532.13.315.48.229.719.6seq23.221.423.740.22.811.00.017.614.9rcpcfgonlstm22.218.332.326.20.014.712.9prod17.316.220.212.21.711.80.017.815.5seq21.524.119.923.20.71.40.016.916.1rtdpcfgonlstm9.423.326.632.10.012.512.9prod6.317.314.515.71.53.40.013.213.2seq19.520.129.624.86.312.30.018.522.9pnponlstm17.119.220.521.96.217.10.020.920.4prod6.812.518.924.53.316.40.025.719.8seq23.827.228.839.211.416.40.022.030.4syn-parseronlstm24.327.637.440.99.316.00.021.330.6prod6.817.121.131.77.817.40.023.721.4"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "The accuracies of each datasets with the I.I.D. generalization. Similar to the CG level, average results of 5 random seeds are reported for the ATIS, GEO, Scholar, and Advising datasets",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "d s,t,D =E (x,y)\u2208D [emd(u s , u t , cost(e s , e t ))] (3)",
+            "formula_coordinates": [
+                7.0,
+                78.84,
+                404.39,
+                211.02,
+                11.22
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "M (s, t) = |E[d s,t,D train ] \u2212 E[d s,t,Dtest ]| \u03c3[d s,t,D train ]\u03c3[d s,t,Dtest ](4)",
+            "formula_coordinates": [
+                7.0,
+                85.05,
+                697.92,
+                204.82,
+                26.49
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "max \u03b8 P \u03b8 (Y | X) = E S\u2208P (S|X) P (Y | S, X) (6)",
+            "formula_coordinates": [
+                14.0,
+                315.18,
+                130.05,
+                209.96,
+                16.35
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "s ik j = sof tmax f s h in (x i:j ), h in (x j:k ) j (8)",
+            "formula_coordinates": [
+                14.0,
+                314.89,
+                504.28,
+                210.25,
+                15.81
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "h i = [h in (x i:i+1 ); h out (x i:i+1 )],",
+            "formula_coordinates": [
+                14.0,
+                348.19,
+                668.4,
+                144.68,
+                12.58
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "max \u03b8 L diora = i log P \u03b8 (x i |h out (x i:i+1 )) (9)",
+            "formula_coordinates": [
+                15.0,
+                82.3,
+                111.48,
+                207.57,
+                24.58
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "s ikA = B C j w ijkABC(10)",
+            "formula_coordinates": [
+                15.0,
+                126.9,
+                596.22,
+                162.96,
+                22.26
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "w ijkABC = \u03c0 A\u2192BC \u2022 s ijB \u2022 s jkA(11)",
+            "formula_coordinates": [
+                15.0,
+                106.95,
+                625.42,
+                182.92,
+                10.77
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": "h i:k = A,B,C,j h ijkABC \u2022 w ijkABC \u2022 \u03c0 s (A) (12)",
+            "formula_coordinates": [
+                15.0,
+                79.68,
+                730.46,
+                210.19,
+                22.26
+            ]
+        },
+        {
+            "formula_id": "formula_9",
+            "formula_text": "h ijkABC = f h (A) + f ls (B) + f rs (C) + f l (h i:j ) + f r (h j:k )(13)",
+            "formula_coordinates": [
+                15.0,
+                331.75,
+                205.66,
+                193.39,
+                27.31
+            ]
+        },
+        {
+            "formula_id": "formula_10",
+            "formula_text": "\u03c0 A\u2192BC = l u l A \u2022 v l B \u2022 w l C",
+            "formula_coordinates": [
+                15.0,
+                306.14,
+                297.34,
+                125.4,
+                14.18
+            ]
+        },
+        {
+            "formula_id": "formula_11",
+            "formula_text": "W = f head (e(X)) \u2022 f tail (e(X)) T (14) Z \u223c G(0, 1) (15) S = Eisner(W + Z)(16)",
+            "formula_coordinates": [
+                15.0,
+                341.71,
+                557.12,
+                183.43,
+                45.38
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/P17-1008"
+}

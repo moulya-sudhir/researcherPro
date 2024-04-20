@@ -1,0 +1,3 @@
+git+https://github.com/titipata/scipdf_parser
+nltk 
+scikit-learn

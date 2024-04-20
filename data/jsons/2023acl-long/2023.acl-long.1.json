@@ -1,0 +1,1111 @@
+{
+    "title": "One Cannot Stand for Everyone! Leveraging Multiple User Simulators to train Task-oriented Dialogue Systems",
+    "authors": "Yajiao Liu; Xin Jiang; Yichun Yin; Yasheng Wang; Fei Mi; Qun Liu; Xiang Wan; Benyou Wang",
+    "pub_date": "",
+    "abstract": "User simulators are agents designed to imitate human users; recent advances have found that Task-oriented Dialogue (ToD) systems optimized toward a user simulator could better satisfy the need of human users. However, this might result in a sub-optimal ToD system if it is tailored to only one ad hoc user simulator, since human users can behave differently. In this paper, we propose a framework called MUST 1 to optimize ToD systems via leveraging Multiple User SimulaTors. The main challenges of implementing the MUST are 1) how to adaptively determine which user simulator to interact with the ToD system at each optimization step, since the ToD system might be over-fitted to some specific user simulators, and simultaneously underfitted to some others; 2) how to avoid catastrophic forgetting of the adaption for a simulator that is not selected for several consecutive optimization steps. To tackle these challenges, we formulate MUST as a Multi-armed bandits (MAB) problem and provide a method called MUST adaptive that balances i) the boosting adaption for adaptive interactions between different user simulators and the ToD system and ii) the uniform adaption to avoid the catastrophic forgetting issue. With both automatic evaluations and human evaluations, our experimental results on MultiWOZ show that the dialogue system trained by MUST achieves a better performance than those trained by a single user simulator. It also has a better generalization ability when testing with unseen user simulators.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Task-oriented dialogue systems aim to help users accomplish their various tasks (e.g., restaurant reservations) through natural language conversations. Training task-oriented dialogue systems in supervised learning approaches often requires a large amount of expert-labeled dialogues, however collecting these dialogues is usually expensive and time-consuming. Moreover, even with a large amount of dialogue data, some dialogue states may not be explored sufficiently for dialogue systems 2 (Li et al., 2016b). To this end, many researchers try to build user simulators to mimic human users for generating reasonable and natural conversations. By using a user simulator and sampling user goals, we can train the dialogue system from scratch with reinforcement learning (RL) algorithms. Previous works tend to design better user simulator models (Schatzmann et al., 2007;Asri et al., 2016;Gur et al., 2018;Kreyssig et al., 2018;Lin et al., 2021). Especially, Shi et al. (2019) builds various user simulators and analyzes the behavior of each user simulator in the popular restaurant search task from MultiWOZ (Budzianowski et al., 2018).",
+                "In real scenarios, dialogue systems need to face various types of users. A single ad hoc user simulator can only represent one or a group of users, while other users might be under-represented. Instead of choosing the best-performing one from many dialogue systems trained by different single user simulators, we believe that it is worth trying to train a dialogue system by leveraging all user simulators simultaneously.",
+                "In this paper, we propose a framework called MUST to utilize Multiple User SimulaTors simultaneously to obtain a better system agent. There exist several simple ways to implement the MUST framework, including a merging strategy, a continual reinforcement learning (CRL) strategy, and a uniform adaption strategy, namely MUST merging , MUST CRL , and MUST uniform respectively (See \u00a73.2). However, none of them could effectively tackle the challenges: 1) how to efficiently leverage multiple user simulators to train the dialogue system since the system might be easily over-fitted to some specific user simulators and simultaneously under-fitted to some others, and 2) it should avoid a catastrophic forgetting issue. To tackle them effectively, we first formulate the problem as a Multi-armed bandits (MAB) problem (Auer et al., 2002); similar to the exploitation vs exploration trade-off, specifying multiple user simulators should trade off a boosting adaption (tackling challenge 1) and a uniform adaption (tackling challenge 2), see \u00a74.1 for more details. Then we implement a new method called MUST adaptive to utilize an adaptively-updated distribution among all user simulators to sample them when training the dialogue system in the RL training.",
+                "Our contributions are three-fold: (1) To the best of our knowledge, our proposed MUST is the first developed work to improve the dialogue system by using multiple user simulators simultaneously; (2) We design several ways to implement the MUST. Especially, we formulate MUST as a Multi-armed bandits (MAB) problem, based on which we provide a novel method MUST adaptive ; and (3) The results show that dialogue systems trained with MUST consistently outperform those trained with a single user simulator through automatic and human evaluations, showing its potential for robustness to the diversity of user simulators. Importantly, it significantly improves the performance of the dialogue system tested on out-of-domain evaluation. Moreover, our results show that our method MUST adaptive can efficiently leverage multiple user simulators to train the dialogue system in terms of convergence speed."
+            ],
+            "publication_ref": [
+                "b13",
+                "b24",
+                "b0",
+                "b5",
+                "b9",
+                "b14",
+                "b26",
+                "b1"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Background",
+            "text": [
+                "Dialogue system. Task-oriented dialogue systems aim to help users accomplish various tasks such as restaurant reservations through natural language conversations. Researchers usually divide the task-oriented dialogue systems into four modules (Wen et al., 2017;Ham et al., 2020;Peng et al., 2021): Natural Language Understanding (NLU) (Liu and Lane, 2016) that first comprehends user's intents and extracts the slots-values pairs, Dialog State Tracker (DST) (Williams et al., 2013) that tracks the values of slots, Dialog Policy Learning (POL) (Peng et al., 2017(Peng et al., , 2018) ) that decides the dialog actions, and Natural Language Generation (NLG) (Wen et al., 2015;Peng et al., 2020) that translates the dialog actions into a natural-language form. The DST module and the POL module usually are collectively referred to as the dialogue manager (DM) (Chen et al., 2017). These different modules can be trained independently or jointly in an end-to-end manner (Wen et al., 2017;Liu and Lane, 2018;Ham et al., 2020;Peng et al., 2021).",
+                "User simulator. The user simulator is also an agent but plays a user role. Different from dialogue systems, the user agent has a goal describing a target entity (e.g., a restaurant at a specific location) and should express its goal completely in an organized way by interacting with the system agent (Takanobu et al., 2020). Therefore, besides the modules of NLU, DM, and NLG like dialogue systems, the user agent should have another module called Goal Generator (Kreyssig et al., 2018), which is responsible for generating the user's goal. Building a user simulator could usually use an agenda-based approach (Schatzmann et al., 2007;Schatzmann and Young, 2009) designing handcrafted rules to mimic user behaviors or a model-based approach such as neural networks (Asri et al., 2016;Kreyssig et al., 2018;Gur et al., 2018) learned on a corpus of dialogues.",
+                "Training dialogue systems with a user simulator. To start a dialogue, a user agent will have an initial goal from its Goal Generator and then expresses its goal in natural languages. However, users' goals are invisible to the system agent. Then the system agent tends to gradually understand the users' utterances, query the database to find entities, and provide useful information to accomplish users' task. When the database result returned by the system agent is empty, the user agent should learn to compromise and change its goal with the help of Goal Generator. When the dialogue ends, the user simulator will reward the system agent according to if it accomplishes the task. Then we could use the reward to update the system agent with RL algorithms (Tseng et al., 2021)."
+            ],
+            "publication_ref": [
+                "b30",
+                "b6",
+                "b17",
+                "b16",
+                "b19",
+                "b18",
+                "b29",
+                "b20",
+                "b3",
+                "b30",
+                "b15",
+                "b6",
+                "b17",
+                "b27",
+                "b9",
+                "b24",
+                "b25",
+                "b0",
+                "b9",
+                "b5",
+                "b28"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "MUST: a Framework to Leverage",
+            "text": [
+                "Multiple User SimulaTors   agenda-based methods and neural networks-based methods on the popular restaurant search task from MultiWOZ (Budzianowski et al., 2018). From their experiments, we observed that the dialogue systems trained by different user simulators vary in their performances (i.e., the success rates tested by the same user simulators). For example, when interacting with the user simulator of AgenT, the success rates of the system agents trained by Agenda-based user simulators (i.e., AgenT, AgenR, AgenG) are much higher than those of the system agents trained by RNN-based user simulators (i.e., RNNT, RNNR, RNN), see Fig. 1(a). The reason might be that these user simulators (i.e., with either handcrafted rules or data-driven learning in their DM modules) have different user dialog act distributions 4 (see Fig. 1(b)) which determine the dialogue state space explored by the dialogue system.",
+                "One cannot stand for everyone. Users might behave differently, one could design different user simulators with specific user dialog act distributions, see Shi et al. (2019). A single user simulator learned on a task-oriented dialogue corpus can just represent one or a group of users, while the dialogue system needs to accomplish tasks from various human users in real scenarios. We argue that it is beneficial to utilize all different user simulators to train the dialogue system. By leveraging multiple user simulators that have different user dialog act distributions, the dialogue systems can explore a larger dialogue state space, which might 4 The dialogue policy learning module is essential in both dialogue systems and user simulators. A policy module corresponds to a dialog act distribution since it decides to take which dialog act to respond to the current dialogue state. The user dialog act distribution behind a user simulator determines the diversity of the dialogue state space explored by dialogue systems; therefore it might affect the system performances.",
+                "improve the ability of the learned dialogue system."
+            ],
+            "publication_ref": [
+                "b26"
+            ],
+            "figure_ref": [
+                "fig_1",
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Some Preliminary Proposals for MUST",
+            "text": [
+                "We propose a framework called MUST, the core idea of which is to train a better dialogue system by leveraging Multiple User SimulaTors simultaneously. There are several simple ways to implement our MUST, including a merging strategy (MUST merging ), a Continual Reinforcement Learning strategy (MUST CRL ), and a uniform adaption strategy (MUST uniform ).",
+                "(I) MUST merging first samples some dialogues from each user simulator and the corresponding dialogue system trained by this simulator. Then it combines the collected dialogues to train a new user simulator for ensembling different user dialog act distributions. Finally, it uses this new user simulator to train the dialogue system with RL.",
+                "(II) MUST CRL 5 treats each user simulator as an independent RL environment. It moves the trained system agent to another one (i.e., let the system agent interact with another user simulator) if the system has converged in the current environment.",
+                "(III) MUST uniform allows the system agent have chances to interact with all user simulators simultaneously. Different from MUST CRL , MUST uniform puts all user simulators in a single RL environment and adopts the simplest way to specify different user simulators to train the dialogue system, which is to pick a user simulator among all user simulators with a uniform distribution for each iteration in the RL training.  (Khetarpal et al., 2020) and would be sensitive to the order of different user agents interacting with the dialogue system, which might result in obtaining a sub-optimal dialogue system. As Shi et al. (2019) shows, the system agents trained by different user simulators have different convergence speeds and converged performances. Namely, the system agent might be easily fitted to some user simulators but might be hardly fitted to others. A uniform distribution for the simulator selection under MUST uniform will result in inefficient training, since it would be unnecessary to assign the many training costs for easily-adapted user simulators. Overall, the challenging problems under MUST are 1) how to efficiently leverage multiple user simulators to train the system agent, and 2) avoiding the catastrophic forgetting issue."
+            ],
+            "publication_ref": [
+                "b8",
+                "b26"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "MUST as a MAB Problem",
+            "text": [
+                "To tackle the challenges in MUST, we first formulate MUST as a Multi-armed bandit (MAB) problem, see \u00a74.1. In \u00a74.2, we propose a method called MUST adaptive to use an adaptively-updated distribution to replace the uniform distribution under the MUST uniform for accelerating the MUST training. We briefly compare these different implementations of MUST in Tab. 1."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Formulating MUST as a MAB Problem",
+            "text": [
+                "Adaptively specifying user simulators to train dialogue systems reminds us of a similar concept in machine learning, called boosting (Zhou, 2012). From a boosting point of view, one should increase the weights of weakly-performing data examples and decrease the weights for well-performing ones.",
+                "In MUST, we accordingly assume that it should reduce the interactions between the dialogue system and those user simulators that the system has performed well; and meanwhile increase the interactions between the system and other user simulators that the system performs poorly. We refer to this strategy as boosting adaption.",
+                "Meanwhile, we should also give some chances to all user simulators to relieve the catastrophic forgetting issue. We refer to this as uniform adaption. Such a trade-off between boosting adaption and uniform adaption is similar to the the exploitation vs exploration trade-off existing in the Multi-armed bandit (MAB) problem (Auer et al., 2002).",
+                "Here, we interpret MUST as a MAB problem. We treat each user simulator as an arm. Suppose there are K arms (simulators), and each arm i has a fixed but unknown reward distribution R i with an expectation \u00b5 i . At each time step t = 1, 2, ..., T , one must choose one of these K arms. We denote the arm pulled at time step t as i t \u2208 {1, ..., K}. After pulling an arm, it receives a reward x it drawn from the arm's underlying reward distribution. The decision maker's objective is to maximize the cumulative expected reward over the time horizon",
+                "T t=1 E[x it ] = T t=1 \u00b5 it .",
+                "(1)",
+                "In MUST, the reward received in each armpulling step refers to the possible performance gain of the dialogue system after it interacts with a selected user simulator. A significant difference between the standard MAB problem and MUST is that the reward expectation of a user simulator (arm) in MUST is not static; it changes over time. For example, by consecutively interacting with the same user simulator, the performance gain (reward) of the system will decay since the system might be in saturation or overfitting to this simulator. Moreover, the performance gain of the system after interacting with a simulator might increase if the simulator has not been selected for a period. To deal with this difference, we should tailor the solution of MAB to the MUST framework."
+            ],
+            "publication_ref": [
+                "b1"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Training with MUST adaptive",
+            "text": [
+                "To solve this MAB problem in MUST, we implement a method called MUST adaptive with a two-phase procedure, as presented in Algorithm 1. MUST adaptive specifies user simulators in a Output: The learned dialogue system S.",
+                "uniform distribution, similar to the UCB1 6 algorithm, to train the dialogue system S in the first T warmup steps (i.e., in the warm-up phase). After that, the adaptive phase will balance the boosting adaption and the uniform adaption by introducing an adaptively-updated distribution p, which is used to specify different user simulators to train the system S in later RL training. To accelerate the RL training, intuitively, p is expected to assign lower weights to user simulators with which S already performs well and higher weights to those user simulators with which S performs poorly.",
+                "(1) Warm-up phase : in the first T warmup dialogues, we use a uniform distribution to sample all user simulators to train the system agent S (lines 4-7). This phase is mainly used to warm up the dialogue system S.",
+                "(2) Adaptive phase : the distribution p used to sample all user simulators will be adaptively updated. We call it as the adaptive phase. When this phase begins (i.e., t = 0), we will first evaluate the performance (i.e., the success rate xj , j \u2208 {1, \u2022 \u2022 \u2022 , K}) of the dialogue system S trained after the warm-up phase. The success rate xj is obtained by letting S interact d times with the simulator U j (e.g., j \u2208 {1, ..., K}) and calculating the 6 There exists an algorithm called UCB1 (Upper Confidence Bound 1 ) (Auer et al., 2002) that could solve the MAB problem. It first pulls each arm once in the first K steps, then will play the arm that could maximize the sum of two terms:",
+                "it = arg maxi xi + 2 ln t T i,t from t = K + 1 to T .",
+                "success rates.",
+                "Inspired by UCB1 (Auer et al., 2002), we design a calibrated performance expectation xj of the system agent S interacting with each user simulator U j taking exploration into consideration beyond pure exploitation:",
+                "xj = xj exploitation + 2 ln t Tj,t exploration , j \u2208 {1, ..., K}; (2)",
+                "where xj is the success rate of the system agent S tested with user simulator U j , and T j,t is the number of times user simulator U j has been selected with so far. Then we normalize xj into",
+                "zj = 1/ (xj \u2212 \u03c4 min({x1, \u2022 \u2022 \u2022 , xK })) ,(3)",
+                "Eq. 3 penalizes the user simulators with which the dialogue system already performs well in the expectation term. Where the hyperparameter \u03c4 is the smooth factor for distribution p = {p 1 , \u2022 \u2022 \u2022 , p K } -the larger \u03c4 is, the sharper p is. Each probability p j in p is calculated as",
+                "p j = z j K i=1 z i .(4)",
+                "In the following T \u2212 1 dialogues, we will specify all user simulators to train the system agent S with this distribution p (lines 15-18). We will also evaluate the RL model S for every e episodes (line 10-12) and update the distribution p with the new K success rates (line 13).",
+                "Difference with the original UCB1. The main differences between our modified UCB1 algorithm and the original UCB1 algorithm are twofold. First, we tailor the original UCB1 into our scenario by using Eq. 3 to penalize the user simulators with which the dialogue system has performed well. Secondly, we adopt a sampling schema based on a well-designed distribution (see Eq. 4) instead of taking the arm with the highest expectation. This is to increase the diversity and flexibility of arm selection."
+            ],
+            "publication_ref": [
+                "b1",
+                "b1"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": [
+                "To verify the effectiveness of MUST, we benchmark the system agents trained either with a single user simulator or multiple user simulators (including MUST merging , MUST uniform , and MUST adaptive ). See MUST CRL in the App. C."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental Setup",
+            "text": [
+                "Available user simulators. There are six user simulators provided by Shi et al. (2019), which are Agenda-Template (AgenT), Agenda-Retrieval (AgenR), Agenda-Generation (AgenG), RNN-Template (RNNT), RNN-Retrieval (RNNR), RNN-End2End (RNN) trained with different dialog planning and generation methods. The NLU modules of all six user simulators are using the RNN model. The DM modules of AgenT, AgenR, and AgenG are rule-based methods. For the NLG module, these three simulators are using the template, retrieval, and generation methods respectively. The DM modules of RNNT, and RNNR are using Sequicity (Lei et al., 2018) as their backbones which is an RNN-based seq2seq model with copy mechanism. The NLG modules of these two simulators are using the template and retrieval methods respectively. The user simulator of RNN uses Sequicity as its backbone in an end-to-end manner.",
+                "Baselines. The baselines are the dialogue systems trained by each user simulator, including Sys-AgenT, Sys-AgenR, Sys-AgenG, Sys-RNNT, Sys-RNNR, and Sys-RNN. For a fair comparison, all system agents (including the systems trained by our MUST) have the same architecture described in Shi et al. (2019). See details in App. B.1.",
+                "MultiWOZ Restaurant Domain Dataset. The original task in MultiWOZ (Budzianowski et al., 2018) is to model the system response. Shi et al. (2019) annotate the user intents and the user-side dialog acts in the restaurant domain of MultiWOZ to build user simulators, which has a total of 1,310 dia-logues. Moreover, we randomly simulate 2,000 dialogues from each rule-based simulator (i.e., AgenT, AgenR, AgenG) and their corresponding system agents respectively, and processe these dialogues to have the same annotation format as the MultiWOZ restaurant domain dataset. We denote this dataset as Simulated Agenda Dataset, which has a total of 6,000 dialogues.",
+                "Evaluation Measures. A straightforward metric to evaluate dialogue systems is the success rate tested by each user simulator. We calculate the success rate between a user simulator and a system agent by sampling 200 dialogues. We exclude some user simulators in training MUST and test the systems with them as out-of-domain evaluation.",
+                "According to the previous study Gunasekara et al. ( 2020), there usually is a gap between automatic evaluations and human evaluations of dialogue systems. Therefore, we ask humans to converse with dialogue systems. Each dialogue system has conversed with 5 different users; each user has 10 dialogues. In total, we collect 50 dialogues for each dialogue system to calculate its success rate. See more details in App. B.5."
+            ],
+            "publication_ref": [
+                "b26",
+                "b11",
+                "b26",
+                "b26"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Implementations",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Two new User Simulators",
+            "text": [
+                "We believe Pre-trained Language Models (PLMs) might improve the capacity of user simulators since they have recently shown remarkable success in building task-oriented dialogue systems (Ham et al., 2020;Peng et al., 2021;Hosseini-Asl et al., 2020).",
+                "Here we implement another two user simulators using GPT (Radford et al., 2018(Radford et al., , 2019)). Building a user simulator using GPT is similar to building a ToD system with GPT. See more details in App. G.",
+                "GPT Simulator. It is first fine-tuned on the simulated agenda dataset and then fine-tuned on the MultiWOZ restaurant domain dataset by leveraging GPT. This user simulator will be used to help implementing MUST.",
+                "GPT IL Simulator. To implement the MUST merging strategy, similar to Imitation Learning (IL), we first train a new user simulator with dialogue sessions collected from different user simulators and their corresponding dialogue systems. We also learn this new user simulator based on GPT model and denote it as GPT IL . GPT IL is first fine-tuned on the simulated agenda dataset. Then we sample 1,400 dialogues from the 97.5 90.0 94.7 3.3 92.9 5.3 [1] The underlined number represents the success rate between a user simulator and its corresponding dialogue system trained by this user simulator. The increasing and decreasing percentages (in red and green colors) use the underlined numbers as the base success rates.",
+                "[2] \u2193 (\u2191) indicates by what percentages the success rate has decreased (increased) compared with the base success rate by interacting with the same user simulator.",
+                "Table 2: The success rates of system agents testing on various user simulators. Each column represents a user simulator, each row represents a dialogue system trained with a specific simulator, e.g., Sys-AgenT means the system trained with AgenT. Each entry shows the success rate of a system agent when dealing with a user simulator. We use four simulators (AgenT, AgenR, RNNT, and GPT) to implement MUST uniform and MUST adaptive .",
+                "simulated agenda dataset and merge them with 1,310 MultiWOZ restaurant domain dialogues to continue fine-tuning GPT IL ."
+            ],
+            "publication_ref": [
+                "b6",
+                "b17",
+                "b7",
+                "b21",
+                "b22"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Dialogue Systems",
+            "text": [
+                "Sys-GPT is trained with the single user simulator GPT. Sys-MUST merging is trained with GPT IL . Sys-MUST uniform is trained by the user simulators of AgenT, AgenR, RNNT, and GPT with a uniform sampling distribution. For training Sys-MUST adaptive 7 , the distribution p will be adaptively updated using our modified UCB1 algorithm. We also train the Sys-MUST uniform and Sys-MUST adaptive by using different subsets of the user simulators for ablation studies in App. D."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental Results",
+            "text": [
+                "Automatic Evaluation. As seen in Tab. 2, Sys-MUST uniform and Sys-MUST adaptive outperform the dialogue systems (Sys-AgenT, Sys-AgenR, Sys-RNNT, and Sys-GPT) trained by a single user simulator in the overall performance, demonstrating the superiority of leveraging multiple user simulators. Especially, Sys-MUST adaptive has a 1.2 absolute value improvement (92.9 vs. 91.7) averagely over the previous SOTA system Sys-AgenR. Observing that Sys-MUST merging is not as competitive as Sys-MUST uniform and Sys-MUST adaptive , this comparison shows that the merging strategy cannot effectively leverage multiple user simulators.",
+                "In in-domain evaluation, the performances of systems (Sys-AgenT, Sys-AgenR, Sys-RNNT, and Sys-GPT) trained by a single user simulator drop a lot when testing with a different simulator. It requires us to delicately select a suitable user simula- tor for obtaining a good dialogue system. However, users might be multi-facet or even unknown, making the selection even more difficult. Therefore, it is essential to leverage multiple user simulators when training dialogue systems. At least, the performance gap of dialogue systems trained with our MUST becomes smaller than without MUST, see the percentages labeled in green and red colors.",
+                "In out-of-domain evaluation where the user simulators used for testing the systems are unseen by our MUST, Sys-MUST uniform and Sys-MUST adaptive achieve at most 2.4 absolute value improvement over Sys-AgenR. This evidences that MUST has a better generalization ability for interacting with unseen user simulators. Moreover, the dialogue systems (Sys-MUST merging , Sys-MUST uniform , and Sys-MUST adaptive ) trained with the proposed MUST approaches have lower standard deviations, which indicates that they are more robust to the diversity of user simulators.",
+                "Human Evaluation. In Tab. 3, the human evaluation results show that our Sys-MUST uniform and Sys-MUST adaptive largely outperform the other dialogue systems when interacting with real users. The consistency between automatic evaluations and human evaluations evidences the effectiveness of our proposed MUST.   "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Analysis and Discussions",
+            "text": [
+                "Convergences of MUST uniform and MUST adaptive . In Fig. 2, we show the learning curves of Sys-MUST uniform and Sys-MUST adaptive in 100,000 steps; the first 40,000 steps are in the warm-up phase for Sys-MUST adaptive . From Fig. 2(a), we can see that training the dialogue system with AgenT, AgenR, RNNT, and GPT by MUST adaptive converges faster than by MUST uniform . We do ablation studies on our modified UCB1 algorithm to help understanding the designed distribution p, see details in App. E. We further plot the performances of the dialogue system tested by each user simulator in the RL training in Fig. 2"
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2",
+                "fig_2",
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "(b)-2(e).",
+            "text": [
+                "Visualization on MUST adaptive . Let us define the adaptation difficulty of a user simulator using how many steps it must take to train the dialogue system with this user simulator until it converges. The adaptation difficulty of all user simulators could be ranked like AgenR > AgenT > GPT > RNNT according to Fig. 2(b)-2(e). To check whether MUST adaptive tends to sample harder-to-adapt user simulators more times in the adaptive phase, as assumed in \u00a74.2, we visualize the sampling proportions of all user simulators in Fig. 3(a). We could observe that AgenR was sampled with 45.1% (the biggest proportion) and it is indeed the hardest user simulator that can be adapted by the system; RNNT has the smallest sampling proportion and it is the easiest user simulator that can be adapted by the system. The consistency between the adaptation difficulty and sampling proportions for these four user simulators evidences our assumption in \u00a74.2. Fig. 3(b) visualizes the variations of the sampling distributions of user simulators. Interestingly, it shows that AgenR and AgenT are competitive with the GPT simulator; while RNNT and GPT are cooperative with each other. This might be because both RNNT and GPT simulators are learned from the dialogue corpus and might share some similar behaviors."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2",
+                "fig_4",
+                "fig_4"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "In this paper, we propose a framework named MUST to improve dialogue systems by using multiple user simulators simultaneously. We discuss several simple methods to implement MUST, which is either inflexible or inefficient. Therefore, we formulate MUST as a Multi-armed bandits (MAB) problem, based on which we propose a novel implementation called MUST adaptive . The experimental results on the restaurant search task from MultiWOZ demonstrate that MUST can largely improve the system agent upon baselines, especially when tested with unseen user simulators. Moreover, MUST adaptive is more efficient than other implementations."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitation",
+            "text": [
+                "The main limitation of this work is that we only conduct our experiments on the restaurant domain of the MultiWOZ since we can only find multiple user simulators from Shi et al. (2019) and they build these simulators only on the restaurant search task. In future work, we plan to apply our proposed methods to multi-domain scenarios."
+            ],
+            "publication_ref": [
+                "b26"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethics Statement",
+            "text": [
+                "There "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Multi-armed bandit problem",
+            "text": [
+                "Reinforcement learning policies face the exploitation versus exploration trade-off, which can be described as the search for a balance between exploring the environment to find profitable actions while taking the empirically best action as often as possible. This exploitation vs exploration dilemma has been widely studied as a Multi-armed bandit (MAB) problem.",
+                "In the MAB problem, there are K arms, and each arm j has a fixed but unknown reward distribution R j with an expectation \u00b5 j . At each time step t = 1, 2, ..., T , the decision maker must choose one of these K arms. We denote the arm pulled at time step t as j t \u2208 {1, ..., K}. After pulling an arm, it will receive a reward X jt which is a realization drawn from the arm's underlying reward distribution. The decision masker's objective is to maximize the cumulative expected reward over the time horizon T t=1 E[X jt ] = T t=1 \u00b5 jt ."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B More details about training dialogue systems B.1 The architectures of user simulators and dialogue systems",
+            "text": [
+                "The basic modules of user simulators and dialogue systems are detailed in Tab. 4."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.2 The implementations of the dialogue systems",
+            "text": [
+                "The NLU modules of all system agents are a 2-layer bidirectional-GRU with 200 hidden units. The NLG modules of them are using the template-based method. The DM modules of them are a simple MLP. The input of the DM module is a state representation, which consists of the traditional dialog state and word count vector of the current utterance same as Shi et al. (2019). We mainly use the policy gradient method to train the DM modules of dialogue systems from scratch."
+            ],
+            "publication_ref": [
+                "b26"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.3 The details of running policy gradient algorithm",
+            "text": [
+                "For training the DM modules of dialogue systems with the policy gradient method, we also apply the \u03f5-greedy exploration strategy. We let \u03f5 be 0.5 in the beginning, and it will decrease to 0 linearly within the RL training. The dialogue ends either when the user simulators say \"goodbye\" or when the number of turns of the dialogue exceeds 10. The reward will be given +1 for task success, -1 for task failure, and -0.1 for each additional turn to encourage the RL-based policy module to finish the task fast. Also, a discounted factor of 0.9 is applied to all the experiences."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.4 The parameters of training Sys-MUST adaptive",
+            "text": [
+                "The hyperparameters used to train the Sys-MUST adaptive are listed in the Tab. 5. Since some user simulators used for implementing our MUST framework are based on the GPT model, we train Sys-MUST adaptive on a V100 GPU and it will cost around 15 hours with the default hyperparameters above."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.5 Human Evaluation on dialogue systems",
+            "text": [
+                "We find 5 volunteers to conduct the human evaluations on dialogue systems. They all have good English skills and are unpaid. Before the experiments, we introduced task-oriented dialogue systems and user simulators to them and tell them how to judge if the generated dialogue is successful. Then we prepare 50 user goals from MultiWOZ Restaurant Domain Dataset: 20 of them are simple, and 30 of them are a little bit complex. We specify 10 user goals for each volunteer and let the volunteer converse with all dialogue systems for each same user goal. In total, we collect 50 dialogues for each  dialogue system to calculate its success rate.",
+                "The criteria to judge whether a task-oriented dialogue is successful are based on two aspects: 1) the system agent correctly understands the user's goal (i.e., the predicted dialogue state tracking result is correct); and 2) the system agent provides all information (i.e., all slot values or a booking reference number) that the user requests. For human evaluations, we follow these standard criteria. Besides, we also see if the system act generated by the system agent is matched to the user act for each turn in the dialogue.",
+                "There have seven user acts, which are 'inform type\", \"inform type change\", \"ask info\", \"anything else\", \"make reservation\", \"make reservation change time\", and \"goodbye\". There have nine system acts, which are \"ask type\", \"present result\", \"nomatch result\", \"no other\", \"ask reservation info\", \"provide info\", \"booking success\", \"booking fail\" and \"goodbye\". The relationships between user acts and system acts are shown in Tab. 6."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Implement MUST with the MUST CRL strategy",
+            "text": [
+                "Without losing any generality, we consider two representative sequential orders: 1) AgenT, AgenR, RNNT, GPT; and 2) AgenR, GPT, AgenT, RNNT.",
+                "For case 1, the first two user simulators are Agenda-based user simulators; the last two user simulators are Neural networks-based user simulators. For case 2, we interleave these two types of user simulators. When the system trained by a user simulator converges, we let it continue to interact with another user simulator following the order. As seen in Tab. 7, in case 1, the system agent achieves the best performance (i.e., 92.4 in terms of the average success rate) after training with AgenT and AgenR sequentially. However, its overall performance degrades to 83.0 after training with RNNT; especially, its performance decreases by 36.0% when testing with AgenR (93.0 \u2192 59.5). Moreover, after continuing to learn from GPT, the performance of the system agent becomes worse for AgenT (95.0 \u2192 75.5) and AgenR (59.5 \u2192 47.5). This indicates the catastrophic forgetting issue heavily happened when the system agent starts learning from AgenR. We also could observe a similar phenomenon from case 2. These results can confirm that implementing our proposed MUST with MUST CRL strategy indeed has the catastrophic forgetting issue."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "D Sensitivity on different subsets of user simulators",
+            "text": [
+                "We also train the Sys-MUST uniform and Sys-MUST adaptive by using different groups of user simulators for ablation studies: 1) five user simulators of AgenT, AgenR, RNNT, RNNR, and GPT; and 2) three user simulators including AgenT, RNNT, and GPT.",
+                "Superiority of MUST. From Tab. 8 and Tab. 9, we can observe that Sys-MUST uniform and Sys-MUST adaptive largely outperform the dialogue systems trained by single user simulators. Especially, they gain an improvement of 4 absolute points (85.4 vs. 81.4) when trained with three user simulators of AgenT, RNNT, and GPT. In summary, MUST  could consistently improve the performance of the systems when using different numbers of user simulators. The ablation studies on different subsets of user simulators can demonstrate the robustness of MUST.",
+                "Out-of-domain evaluation. When testing our MUST with unseen user simulators, Sys-MUST uniform and Sys-MUST adaptive can also largely outperform the dialogue systems trained by a single user simulator. As seen in Tab. 8, Sys-MUST adaptive achieves a 2.7 absolute value improvement (92.5 vs 89.8) over Sys-AgenR. Sys-MUST uniform and Sys-MUST adaptive even improve at least 5.7 points (80.0 vs 74.3) over Sys-GPT (as shown in Tab. 9). These experimental results on different subsets of user simulators demonstrate that our MUST has a better generalization ability for interacting with unseen user simulators and is insensitive to the user simulator selection.",
+                "Comparison between MUST uniform and MUST adaptive . Fig. 4 shows the learning curves of Sys-MUST uniform and Sys-MUST adaptive on different subsets of user simulators. The first 40,000 steps are in the warm-up phase for Sys-MUST adaptive . We could conclude that training the dialogue system by MUST adaptive consistently converges faster than by MUST uniform , at least in the scenarios when using three, four, or five user simulators to implement MUST (see Fig. 4(a), From Tab. 8 where MUST is trained with five user simulators, we could observe that Sys-MUST adaptive outperforms Sys-MUST uniform with 0.5 absolute point. The performance gain becomes smaller when MUST is trained with three user simulators (see Tab. 9). This probably shows that Sys-MUST adaptive would be more beneficial when there exist more user simulators."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "E Ablation study for the modified UCB1 algorithm E.1 Necessity of the exploration term",
+            "text": [
+                "Our modified UCB1 algorithm provides a distribution for guiding how to sample different user simulators to accelerate the entire MUST training. The exploration term in the proposed MUST adaptive exists mainly for uniform adaption (see the detailed explanation in Sec. 4.1). The original UCB1 algorithm (Auer et al., 2002) can tell us how to pull arms in bandits to maximize the cumulative expected reward. It is well-known that it cannot explore effectively without the exploration (UCB) term; consequently, it might not find the optimal action and lead to relatively poor performance. It is difficult to theoretically prove the usefulness of the exploration term in our scenario (like in the original UCB1 algorithm), which we leave as future work. However, we alternatively conduct some ablation studies to evidence the necessity of the exploration term.",
+                "MUST adaptive w/t exploration. If we omit the exploration term in our modified UCB1 algorithm, the simplest way to calculate the distribution p is to make the sample probability w.r.t a user simulator solely depend on the inversion of the system's performance. See the row called 'w/t exploration' in Tab. 10 for comparisons. In this situation, the obtained distribution p might be sharp due to the lack of the exploration term, which would be harmful for uniform adaption to some extent. As Fig. 5(a) shows, MUST adaptive performs worse and converges slower when omitting the exploration term, compared with when our modified UCB1 algorithm has the exploration term. This could demonstrate both the importance of uniform adaption and the usefulness of the exploration term."
+            ],
+            "publication_ref": [
+                "b1"
+            ],
+            "figure_ref": [
+                "fig_8"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "E.2 Ablation study on the designed distribution",
+            "text": [
+                "Rationale of exploitation vs exploration tradeoff. Similar to the exploitation vs exploration trade-off, the distribution p under the MUST adaptive should trade off the boosting adaption and the uniform adaption when specifying multiple user simulators. Considering the boosting adaption, we make a exploitation assumption stated as follows: p is expected to assign lower weights to user simulators with which the system agent S already performs well and higher weights to those user simulators with which S performs poorly. Therefore, the sampling ratios for different user simulators should be inversely proportional to the system's performance on each user simulator.",
+                "Rationale of the modified UCB1 algorithm.",
+                "The modified UCB1 algorithm for implementing MUST adaptive is defined as",
+                "xj = xj exploitation + 2 ln t T j,t exploration , j \u2208 {1, ..., K}; z j = 1/ (x j \u2212 \u03c4 min({x 1 , \u2022 \u2022 \u2022 , xK })) , p i = z j K j=1 z j .(5)",
+                "MUST adaptive in Eq. 5 (which is the same as Eq. 2, Eq. 3, and Eq. 4) consists of three steps: exploitation-exploration term construction, postprocessing (re-scaling operation and the inversion operation), and the probability normalization, corresponding to each line in Eq. 5. Besides this way, we could have the following three variants that shuffle the order of these three key operations (i.e., the exploitation-exploration term construction, re-scaling operation, and the inversion operation). We name these variants as as MUST adaptive -I, MUST adaptive -II, and MUST adaptive -III.",
+                "MUST adaptive -I. For the exploitation assumption, we make the exploitation term inversely proportional to the system's performance xj on each user simulator U j , which is denoted as MUST adaptive -I. From Tab. 10, we can obverse that the difference between MUST adaptive -I and MUST adaptive is that MUST adaptive -I take the inversion of x before the exploitation-exploration term construction while MUST adaptive take the inversion operation after the exploitation-exploration term construction. Since each xj , j \u2208 {1, \u2022 \u2022 \u2022 , K} is smaller than 1, 1 xj will be larger than 1. Therefore, the term of 1 xj and the exploration term of 2 ln t T j,t (smaller than 1) are not with the same magnitude, which will lead to a consequence that the exploitation term becomes dominant while the exploration term is negligible. We have discussed a similar issue of ignoring the exploration term in Sec. E.1. Therefore, we adopt MUST adaptive in default if not specified rather than MUST adaptive -I since the latter might suffer from the different magnitudes of the exploitation term and the exploration term.  Results for ablation study on the variants. Experimental results of these different variants are shown in Fig. 5(b). The convergence speed of MUST adaptive -I is much slower compared to others, which demonstrates that the exploration term is useful once more. The convergence speeds of MUST adaptive -II and MUST adaptive -III is comparative to MUST adaptive . This probably shows that variants exploitation-exploration term post-processing distribution",
+                "MUST adaptive xj = xj + 2 ln t T j,t zj = 1 (xj\u2212\u03c4 min({x 1 ,\u2022\u2022\u2022 ,x K })) pj = z j K i=1 z i w/t exploration zj = 1 xj MUST adaptive -I xj = 1 xj + 2 ln t T j,t zj = xj \u2212 \u03c4 min({1/x1, \u2022 \u2022 \u2022 , 1/xK }) MUST adaptive -II xj = 1/x j K i=1 1/x i zj = \u1e91j \u2212 \u03c4 min({x1, \u2022 \u2022 \u2022 , xK }) \u1e91j = xj + 2 ln t T j,t MUST adaptive -III xj = 1 (x j \u2212\u03c4 min({x 1 ,\u2022\u2022\u2022 ,x K })) zj = xj K i=1 xi + 2 ln t T j,t",
+                "Table 10: The variants of MUST adaptive . The MUST adaptive implementation is an exploitation-exploration term followed by a post-processing for the re-scaling purpose and a sum-one normalization. Since we omit the exploration term for the second row, therefore, it does not need the post-processing. MUST adaptive -III moves the re-scaling and the inversion operations to the front of the constructed exploitation-exploration term.",
+                "our design with three operations (i.e., exploitationexploration term construction, re-scaling strategy, and the inversion of xj ) is not only reasonable but also robust to the order permutation of these three operations."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "F Implementing MUST with more user simulators",
+            "text": [
+                "To implement our MUST with more user simulators, we use Simulated Agenda Dataset to train four extra user simulators 8 . Fig. 6(a) shows the learning curve of the system agent trained by MUST with eight simulators (AgenT, AgenR, RNNT, GPT, GPT AT , GPT AR , GPT AG , and GPT rand ). We could observe that the training of our proposed MUST can still succeed when we increase the number of user simulators to eight. Sys-MUST adaptive still converges faster than Sys-MUST uniform even though the difference between their convergence speeds is not too large in this case. It might be because some user simulators are similar (e.g., GPT AT is similar to AgenT, GPT AR is similar to AgenR), which might lead that the distribution p approaches a uniform distribution. Fig. 6(b) compares the learning curves of Sys-MUST adaptive and Sys-MUST uniform trained with different numbers of user simulators (i.e., four, five, and eight user simulators). It is a fair comparison because these combinations include the hardest 8 Simulated Agenda Dataset (See Sec. 5.1) is simulated from each rule-based user simulator (i.e., AgenT, AgenR, AgenG) and its corresponding system agent respectively. We use them to build three new user simulators denoted as GPTAT, GPTAR, and GPTAG based on the GPT model respectively. For example, we use the simulated dialogues from AgenT and Sys-AgenT to build the GPTAT. we also collect 3000 dialogues randomly from Simulated Agenda Dataset to train another new GPT user simulator denoted as GPT rand . user simulator AgenR that can be adapted by the system and the easiest user simulator RNNT that can be adapted by the system (See Sec. 5.4). We can observe that, with more user simulators, Sys-MUST adaptive not only performs better but also converges faster than with fewer user simulators. This probably shows that Sys-MUST adaptive has the potential to be generalized to a larger set of user simulators. Plus, we also could observe that Sys-MUST adaptive consistently converges faster than Sys-MUST uniform in different numbers of user simulators."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_10",
+                "fig_10"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "G Modeling User Simulator with GPT",
+            "text": [
+                "We name the model of building a user simulator based on GPT as U-GPT. In this section, we will illustrate its details and conduct experiments to prove that it is a better model for building a user simulator."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "G.1 The architecture of U-GPT",
+            "text": [
+                "As Fig. 7(a) shown, our U-GPT consists of four modules, which are Natural Language Understanding (NLU), Goal Generator, Dialog Policy Learning (POL), and Natural Language Generation (NLG). Dialogues consist of multiple turns. In the first turn t = 0, U-GPT (1) first outputs its NLU results N 0 by understanding the system input S 0 , and (3) decide its actions A 0 which is a list of pairs: (action_type, slot_name) based on (2) its initial goal G 0 and {S 0 , N 0 }. U-GPT then (4) conditions on {S 0 , N 0 , G 0 , A 0 } to generate the delexicalized utterance U 0 . The generated placeholders in U 0 will be filled using the corresponding slot values in the goal G 0 . When the conversation proceeds to turn t, U-GPT (1) generates the  NLU results N t based on all of previous dialogue history and generated outputs {C 0 , . . . , C t\u22121 , S t }, here",
+                "C i = [S i , N i , G i , A i , U i ].",
+                "If there has \"nooffer\" intent in N t representing that no entities could satisfy current constraints, then (2) Goal Generator should generate a new goal G t . Then U-GPT will continue to (3) generate the user acts A t and (4) generate delexicalized utterance U t conditioned on {C 0 , . . . , C t\u22121 , S t , N t , G t } sequentially. We should notice that the user utterances occurred in the history context should be lexicalized because they contain important information. [eos_pol], [eos_utt] to signal the ending of sequence representations of different modules. For the NLU results N t , we use five categories: \"inform\", \"request\", \"book inform\", \"select\", \"recommend\" same as Shi et al. (2019) to represent them. And we also introduce five tokens [eos_constraint], [eos_book], [eos_recommend],",
+                "[eos_select], [eos_request] to record different information. All of these tokens and the intents of user actions will be added to the vocabulary of GPT as additional special tokens. For training U-GPT, we use the same training objective as GPT which is to maximize the following likelihood:",
+                "L(U ) = i log P (u i |u i\u2212k , ..., u i\u22121 ; \u0398), \u2200 u i \u2208 {S 0 , N 0 , G 0 , A 0 , U 0 , ..., A t , U t },",
+                "where k is the size of the context window, and the conditional probability P is parameterized with \u0398."
+            ],
+            "publication_ref": [
+                "b26"
+            ],
+            "figure_ref": [
+                "fig_11"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "G.2 Evaluations on U-GPT",
+            "text": [
+                "To evaluate our proposed U-GPT, we adopt both indirect evaluations and direct evaluations as in Shi et al. (2019). We evaluate a user simulator indirectly using the average success rate of the system agent trained by this simulator. It is called crossmodel evaluation (Schatzmann and Young, 2009) which assumes a strategy learned with a good user model still performs well when tested on poor user models. It can indirectly evaluate the goodness of a user simulator. For direct evaluations, we adopt six evaluation measures to evaluate the diversity of user simulators automatically: average utterance length, vocabulary size, Dist-1, Dist-2 (Li et al., 2016a) and Entropy (Zhang et al., 2018). We also ask human users to rate the simulated dialogues 9 to assess the user simulators directly. We use five same metrics as Shi et al. (2019) which are Fluency, Coherence, Goal Adherence, Diversity, and Overall quality to assess user simulators from multiple aspects."
+            ],
+            "publication_ref": [
+                "b26",
+                "b25",
+                "b12",
+                "b26"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "G.3 Training details of user simulators",
+            "text": [
+                "We implement our GPT-based user simulators with DistilGPT2 (Sanh et al., 2020), a distilled version of GPT-2 by HuggingFace's Transformers (Wolf et al., 2020). We select the best performing models on the validation set through hyperparameters {\"info\":{\"food\": \"Venetian\", \"pricerange\": \"expensive\", \"area\": \"centre\"}, \"book\": {\"time\": \"12:00\", \"day\": \"Wednesday\", \"people\": \"4\"}} {\"info\":{\"food\": \"Chinese\", \"pricerange\": \"expensive\", \"area\": \"centre\"}, \"book\": {\"time\": \"12:00\", \"day\": \"Wednesday\", \"people\": \"4\"}}"
+            ],
+            "publication_ref": [
+                "b23",
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "System Agent User Simulator",
+            "text": [
+                "(2) Goal Generator (1) NLU (2) Goal Generator   search of learning rate and batch size. The best models were fine-tuned with a batch size of 64 and a learning rate of 1e-3 over the corresponding dataset. We use the greedy decoding strategy for generating word-tokens in the inference phrase."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "G.4 Experiments",
+            "text": [
+                "GPT-RNN. Because the implementation of user simulator RNN mainly consists of NLU and NLG, we remove the POL module from U-GPT and use the same annotated data as RNN to fine-tune it to compare our U-GPT with the RNN-based methods fairly and name it as GPT-RNN.",
+                "As Tab. 11, Tab. 12, Tab. 13 show, GPT-RNN outperforms the user simulator RNN. It proves the power of leveraging GPT.",
+                "Our GPT-RNN performs better than the user simulator RNNT, which can be seen from the crossmodel evaluation results in Tab. 11, the automatic evaluation results in Tab. 12, and the Hu.Div score in the human evaluation results in Tab. 13. However, as Tab. 13 shows, RNNT performs better than our GPT-RNN in the overall performance from the human evaluation. We think this might be because (1) the third-party system also has an impact on the generated dialogues and (2) the NLG module of RNNT is the template-based method which leads to the generated dialogues from RNNT being easy for the third-party system to understand and interact with.",
+                "The automatic evaluation results in Tab. 12 and the Hu.Div score in the human evaluation results in Tab. 13 show that RNNR can generate more diverse language than our GPT-RNN. We think it is because the user utterances generated by RNNR are retrieved from a corpus that is written by real humans and the sentences written by humans are usually more diverse than the sentences generated by generative models. Even though the dialogues generated by RNNR are more diverse, the dialogues generated by our GPT-RNN are more fluent and coherent. Also, the cross-model evaluation results in Tab. 11 show that GPT-RNN can help to learn a more robust system agent than RNNR, but the Hu.All score in the human evaluation in Tab. 13 gives the opposite result. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgements",
+            "text": [
+                "Part of this work was done when the first author worked at Huawei Noah's Ark Lab. Besides, this work is supported by the Chinese Key-Area Research and Development Program of Guangdong Province (2020B0101350001), the Shenzhen Science and Technology Program (JCYJ20220818103001002), the Guangdong Provincial Key Laboratory of Big Data Computing, The Chinese University of Hong Kong, Shenzhen, Shenzhen Key Research Project (C10120230151) and Shenzhen Doctoral Startup Funding (RCBS20221008093330065). We would like to thank Zichao Li, Chen Zhang, and Dong Yang for their helpful discussions. Moreover, we thank anonymous reviewers for their valuable suggestions."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "",
+            "text": [
+                "B3. Did you discuss if your use of existing artifact(s) was consistent with their intended use, provided that it was specified? For the artifacts you create, do you specify intended use and whether that is compatible with the original access conditions (in particular, derivatives of data accessed for research purposes should not be used outside of research contexts)?",
+                "No response.",
+                "B4. Did you discuss the steps taken to check whether the data that was collected / used contains any information that names or uniquely identifies individual people or offensive content, and the steps taken to protect / anonymize it? No response.",
+                "B5. Did you provide documentation of the artifacts, e.g., coverage of domains, languages, and linguistic phenomena, demographic groups represented, etc.? No response.",
+                "B6. Did you report relevant statistics like the number of examples, details of train / test / dev splits, etc. for the data that you used / created? Even for commonly-used benchmark datasets, include the number of examples in train / validation / test splits, as these provide necessary context for a reader to understand experimental results. For example, small differences in accuracy on large test sets may be significant, while on small test sets they may not be.",
+                "No response."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Did you run computational experiments?",
+            "text": [
+                "Yes. Sec. 5",
+                "C1. Did you report the number of parameters in the models used, the total computational budget (e.g., GPU hours), and computing infrastructure used?"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "See appendix",
+            "text": [
+                "The Responsible NLP Checklist used at ACL 2023 is adopted from NAACL 2022, with the addition of a question on AI writing assistance."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "A sequence-to-sequence model for user simulation in spoken dialogue systems",
+            "journal": "",
+            "year": "2016",
+            "authors": "Layla El Asri; Jing He; Kaheer Suleman"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Finite-time analysis of the multiarmed bandit problem",
+            "journal": "",
+            "year": "2002",
+            "authors": "Peter Auer; Nicol\u00f2 Cesa-Bianchi; Paul Fischer"
+        },
+        {
+            "ref_id": "b2",
+            "title": "MultiWOZ -a largescale multi-domain Wizard-of-Oz dataset for taskoriented dialogue modelling",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Pawe\u0142 Budzianowski; Tsung-Hsien Wen; Bo-Hsiang Tseng; I\u00f1igo Casanueva; Stefan Ultes; Milica Osman Ramadan;  Ga\u0161i\u0107"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Deep learning for dialogue systems",
+            "journal": "",
+            "year": "2017",
+            "authors": "Yun-Nung Chen; Asli Celikyilmaz; Dilek Hakkani-T\u00fcr"
+        },
+        {
+            "ref_id": "b4",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "R ; Chulaka Gunasekara; Seokhwan Kim; Luis Fernando; D' Haro; Abhinav Rastogi; Yun-Nung Chen; Mihail Eric; Behnam Hedayatnia; Karthik Gopalakrishnan; Yang Liu; Chao-Wei Huang; Dilek Hakkani-T\u00fcr; Jinchao Li; Qi Zhu; Lingxiao Luo; Lars Liden; Kaili Huang; Shahin Shayandeh; Runze Liang; Baolin Peng; Zheng Zhang; Swadheen Shukla; Minlie Huang; Jianfeng Gao; Shikib Mehri; Yulan Feng; Carla Gordon"
+        },
+        {
+            "ref_id": "b5",
+            "title": "User modeling for task oriented dialogues",
+            "journal": "",
+            "year": "2018",
+            "authors": "Izzeddin Gur; Dilek Hakkani-Tur; Gokhan Tur; Pararth Shah"
+        },
+        {
+            "ref_id": "b6",
+            "title": "End-to-end neural pipeline for goal-oriented dialogue systems using GPT-2",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Donghoon Ham; Jeong-Gwan Lee; Youngsoo Jang; Kee-Eung Kim"
+        },
+        {
+            "ref_id": "b7",
+            "title": "A simple language model for task-oriented dialogue",
+            "journal": "Curran Associates, Inc",
+            "year": "2020",
+            "authors": "Ehsan Hosseini-Asl; Bryan Mccann; Chien-Sheng Wu; Semih Yavuz; Richard Socher"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Towards continual reinforcement learning: A review and perspectives",
+            "journal": "CoRR",
+            "year": "2020",
+            "authors": "Khimya Khetarpal; Matthew Riemer; Irina Rish; Doina Precup"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Neural user simulation for corpus-based policy optimisation of spoken dialogue systems",
+            "journal": "",
+            "year": "2018",
+            "authors": "Florian Kreyssig; I\u00f1igo Casanueva; Pawe\u0142 Budzianowski; Milica Ga\u0161i\u0107"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Annual SIGdial Meeting on Discourse and Dialogue",
+            "journal": "Association for Computational Linguistics",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b11",
+            "title": "Sequicity: Simplifying task-oriented dialogue systems with single sequence-to-sequence architectures",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Wenqiang Lei; Xisen Jin; Min-Yen Kan; Zhaochun Ren; Xiangnan He; Dawei Yin"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Deep reinforcement learning for dialogue generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2016",
+            "authors": "Jiwei Li; Will Monroe; Alan Ritter; Dan Jurafsky; Michel Galley; Jianfeng Gao"
+        },
+        {
+            "ref_id": "b13",
+            "title": "A user simulator for task-completion dialogues",
+            "journal": "",
+            "year": "2016",
+            "authors": "Xiujun Li; C Zachary; Bhuwan Lipton; Lihong Dhingra; Jianfeng Li; Yun-Nung Gao;  Chen"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Domainindependent user simulation with transformers for task-oriented dialogue systems",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Nurul Hsien-Chin Lin; Songbo Lubis; Carel Hu; Christian Van Niekerk; Michael Geishauser; Shutong Heck; Milica Feng;  Gasic"
+        },
+        {
+            "ref_id": "b15",
+            "title": "End-to-end learning of task-oriented dialogs",
+            "journal": "",
+            "year": "2018",
+            "authors": "Bing Liu; Ian Lane"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Attention-based recurrent neural network models for joint intent detection and slot filling",
+            "journal": "CoRR",
+            "year": "2016",
+            "authors": "Bing Liu; Ian R Lane"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Shahin Shayandeh, Lars Liden, and Jianfeng Gao",
+            "journal": "",
+            "year": "2021",
+            "authors": "Baolin Peng; Chunyuan Li; Jinchao Li"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Deep Dyna-Q: Integrating planning for task-completion dialogue policy learning",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Baolin Peng; Xiujun Li; Jianfeng Gao; Jingjing Liu; Kam-Fai Wong"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Composite task-completion dialogue policy learning via hierarchical deep reinforcement learning",
+            "journal": "",
+            "year": "2017",
+            "authors": "Baolin Peng; Xiujun Li; Lihong Li; Jianfeng Gao; Asli Celikyilmaz; Sungjin Lee; Kam-Fai Wong"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Few-shot natural language generation for taskoriented dialog",
+            "journal": "",
+            "year": "2002",
+            "authors": "Baolin Peng; Chenguang Zhu; Chunyuan Li; Xiujun Li; Jinchao Li; Michael Zeng; Jianfeng Gao"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Improving language understanding by generative pre-training",
+            "journal": "",
+            "year": "2018",
+            "authors": "Alec Radford; Karthik Narasimhan"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Language models are unsupervised multitask learners",
+            "journal": "",
+            "year": "2019",
+            "authors": "Alec Radford; Jeff Wu; Rewon Child; David Luan; Dario Amodei; Ilya Sutskever"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Distilbert, a distilled version of bert: smaller, faster, cheaper and lighter",
+            "journal": "",
+            "year": "2020",
+            "authors": "Victor Sanh; Lysandre Debut; Julien Chaumond; Thomas Wolf"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Agenda-based user simulation for bootstrapping a POMDP dialogue system",
+            "journal": "",
+            "year": "2007",
+            "authors": "Jost Schatzmann; Blaise Thomson; Karl Weilhammer; Hui Ye; Steve Young"
+        },
+        {
+            "ref_id": "b25",
+            "title": "The hidden agenda user simulation model",
+            "journal": "IEEE Transactions on Audio, Speech, and Language Processing",
+            "year": "2009",
+            "authors": "Jost Schatzmann; Steve Young"
+        },
+        {
+            "ref_id": "b26",
+            "title": "How to build user simulators to train RL-based dialog systems",
+            "journal": "Association for Computational Linguistics",
+            "year": "1990",
+            "authors": "Weiyan Shi; Kun Qian; Xuewei Wang; Zhou Yu"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Multi-agent task-oriented dialog policy learning with role-aware reward decomposition",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Ryuichi Takanobu; Runze Liang; Minlie Huang"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Transferable dialogue systems and user simulators",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Bo-Hsiang Tseng; Yinpei Dai; Florian Kreyssig; Bill Byrne"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Semantically conditioned LSTM-based natural language generation for spoken dialogue systems",
+            "journal": "",
+            "year": "2015",
+            "authors": "Milica Tsung-Hsien Wen; Nikola Ga\u0161i\u0107; Pei-Hao Mrk\u0161i\u0107; David Su; Steve Vandyke;  Young"
+        },
+        {
+            "ref_id": "b30",
+            "title": "A network-based end-to-end trainable task-oriented dialogue system",
+            "journal": "Association for Computational Linguistics",
+            "year": "2017",
+            "authors": "David Tsung-Hsien Wen; Nikola Vandyke; Milica Mrk\u0161i\u0107; Lina M Ga\u0161i\u0107; Pei-Hao Rojas-Barahona; Stefan Su; Steve Ultes;  Young"
+        },
+        {
+            "ref_id": "b31",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": " Sys-Agenr"
+        },
+        {
+            "ref_id": "b32",
+            "title": "",
+            "journal": "System \\User AgenT AgenR AgenG RNNT RNNR RNN GPT GPTIL Avg.\u2191 Std.\u2193 Sys-RNNT",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b33",
+            "title": "Did you discuss the experimental setup, including hyperparameter search and best-found hyperparameter values?",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b34",
+            "title": "error bars around results, summary statistics from sets of experiments), and is it transparent whether you are reporting the max, mean, etc",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b35",
+            "title": "for preprocessing, for normalization, or for evaluation",
+            "journal": "",
+            "year": "",
+            "authors": " Nltk;  Spacy;  Rouge"
+        },
+        {
+            "ref_id": "b36",
+            "title": "crowdworkers) or research with human participants?",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b37",
+            "title": "Did you report the full text of instructions given to participants, including e.g., screenshots, disclaimers of any risks to participants or annotators",
+            "journal": "",
+            "year": "",
+            "authors": " D1"
+        },
+        {
+            "ref_id": "b38",
+            "title": "crowdsourcing platform, students) and paid participants, and discuss if such payment is adequate given the participants' demographic",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b39",
+            "title": "Did you discuss whether and how consent was obtained from people whose data you're using/curating? For example, if you collected data via crowdsourcing, did your instructions to crowdworkers explain how the data would be used?",
+            "journal": "",
+            "year": "",
+            "authors": " D3"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Was the data collection protocol approved (or determined exempt) by an ethics review board?",
+            "journal": "",
+            "year": "",
+            "authors": " D4"
+        },
+        {
+            "ref_id": "b41",
+            "title": "Did you report the basic demographic and geographic characteristics of the annotator population that is the source of the data?",
+            "journal": "",
+            "year": "",
+            "authors": " D5"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "(a) Success rates of different systems. (b) Dialog act distributions of different user simulators.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 1 :1Figure 1: (a) is the heat map on the success rates of system agents tested by different user simulators on 200 dialogues. (b) shows the dialog act distributions of Agenda-based User Simulators (ABUS) and Neural networksbased User Simulators (NUS) provided by Shi et al. (2019). There exist seven user dialog acts annotated in the restaurant search task from MultiWOZ, as shown on the Y-axis.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 2 :2Figure 2: The learning curves of Sys-MUST uniform and Sys-MUST adaptive . (a) shows their average success rates tested with all user simulators (AgenT, AgenR, RNNT, and GPT). The success rates of them tested with each user simulator are shown in (b)-(e).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "(a) The sampling proportion of simulators. (b) Variations of the sampling proportions (in every 2000 steps) of simulators.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 3 :3Figure 3: The sampling proportions of user simulators in average (a) and in time horizon (b).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Fig. 22Fig. 2(a), and Fig. 4(b), respectively).From Tab. 8 where MUST is trained with five user simulators, we could observe that Sys-MUST adaptive outperforms Sys-MUST uniform with 0.5 absolute point. The performance gain becomes smaller when MUST is trained with three user simulators (see Tab. 9). This probably shows that Sys-MUST adaptive would be more beneficial when there exist more user simulators.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 4: The learning curves of Sys-MUST uniform and Sys-MUST adaptive .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "(a) Ablation study on the exploration term (b) Ablation study on the distribution p",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_8",
+            "figure_caption": "Figure 5 :5Figure 5: The learning curves of Sys-MUST uniform and Sys-MUST adaptive .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_9",
+            "figure_caption": "(a) The learning curves of the system trained with eight user simulators. (b) Comparison between different numbers of user simulators.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_10",
+            "figure_caption": "Figure 6 :6Figure 6: The learning curves of Sys-MUST uniform and Sys-MUST adaptive .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_11",
+            "figure_caption": "Fig. 77(b) shows an example of training sequence which consists of the concatenation x = [C 0 , C 1 ]. In order to leverage GPT, we need to convert the generated outputs {N i , G i , A i , U i } to sequences of tokens resembling a text. And we introduce delimiter tokens [eos_resp], [eos_nlu], [eos_goal],",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_12",
+            "figure_caption": "The details of the first two-turn interactions between a system agent and our U-GPT. (b) An example of the model input for training U-GPT.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_14",
+            "figure_caption": "Figure 7 :7Figure7: The overview of our U-GPT which consists of Natural Language Understanding (NLU), Goal Generator, Dialog Policy Learning (POL), and Natural Language Generation (NLG). It uses the auto-regressive language model GPT to understand the system inputs, generate the user actions and the user utterances given the dialogue context and the user goals sequentially in an end-to-end manner. (a) gives a detailed description of the first two-turn interactions between a system agent and our U-GPT. For training U-GPT, we need to convert the dialogue context and all annotations to sequences of tokens. (b) presents the training example of the first two-turn dialogues in (a).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Algorithm 1: Implement MUST adaptive with the modified UCB1 algorithm Input: K fixed User simulators U = {U1, U2, \u2022 \u2022 \u2022 UK } and the values of hyperparameters Twarmup, T, e, d, \u03c4 ; 1 Initialization: randomly initialize System agent S; 2 Initialization: initialize the simulator sampling distribution p as a uniform distribution. evaluate the performance i.e. the success rate xj of the agent S by letting it interact d times with the simulator Uj;",
+            "figure_data": "3 (1) Warm-up phase: 4 for t = 0, ..., Twarmup \u2212 1 do 5 sample a simulator Uj in U w.r.t. the distribution p; 6 synthesize a new dialogue using the system agent S and the sampled Uj ; 7 use the reward obtained for the dialogue to update S with a RL algorithm;8 (2) Adaptive phase: 9 for t = 0, ..., T \u2212 1 do 10 if t%e == 0 then 11 for j = 1, ..., K do"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "MUSTmerging 97.5 \u2191 0.0% 83.5 \u2193 7.2% 94.5 \u2193 4.6% 80.5\u2193 1.8% 97.5 94.0 82.5 91.3 6.4 90.0 6.9 Sys-MUST uniform 97.5 \u2191 0.0% 89.0 \u2193 1.0% 97.5\u2193 1.5% 82.5\u2191 0.5% 96.5 96.0 87.5 93.4 4.2 92.4 5.6 Sys-MUST adaptive 97.5 \u2191 0.0% 89.5 \u2193 0.5% 97.0\u2193 2.0% 82.5\u2191 0.5% 96.5",
+            "figure_data": "Dialogue Systems single Sys-AgenT Sys-AgenR Sys-RNNT Sys-GPT MUST Sys-In-domain evaluation AgenR RNNT 54.0 \u2193 40.0% 98.5 \u2193 0.5% 78.0\u2193 4.9% 72.5 Out-of-domain evaluation GPT AgenG RNNR RNN Avg.\u2191 Std.\u2193 Avg.\u2191 Std.\u2193 All 92.5 77.0 80.7 8.6 81.4 14.8 96.0 \u2193 1.5% 90.0 AgenT 97.5 98.5\u2193 0.5% 80.5\u2193 1.8% 97.5 97.5 82.0 92.3 7.3 91.7 7.1 30.5 \u2193 68.7% 23.0 \u2193 74.4% 99.0 75.5\u2193 7.9% 35.5 97.5 84.0 72.3 26.6 63.6 30.5 60.5 \u2193 37.9% 51.5 \u2193 42.8% 97.0 \u2193 2.0% 82.0 59.5 94.0 92.0 81.8 15.8 76.6 17.6"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Human evaluation.",
+            "figure_data": "Dialogue Systems single Sys-AgenT Sys-AgenR Sys-RNNT Sys-GPT MUST Sys-MUSTmerging Sys-MUST uniform Sys-MUST adaptive 92.0 human evaluation 76.0 84.0 34.0 58.0 90.0 92.0"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "are no ethics-related issues in this paper. The data and other related resources in this work are open-source and commonly-used by many existing work.",
+            "figure_data": "Jason Williams, Antoine Raux, Deepak Ramachandran, and Alan Black. 2013. The dialog state tracking challenge. In Proceedings of the SIGDIAL 2013 Con-ference, pages 404-413, Metz, France. Association for Computational Linguistics.Thomas Wolf, Lysandre Debut, Victor Sanh, Julien Chaumond, Clement Delangue, Anthony Moi, Pier-ric Cistac, Tim Rault, Remi Louf, Morgan Funtow-icz, Joe Davison, Sam Shleifer, Patrick von Platen, Clara Ma, Yacine Jernite, Julien Plu, Canwen Xu, Teven Le Scao, Sylvain Gugger, Mariama Drame, Quentin Lhoest, and Alexander Rush. 2020. Trans-formers: State-of-the-art natural language processing. In Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing: System Demonstrations, pages 38-45, Online. Association for Computational Linguistics.Yizhe Zhang, Michel Galley, Jianfeng Gao, Zhe Gan, Xiujun Li, Chris Brockett, and Bill Dolan. 2018. Generating informative and diverse conversational responses via adversarial information maximization. In NeurIPS."
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "Shi et al., 2019) RNN \u2020 Agenda Template AgenR(Shi et al., 2019) RNN \u2020 Agenda Retrieval AgenG(Shi et al., 2019) RNN \u2020 Agenda RNN \u2020 (Generation) RNNT(Shi et al., 2019) The architectures of user simulators and dialogue systems. Modules with \u2020 are trainable.",
+            "figure_data": "Agent TypesAgentsNLU DMNLGUser Simulators Dialogue Systems All AgenT (RNN  \u2020 RNNR (Shi et al., 2019) RNN  \u2020 RNN (Shi et al., 2019) RNN  \u2020 (NLU + NLG) Template Retrieval GPT (ours) Transformer  \u2020 (NLU + DM + NLG) GPTIL (ours) Transformer  \u2020 (NLU + DM + NLG) RNN  \u2020 RNN  \u2020 TemplateHyperparameterValueT100,000T 040,000e2,000d200\u03c40.75"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "The hyperparameters used for training the Sys-MUST adaptive .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "The relationships between user acts and system acts.",
+            "figure_data": "Dialogue Systems"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "The experimental results of implementing MUST with the MUST CRL strategy.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "table",
+            "figure_id": "tab_11",
+            "figure_caption": "Ablation study on MUST. It uses five user simulators (AgenT, AgenR, RNNT, RNNR and GPT simulator) to implement MUST uniform and MUST adaptive .",
+            "figure_data": "Dialogue Systems single Sys-AgenT Sys-RNNT Sys-GPT MUST Sys-MUST uniform 97.5\u2191 0.0% 96.0\u2193 3.0% 82.5\u2191 0.6% 55.0 In-domain evaluation AgenT RNNT GPT AgenR AgenG RNNR RNN Avg.\u2191 Std.\u2193 Avg.\u2191 Std.\u2193 Out-of-domain evaluation All 97.5 98.5\u2193 0.5% 78.0 \u2193 0.5% 54.0 72.5 92.5 77.0 74.0 13.7 81.4 14.8 30.5 \u2193 68.7% 99.0 75.5\u2193 7.9% 23.0 35.5 97.5 84.0 60.0 31.4 63.6 30.5 60.5 \u2193 37.9% 97.0 \u2193 2.0% 82.0 51.5 59.5 94.0 92.0 74.3 19.0 76.6 17.6 82.0 97.5 87.0 80.3 15.7 85.4 13.9 Sys-MUST adaptive 97.5\u2191 0.0% 97.5\u2193 1.5% 82.5\u2191 0.6% 55.5 80.5 97.0 87.0 80.0 15.3 85.4 13.9"
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "table",
+            "figure_id": "tab_12",
+            "figure_caption": "Ablation study on MUST. It uses three user simulators (AgenT, RNNT, and GPT simulator) to implement MUST uniform and MUST adaptive .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_13",
+            "figure_caption": "hello! what can i help you? <eos_resp> [eos_constraint] [eos_book] [eos_recommend] [eos_select] [eos_request] <eos_nlu> [info] food venetian pricerange expensive area centre [request] [book] time 12:00 day wednesday people 4 <eos_goal> [inform_type] food area <eos_pol> i am looking at a place to eat that serves venetian food in the centre. <eos_utt> unfortunately, i do not see any restaurants that serve venetian in the centre of town. would you like to try a different area or type of cuisine? <eos_resp> nooffer [eos_constraint] [eos_book] [eos_recommend] [eos_select] [eos_request] <eos_nlu> [info] food chinese pricerange expensive area centre [request] [book] time 12:00 day wednesday people 4 <eos_goal> [inform_type_change] food <eos_pol> Do you have any [value_food] restaurants ? <eos_utt> Hello! What can I help you? constraint: [], book: [], recommend: [], select: [], request: [] inform_type: [food, area] I am looking at a place to eat that serves [value_food] food in the [value_area] . I am looking at a place to eat that serves Venetian food in the centre. Unfortunately, I don't see any restaurants that serve Venetian in the centre of town. Would you like to try a different area or type of cuisine?",
+            "figure_data": "constraint: [nooffer], book: [],recommend: [], select: [], request: []inform_type_change: [food]Do you have any [value_food] restaurants ?Yes there are 10 in the centre of town. Any price preference?Do you have any Chinese restaurants?"
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "table",
+            "figure_id": "tab_14",
+            "figure_caption": "Cross study results. Each entry shows the success rate obtained by having the user simulator interacting with the RL system for 200 times.",
+            "figure_data": "User Simulators Utt \u2191 Vocab \u2191 DIST-1 \u2191 DIST-2 \u2191 ENT-4 \u2191 RNNT 9.83 192 0.77% 1.51% 4.24 RNNR 11.06 346 2.45% 9.59% 6.59 RNN 10.95 205 1.17% 3.14% 4.98 GPT-RNN 14.00 262 1.13% 3.53% 5.62"
+        },
+        {
+            "figure_label": "12",
+            "figure_type": "table",
+            "figure_id": "tab_15",
+            "figure_caption": "Automatic evaluation results of RNNT, RNNR and GPT-RNN. The metrics include average utterance length (Utt), vocabulary size (Vocab), distinct-n (DISTn) and entropy (ENT-n).",
+            "figure_data": "RNNT RNNR RNN GPT-RNN4.60 3.92 2.80 4.104.68 3.88 2.30 4.044.96 4.72 2.86 4.303.34 3.94 2.74 3.704.70 4.16 2.30 4.00"
+        },
+        {
+            "figure_label": "13",
+            "figure_type": "table",
+            "figure_id": "tab_16",
+            "figure_caption": "Human evaluation results of RNNT, RNNR and GPT-RNN. The metrics include sentence fluency (Hu.Fl), coherence (Hu.Co), goal adherence (Hu.Go), language diversity (Hu.Div) and an overall score (Hu.All).",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "T t=1 E[x it ] = T t=1 \u00b5 it .",
+            "formula_coordinates": [
+                4.0,
+                370.06,
+                421.09,
+                91.39,
+                34.56
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "it = arg maxi xi + 2 ln t T i,t from t = K + 1 to T .",
+            "formula_coordinates": [
+                5.0,
+                70.86,
+                761.87,
+                194.78,
+                13.83
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "xj = xj exploitation + 2 ln t Tj,t exploration , j \u2208 {1, ..., K}; (2)",
+            "formula_coordinates": [
+                5.0,
+                318.68,
+                425.12,
+                206.47,
+                39.8
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "zj = 1/ (xj \u2212 \u03c4 min({x1, \u2022 \u2022 \u2022 , xK })) ,(3)",
+            "formula_coordinates": [
+                5.0,
+                342.83,
+                528.48,
+                182.19,
+                16.88
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "p j = z j K i=1 z i .(4)",
+            "formula_coordinates": [
+                5.0,
+                381.84,
+                630.97,
+                143.32,
+                30.12
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "xj = xj exploitation + 2 ln t T j,t exploration , j \u2208 {1, ..., K}; z j = 1/ (x j \u2212 \u03c4 min({x 1 , \u2022 \u2022 \u2022 , xK })) , p i = z j K j=1 z j .(5)",
+            "formula_coordinates": [
+                14.0,
+                318.67,
+                448.15,
+                206.49,
+                94.24
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "MUST adaptive xj = xj + 2 ln t T j,t zj = 1 (xj\u2212\u03c4 min({x 1 ,\u2022\u2022\u2022 ,x K })) pj = z j K i=1 z i w/t exploration zj = 1 xj MUST adaptive -I xj = 1 xj + 2 ln t T j,t zj = xj \u2212 \u03c4 min({1/x1, \u2022 \u2022 \u2022 , 1/xK }) MUST adaptive -II xj = 1/x j K i=1 1/x i zj = \u1e91j \u2212 \u03c4 min({x1, \u2022 \u2022 \u2022 , xK }) \u1e91j = xj + 2 ln t T j,t MUST adaptive -III xj = 1 (x j \u2212\u03c4 min({x 1 ,\u2022\u2022\u2022 ,x K })) zj = xj K i=1 xi + 2 ln t T j,t",
+            "formula_coordinates": [
+                16.0,
+                95.86,
+                92.44,
+                401.87,
+                107.56
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "C i = [S i , N i , G i , A i , U i ].",
+            "formula_coordinates": [
+                17.0,
+                93.88,
+                557.03,
+                114.77,
+                11.81
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": "L(U ) = i log P (u i |u i\u2212k , ..., u i\u22121 ; \u0398), \u2200 u i \u2208 {S 0 , N 0 , G 0 , A 0 , U 0 , ..., A t , U t },",
+            "formula_coordinates": [
+                17.0,
+                315.07,
+                262.58,
+                180.5,
+                45.27
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/D18-1547"
+}

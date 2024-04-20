@@ -1,0 +1,772 @@
+{
+    "title": "Detecting and Mitigating Hallucinations in Machine Translation: Model Internal Workings Alone Do Well, Sentence Similarity Even Better",
+    "authors": "David Dale; Elena Voita; Lo\u00efc Barrault; Marta R Costa-Juss\u00e0; Meta Ai",
+    "pub_date": "",
+    "abstract": "While the problem of hallucinations in neural machine translation has long been recognized, so far the progress on its alleviation is very little. Indeed, recently it turned out that without artificially encouraging models to hallucinate, previously existing methods fall short and even the standard sequence log-probability is more informative. It means that internal characteristics of the model can give much more information than we expect, and before using external models and measures, we first need to ask: how far can we go if we use nothing but the translation model itself ? We propose to use a method that evaluates the percentage of the source contribution to a generated translation. Intuitively, hallucinations are translations \"detached\" from the source, hence they can be identified by low source contribution. This method improves detection accuracy for the most severe hallucinations by a factor of 2 and is able to alleviate hallucinations at test time on par with the previous best approach that relies on external models. Next, if we move away from internal model characteristics and allow external tools, we show that using sentence similarity from cross-lingual embeddings further improves these results. We release the code of our experiments. 1",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Hallucinations in machine translation (MT) are cases when the model generates output that is partially or fully unrelated to the source sentence. While generally this phenomenon is not frequent and has low impact on corpus-level automatic metrics, the impact of hallucinations on user experience can be rather dramatic. For example, if a translation system generates The staff were very friendly and helpful in response to an input sentence about e.g. a marvelous view from the window, a user is unlikely to trust this system in future.",
+                "1 https://github.com/facebookresearch/stopes/tree/ main/demo/alti/detecting_hallucinations While the problem of hallucinations is known, addressing it remains challenging. Firstly, hallucinations are very rare. This is why previous work mostly resorted to settings where models are encouraged to hallucinate, by e.g. artificially perturbing source sentence (Lee et al., 2019;Raunak et al., 2021), adding specific types of noise to the training data (Raunak et al., 2021), working under domain shift (Wang and Sennrich, 2020;M\u00fcller et al., 2020), among others (Zhou et al., 2021). Secondly, hallucinations are hard to identify with automatic metrics. Often, hallucinations were defined as translations with low quality according to some metric such as adjusted BLEU or chrF (Lee et al., 2019;Raunak et al., 2021;M\u00fcller and Sennrich, 2021) or translations satisfying some heuristic condition (Berard et al., 2019;Raunak et al., 2021). Overall, it is not clear whether proposed methods detect naturally occurring hallucinations well.",
+                "Recently, when revisiting previous work in a relatively clean setting, Guerreiro et al. (2022) found that existing detection methods fall short and the standard sequence log-probability is the most informative. To show this, the authors gathered a large dataset with professional annotations of translations that, according to 10 previously proposed methods, are likely to be hallucinations. This data (hallucinations along with the model that generated them) made it possible to first, evaluate the performance of various detection methods and second, to work on alleviating hallucinations at test time. For the latter, the idea is \"detect-then-rewrite\": after flagging a translation as likely to be pathological, generate several alternative hypotheses and pick the best one relying on some measure. So far, the best realization of this general framework uses sequence log-probability -Seq-Logprob -for detection, Monte Carlo dropout (Gal and Ghahramani, 2016) to generate several alternative translation hypotheses, and COMET-QE to pick the final candidate (see Guerreiro et al. (2022) for the details).",
+                "We use the same test bed and substantially improve previous results.",
+                "Regarding hallucination detection, we view the observation that Seq-Logprob outperforms previous (specifically targeted to hallucinations) methods as follows: internal model characteristics may contain much more information than we expect. Therefore, before developing or using external models and measures, we ask: how far can we go if we use nothing but the translation model itself ? We propose to use a method that evaluates the percentage of the source contribution to a generated translation. Intuitively, since hallucinations are translations that are \"detached\" from the source, low source contribution should be able to identify hallucinations. Despite the fact that understanding hallucinations was one of the motivations behind the first method evaluating relative source and target contributions, both existing methods only looked at highly artificial hallucinations (Voita et al., 2021;Ferrando et al., 2022). We propose to use ALTI+ by Ferrando et al. (2022), the method that aggregates layer-wise tokens attributions, for both hallucination detection and reranking in the \"detect-then-rewrite\" pipeline. For detection of the most severe hallucinations, it is twice more accurate than Seq-Logprob. For reranking, it performs on par with the previous best COMET-QE. All in all, we improve the overall pipeline results by relying on internal model characteristics alone.",
+                "When allowing external tools, previous work mostly focused on different ways to automatically evaluate quality of a translation example, either with string-based methods or neural quality estimation systems. This idea (the better we estimate translation quality, the better we are at detecting hallucinations) is natural: hallucinations are lowquality translations in the first place. However, implementing this idea in practice is challenging: even state-of-the-art quality estimation system substantially fails (Guerreiro et al., 2022). We hypothesize that instead of targeting quality evaluation, it might be beneficial to use models trained with a rather different objective. Indeed, as we show in this paper, similarity between the source and a translation estimated via cross-lingual sentence embeddings outperforms the best internal method. Apart from cross-lingual sentence similarity (which is expected to be sensitive to highly incorrect translations), we find that cross-lingual natural language inference models (less anticipated in the context of machine translation) also perform quite well. To the best of our knowledge, we are the first to apply these models for hallucination detection.",
+                "Overall, we show that:",
+                "\u2022 by using only the model's inner workings, we",
+                "\u2022 detect the most severe type of hallucinations with twice better precision;",
+                "\u2022 alleviate hallucinations at test time with results on par with the best previous method that relies on an external model; \u2022 models focused on semantic similarity of sentences detect all types of hallucinations with precision 80% higher than previous methods."
+            ],
+            "publication_ref": [
+                "b23",
+                "b23",
+                "b32",
+                "b19",
+                "b34",
+                "b23",
+                "b20",
+                "b1",
+                "b23",
+                "b11",
+                "b10",
+                "b11",
+                "b31",
+                "b7",
+                "b7",
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Background and Setting",
+            "text": [
+                "In this section, we describe the framework and data we use for evaluation of hallucination detection and mitigation methods. This framework was proposed by Guerreiro et al. (2022) and consists of a large dataset of annotated translations along with the model that produced them. To the best of our knowledge, this is the only released data that can be used to analyze hallucinations in a \"clean\" setting."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Model",
+            "text": [
+                "The model is Transformer base (Vaswani et al., 2017) from fairseq (Ott et al., 2019) with the standard hyperparameters setting. It was trained on the WMT'18 German-English news translation data excluding Paracrawl (Bojar et al., 2018) -totalling 5.8M sentence pairs. Since Guerreiro et al.",
+                "(2022) used randomly chosen 1/3 of the dataset as a held-out set for analysis, the model was trained on the remaining 2/3 of the dataset. We use the model released by Guerreiro et al. (2022) that has been used to generate the hallucinations we analyze."
+            ],
+            "publication_ref": [
+                "b29",
+                "b21",
+                "b2",
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Hallucination Dataset",
+            "text": [
+                "The hallucination dataset released by Guerreiro et al. ( 2022) contains fine-grained manual annotations of 3415 German-to-English translations generated by the model above. These translations are chosen from a set of 1.8M translations of heldout data as the ones that are likely to be pathological. The criteria used to flag the translations include 10 methods ranging from previously proposed heuristics (Lee et al., 2019;Berard et al., 2019;Raunak et al., 2021) to quality estimation models (Rei et al., 2020b) and uncertainty detectors (Fomicheva et al., 2020;Zerva et al., 2021;Guerreiro et al., 2022). The taxonomy of translation pathologies in the dataset is shown in Figure 1. Here, hallucinations are defined as severe translation errors that are detached from the source. These can be either oscillatory (i.e. contain erroneous repetitions of words and phrases) or largely fluent. The latter is further split by severity of an error into fully detached (the whole content is not supported by the source) and strongly, but not fully, detached (significant proportion of output is not supported by the source). 2 Additionally, the annotated data contains translation errors that are deemed not detached from the source (Figure 1). Overall, 323 examples are judged to be hallucinations, 1044 are less severe translation errors and the rest are correct translations.",
+                "Note that so far, there is no \"canonical\" hallucination taxonomy and previous work used various, mostly overlapping, definitions (Lee et al., 2019;Raunak et al., 2021;Zhou et al., 2021;Ji et al., 2022;Raunak et al., 2022;Guerreiro et al., 2022). We follow the taxonomy by Guerreiro et al. (2022) for consistency with the dataset and the evaluation framework we use and because this taxonomy is general enough for our purposes."
+            ],
+            "publication_ref": [
+                "b1",
+                "b23",
+                "b26",
+                "b8",
+                "b33",
+                "b11",
+                "b23",
+                "b34",
+                "b24",
+                "b11",
+                "b11"
+            ],
+            "figure_ref": [
+                "fig_0",
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Reference-Based Oracles",
+            "text": [
+                "Following previous work (M\u00fcller and Sennrich, 2021;Guerreiro et al., 2022), we use:",
+                "\u2022 chrF: character n-gram F score of the translation with respect to the reference. We use the CHRF++ version that also takes into account word unigrams and bigrams (Popovi\u0107, 2017);",
+                "\u2022 COMET: a neural quality estimation metric by Rei et al. (2020a) which was shown to be the state-of-the-art reference-based method (Kocmi et al., 2021)."
+            ],
+            "publication_ref": [
+                "b20",
+                "b11",
+                "b22",
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Internal Measures",
+            "text": [
+                "Baseline: Seq-Logprob. This is the standard length-normalized sequence log-probability. Compared to previously introduced methods specifically targeting hallucinations, this simple metric performs the best (Guerreiro et al., 2022).",
+                "We use ALTI: percentage of source contribution.",
+                "We compute the percentage of source impact on the generated translation using the recently introduced ALTI+ (Ferrando et al., 2022). At a high level, it decomposes each transformer block into a sum of functions of individual tokens and views an output representation as a summation of transformed input vectors. Then it evaluates contribution of these vectors to the resulting sum. Among other things, ALTI+ (as well as an earlier Layerwise Relevance Propagation (LRP) -based method by Voita et al. (2021)) was used to show that for artificially created hallucinations, source influence is much lower than for \"healthy\" translations. Our work is the first to test this intuition in a real setting where hallucinations are generated naturally. 3  Formally, for a model and its generated translation, we compute the total source contribution as the sum of contributions of all source tokens. We do it for each target token individually and then average across target tokens. The scores are computed by the same model that produced the translations (Section 2.1)."
+            ],
+            "publication_ref": [
+                "b11",
+                "b7",
+                "b31"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "External models",
+            "text": [
+                "Baseline: COMET-QE. For a reference-free model, we use the state-of-the-art COMET-QE (Rei et al., 2020b) for its superior performance compared to other quality estimators (Mathur et al., 2020;Freitag et al., 2021;Kocmi et al., 2021).",
+                "We use: sentence similarity. Overall, we consider three measures based on pretrained models that evaluate semantic similarity of two sentences:",
+                "\u2022 LASER: cosine similarity of source and translation sentence embeddings from LASER2. LASER2 (Heffernan et al., 2022) improves LASER (Artetxe and Schwenk, 2019) by replacing LSTM encoder with a Transformer and using teacher-student training;",
+                "\u2022 LaBSE: cosine similarity of source and translation sentence embeddings from LaBSE (Feng et al., 2022). LaBSE is a dual-encoder approach based on pretrained transformers and fine-tuned for translation ranking with an additive margin softmax loss;",
+                "\u2022 XNLI: product of the entailment probabilities of source to translation and translation to source. We compute entailment scores with RoBERTa (Conneau et al., 2020) finetuned on a combination of NLI data in 15 languages (Conneau et al., 2018). 4   4 Detection Experiments"
+            ],
+            "publication_ref": [
+                "b26",
+                "b18",
+                "b12",
+                "b0",
+                "b5",
+                "b3"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Main results",
+            "text": [
+                "Overall results are shown in Table 1. We report ROC AUC and precision at 90% recall. 5 In addition to overall results, we also report metrics for fully detached hallucinations separately. First, let us look at internal methods. While for all hallucinations ALTI performs comparably to Seq-Logprob, for fully detached hallucinations it has twice better precision. Since ALTI averages the source contributions over all generated tokens, it is more effective at detecting the most severe hallucinations rather than the ones where only part of the tokens are detached. Note also that for fully detached hallucinations, internal ALTI performs almost on par with the best external methods.",
+                "Among both all and fully detached hallucinations, their precision at 90% recall is roughly twice better than that of Seq-Logprob. While such a good performance might be expected for LaBSE that evaluates crosslingual sentence similarity (in a way, this might be seen as a measure of translation quality), results for XNLI are rather surprising: to the best of our knowledge, models optimized for XNLI have not been used in the context of machine translation. Note also the large difference between LaBSE and LASER: while the former shows big improvements compared to Seq-Lobprob, the latter noticeably lags behind. This is not surprising when looking at training objectives of the underlying models. LaBSE is trained on a translation ranking task and thus explicitly encourages ordering translations by severity of an error; for LASER, this is not the case.",
+                "To further understand differences between detectors, we look at the distributions of the detection scores in Section 4.2 and the detected pathology types in Section 4.3."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Analysing Distributions of the Scores",
+            "text": [
+                "For each of the methods, Figure 2 shows distributions of the scores for fully detached hallucinations, strongly detached hallucinations, less severe errors and correct translations.",
+                "Internal methods: partial hallucinations are bimodal. ALTI and Seq-Logprob show similar behavior: errors are distributed similarly to correct translations, and the scores for partial (strongly detached) hallucinations have bimodal distribution. At a high level, for the model, some partial hallucinations \"look\" more like full hallucinations, and some -like errors. This can motivate future work: it would be interesting to understand whether it depends on detachment or on more simple patterns such as e.g. the proportion of hallucinated tokens.",
+                "COMETs: blind to error severity. COMET and COMET-QE scores 6 do not separate hallucinations from less severe errors. This agrees with previous work noting that since quality estimation models are mostly trained on data that lacks negative examples, COMETs may be inadequate at evaluating poor translations in general (Takahashi et al., 2021;Sudoh et al., 2021) and hallucinations in particular (Guerreiro et al., 2022). What is also expected, is that compared to reference-free COMET-QE, the overlap between the scores for correct and incorrect translations is much lower for reference-based COMET. ChrF behaves similarly to COMET.",
+                "LaBSE: ranks hallucination severity best. LaBSE is the only detector with a clear order between full, partial hallucinations, and non-hallucinations. Once again, this is expected because only LaBSE is trained for ranking. Interestingly, for LASER, modes for the three distributions are also ordered; unfortunately, the distributions themselves overlap significantly which makes it not suitable as a detector. Both LaBSE and LASER ignore most of the non-hallucinated translation errors. XNLI: no middle ground. Finally, XNLI distributions are very peaky and concentrated around 0 and 1. This is expected: XNLI's decision is always binary. While this provides good separation between fully detached hallucinations and correct translations, it is hard to estimate error severity."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Detected Pathology Types",
+            "text": [
+                "Now we come to fine-grained categories and look at detected pathology types. For each method, we flag a translation as \"detected\" if it belongs to a fraction (e.g. 10%) of the hallucination dataset corresponding to the lowest scores. 7 Then we look at \u2022 the distribution of pathology types contained among detected examples (Figure 3);",
+                "\u2022 recall for different translation types with respect to the whole dataset (Figure 4).",
+                "The three best methods are similar. Figure 3 shows that ALTI, LaBSE and XNLI select similar pathology types. For them, flagged examples consist mostly of fully detached and strongly detached hallucinations, along with other errors.",
+                "LASER is an outlier. Instead of focusing on pathological translations, LASER behaves differently and flags correct translations more. This explains its poor detection performance mentioned above. XNLI flags undergenerations. Figure 4 shows that XNLI (and, to a lesser extent, LaBSE) flags a large proportion of undertranslations. This makes sense: these criteria are symmetric, and if we swap the source and the undergenerated translation, the longer source can be seen as a hallucination.",
+                "Fully detached are the easiest to detect. As expected, fully detached hallucinations are the easiest to detect: all methods detect them entirely when taking 20% of the hallucination dataset (Figure 4), and they are the most frequent among the examples flagged by the best performing methods (Figure 3). This agrees with Guerreiro et al. ( 2022) that oscillatory and strongly detached hallucinations are more difficult to detect, and shows that improvements with our methods mostly come from these types."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2",
+                "fig_3",
+                "fig_2",
+                "fig_3",
+                "fig_3",
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Mitigating Hallucinations at Test Time",
+            "text": [
+                "Finally, let us come to the second part of the \"detectthen-rewrite\" pipeline: for a flagged translation, generate several alternative hypotheses and rerank them (Guerreiro et al., 2022) 8 . This general framework has two degrees of freedom: (i) generation of hypotheses, (ii) reranking approach. We show that",
+                "\u2022 for generating hypotheses, simply applying MC dropout (as done in Guerreiro et al. ( 2022)) outperforms more involved methods such as diverse beam search (Section 5.2);",
+                "\u2022 for reranking, we can match COMET-QE with Here, the types are presented in a multilabel manner, i.e. one translation may contribute to multiple axes.",
+                "internal ALTI and decrease the hallucination rate by using LaBSE (Section 5.3)."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation methodology",
+            "text": [
+                "In this section, we explain the setup for the experiments with automatic evaluation in Sections 5.2 and 5.3. The setup for manual annotation is explained later in Section 5.3.2."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Metrics.",
+            "text": [
+                "In our experiments, we use several metrics. First, we use quality evaluation metrics commonly used by the community, i.e. COMET (Rei et al., 2020b) and BLEU. Additionally, we use the two best metrics for hallucination detection: LaBSE and XNLI. We show some of the metrics in the main text and the rest in the appendix.",
+                "Data. First, we analyze the impact of our method on translations of different quality levels. For this, we randomly sample 150 sentences from each of the following groups of the hallucination dataset (Section 2.2): fully detached hallucinations, strongly detached hallucinations, all other translation pathologies, and correct translations (to make sure that our mitigation does not accidentaly ruin them). We apply all versions of the hallucination mitigation algorithm to these 600 sentences. Note that in a practical application, we would apply the mitigation techniques only to the translations labeled by a detection algorithm as potential hallucination. We simulate this later in Section 5.3.2 when performing manual annotation."
+            ],
+            "publication_ref": [
+                "b26"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Generation Strategies",
+            "text": [
+                "To generate alternative hypotheses, Guerreiro et al. ( 2022) use Monte Carlo dropout (Gal and Ghahramani, 2016). This means they leave standard beam search inference intact and achieve variability in translations via activating model dropout at inference. A natural question is whether using other  generation strategies can give better results. For example, if we use e.g. beam search specifically designed to produce diverse translations, can we get better hypotheses?",
+                "To test this, we use the following methods:",
+                "\u2022 DEFAULT: standard decoding without reranking, i.e. beam search with size 5, where we pick only the top 1 candidate; \u2022 BEAM SEARCH: beam search with size n;",
+                "\u2022 sampling from the predicted distribution:",
+                "\u2022 SAMPLING: from the whole distribution;",
+                "\u2022 SAMPLING P=80: from the top p = 80% of the distribution, i.e. nucleus sampling (Holtzman et al., 2020); \u2022 diverse beam search:",
+                "\u2022 DBS_N: method by Vijayakumar et al.",
+                "(2016) with beam widths s = 1, 3, 10;",
+                "\u2022 D_DEC_R: diverse decoding with diversity rates r = 1, 3, 10 (Li et al., 2016); \u2022 Monte Carlo dropout:",
+                "\u2022 MC GREEDY: n iterations of greedy search with dropout;",
+                "\u2022 MC BEAM: the method used in Guerreiro et al. ( 2022), i.e. n iterations of beam search with dropout, each with size 10. Unless stated otherwise, n = 10 in all experiments."
+            ],
+            "publication_ref": [
+                "b10",
+                "b13"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "The Impact of Generation Strategy",
+            "text": [
+                "The results are shown in Figure 5. To disentangle the effect of generation strategy from the subsequent reranker performance, we show the results for all combinations. As rerankers, we considered COMET-QE used in Guerreiro et al. (2022) and the methods proposed in Section 3.",
+                "We see that the MC BEAM method clearly outperforms all the other. This is interesting for two reasons. First, MC dropout is easy to use: one has to apply standard inference with dropout on with-out other changes to the implementation. Next, differently from modifying decoding strategies, here variability in hypotheses comes from model predictive uncertainty (Gal and Ghahramani, 2016;Zerva et al., 2021;Guerreiro et al., 2022). This is one more evidence that understanding model inner characteristics can be beneficial in various settings.",
+                "Based on these results, in what follows we generate hypotheses with beam search with MC dropout."
+            ],
+            "publication_ref": [
+                "b11",
+                "b10",
+                "b33",
+                "b11"
+            ],
+            "figure_ref": [
+                "fig_4"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "The Impact of Number of Hypotheses",
+            "text": [
+                "We also check whether generating more than 10 hypotheses can improve the overall results. Figure 6 shows the final COMET scores depending on the number of hypotheses. We see that the scores increase with more hypotheses and do not saturate at 10. This implies that in cases when the quality of a translation is much more important than its computational cost, one can potentially improve the quality by generating more candidate hypotheses."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_5"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Reranking Approaches",
+            "text": [
+                "Apart from detecting hallucinations, the methods we propose can be applied as rerankers in the \"detect-than-rewrite\" pipeline."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Automatic Evaluation",
+            "text": [
+                "Figure 5 shows that, regardless of the generation method, LaBSE is the best reranker and it performs notably better than the strong COMET-QE baseline. Apart from the average results, Table 2 also shows COMET scores for each pathology type. We can see that reranking with any method is better than no reranking for all groups of original translations. Compared to the COMET-QE baseline, LABSE improves the scores for hallucinations and correct translations, but drops quality for other pathologies.",
+                "The only internal method ALTI performs better than COMET-QE for fully detached hallucinations, but is inferior when looking at other translations: it Pathologies Cor. Avg. Reranker F."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "S. O.",
+            "text": [
+                "No reranking -1.23 -0.97 -0.59 0.27 -0.63 Baseline COMET-QE -0.21 -0.13 -0.14 0.35 -0.03 Ours ALTI -0.17 -0.24 -0.39 0.25 -0.14 LASER -0.11 -0.23 -0.35 0.27 -0.11 LaBSE -0.07 -0.12 -0.26 0.39 -0.01 XNLI -0.12 -0.18 -0.28 0.30 -0.07 is very sensitive to the most severe pathology, but is not capable to rank relatively good translations. Note that for former pathologies, the average COMET scores are negative even after mitigation. As we saw in Figure 2, this may be normal even for correct translations, and may reflect the fact that, while being technically correct, they are far from being perfect."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Human evaluation",
+            "text": [
+                "Data. To confirm the results of automatic evaluation, we perform a human evaluation. With each method, we translate the same 200 source sentences. They are randomly sampled from the hallucination dataset with the distribution of pathologies roughly mimicking outputs of the best detectors (Figure 3). Overall, for 55% of the sentences their original translations are labeled as hallucinations, 25% as errors and 20% as correct translations. 9  We compare the original translations and three reranking methods: the baseline COMET-QE used in Guerreiro et al. ( 2022), the best overall reranker LaBSE, and the only internal method ALTI.",
+                "Annotation. For each of the 200 source sentence, we deduplicate and shuffle the four translations to mitigate annotator bias. The 602 resulting sentence pairs are labeled by 3 annotators into three categories: Correct, Error, and Hallucination. We aggregate the labels by majority vote; in case of ties (20 out of the 602 sentence pairs after deduplication) we pessimistically assume a hallucination. For hallucinations, all the differences are significant, except the one between ALTI vs COMET-QE. For correct translations, the difference between LaBSE and ALTI is statistically significant.",
+                "We evaluate the statistical significance of the pairwise differences in the proportions of correct and hallucinated translations using two-sided Student test for two related samples with 5% confidence level. We provide more details on the annotation guidelines and inter-annotation agreement in Appendix C.",
+                "Results. Human evaluation results are shown in Figure 7. All reranking methods reduce hallucinatory rate by a factor of 2.5 to 3. Interestingly, when looking at hallucinations, internal ALTI performs on par with COMET-QE: the differences between these two methods are not statistically significant. COMET-QE, however, has less errors. This is expected as it was trained to distinguish correct translations from errors. Coming to LaBSE, we find that it produces slightly less hallucinations than other reranking methods and more correct translations than ALTI; these differences are significant at 5% confidence level. Overall, by using sentence similarity from LaBSE, we improve both on hallucinations detection and mitigation at test time.",
+                "Surprisingly, LaBSE and ALTI outperform COMET-QE with a large margin for hallucination detection, but not for hypotheses reranking. As we explain in Section 4.2, quality estimation models are mostly trained on data that lacks negative examples. Therefore, COMETs may be inadequate at evaluating poor translations in general and hallucinations in particular (Takahashi et al., 2021;Sudoh et al., 2021;Guerreiro et al., 2022). For reranking, the goal is the opposite: finding the best translations (as opposed to the worst), which is closer to the COMET training objective.",
+                "Note that since COMET-QE is the state-of-theart quality estimator, it is a very strong baseline for the reranking stage where the goal is to find a better translation. The fact that we can match its hallucinatory rate reduction by analyzing model inner workings has value from different perspectives.",
+                "For research, it can motivate future work on model understanding; for practitioners, it means that hallucination mitigation is not limited to language pairs where external models such as COMET-QE exist: model understanding might be enough."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [
+                "fig_2",
+                "fig_6"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusions",
+            "text": [
+                "We start by asking how far we can go at detecting and mitigating hallucinations if we use nothing but the translation model itself. Turns out, we can improve the results of the overall \"detect-then-rewrite\" pipeline by evaluating the percentage of source contribution to a generated translation: translations with low source contribution are likely to be \"detached\" from the source, i.e. hallucinations. For detecting the most severe type of hallucinations, this method improves previous results twice; for mitigating hallucinations at test time, it matches the hallucination reduction rate of the previous best external method. We believe this can motivate future research on model analysis. When allowing external models, we expand the methods for handling hallucinations from models specialized for quality estimation to a broader set of objectives, e.g. sentence similarity from cross-lingual embeddings. Apart from showing that LaBSE improves previous results significantly, we also find that models so far overlooked in the context of machine translation (e.g. natural language inference) can be beneficial. We hope future work will build on this idea."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "Our analysis and conclusions have been based only on a single translation direction (German to English), a single dataset, and a single transformerbased model. The generalization to other languages, data and models is yet to be verified.",
+                "Even in this setup, we have seen that some of the proposed methods are very good at detecting fully detached hallucinations. However, none of them were able to well separate strongly detached hallucinations (when only a part of the generated translation is unrelated to the source) from correct translations. Perhaps, such partial hallucinations should be detected on the level of individual tokens instead of the whole sentence.",
+                "One of the metrics that we propose, average ALTI source contribution, has an advantage of not requiring any external models except the translation model itself. However, the two best detection metrics (based on LaBSE and on XNLI model) re-quire additional encoders trained on the source and target languages, which limits their applicability for lower-resourced languages or in the settings with limited computational resources.",
+                "Being an internal method is an advantage of ALTI, but it is also a limitation: this method is suitable only for transformer-based translation models. In principle, it can be adapted to other neural architectures, but not to non-neural approaches, such as statistical machine translation."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethical statement",
+            "text": [
+                "We do not foresee any considerable risks associated with our work. In principle, our framework for hallucination mitigation could be intentionally reversed to produce lower-quality translations. But there are easier ways to produce a bad translation, such as just sampling the output text randomly, so we do not think that our work poses any additional risks.",
+                "This work is based on the open source dataset and model released by Guerreiro et al. (2022) and thus inherits all their potential biases.",
+                "We will make our code publicly available to ensure reproducibility of our experiments."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Implementation and computing",
+            "text": [
+                "All our experiments were carried out on a single server with one NVIDIA Quadro GP100 GPU. The total computation time for generating and scoring translations was less than 24 hours.",
+                "To compute BLEU and ChrF++, we use the SacreBLEU package 10 with the default parameters. For COMET and COMET-QE, we use the COMET package 11 with the wmt20-comet-da and wmt20-comet-qe-da-v2 models, respectively. The translation hypotheses, Seq-Logprob, and LASER are computed using the Fairseq framework 12 . To compute ALTI+, we adapt the code 13 by Ferrando et al. (2022). For the inference of LaBSE and the XNLI model, we use the transformers package 14 ."
+            ],
+            "publication_ref": [
+                "b7"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Mitigating Hallucinations at Test Time",
+            "text": [
+                "Table 3 shows XNLI scores after reranking MC dropout hypotheses by various methods. Note that since here XNLI was used both to rerank and well as evaluate quality, in the experiment XNLI can be viewed as an oracle."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "C Manual Evaluation",
+            "text": [
+                "In this appendix we describe the manual evaluation. First, we detail the simple guidelines that were presented to manual annotators. Second, we report the number of annotators and inter-annotation agreement. Third, we report the results of statistical sigificance tests for comparing all the methods.",
+                "Guidelines Annotators were provided with the guidelines shown in Table 4. For the reporting purposes, \"Partial hallucination\" was grouped together with \"Full hallucination\", and \"Undertranslation\" with \"Other\".",
+                "Inter-annotation agreement We evaluated interannotation agreement by Fleiss' Kappa. For the three annotators and the three aggregated labels, it equals 0.57 on the 602 sentence pairs that were labeled (with the 5 original labels, it is 0.55). This may be interpreted as moderate agreement.",
+                "The differences The Tables 5 and 6 compare proportions of correct and hallucinated translations for each of the manually evaluated methods. The Pvalues are computed with paired two-sided Student test (scipy.stats.ttest_rel).",
+                "Each row of the data consists of the German source sentence, its reference English translation (it is not always accurate!), and 1 to 4 machine translation outputs. The machine translation outputs are presented in a random order, to exclude the possibility of bias toward any specific method.",
+                "For each of the machine translations, you need to assign one of the following labels:",
+                "\u2022 OK: An acceptable translation; it conveys the main meaning correctly and does not introduce extra meaning. Some details still may differ, and minor errors are acceptable.",
+                "\u2022 Partial hallucination: a part of the translation is unrelated to the source, or is related very indirectly, such as via a common topic.",
+                "\u2022 Full hallucination: most or all of the translation is unrelated to the source, or is related very indirectly.",
+                "\u2022 Undertranslation: there is no hallucinations, but a significant part of the source is not translated at all.",
+                "\u2022 Other: there are no hallucinations or undertranlsations, but there are other translation errors that make the translation unacceptable. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3",
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "",
+            "text": [
+                "We used a translation model and a dataset described in section 2 B1. Did you cite the creators of artifacts you used?",
+                "Yes, in section 2 B2. Did you discuss the license or terms for use and / or distribution of any artifacts?",
+                "No, the license is included in the reference to the authors B3. Did you discuss if your use of existing artifact(s) was consistent with their intended use, provided that it was specified? For the artifacts you create, do you specify intended use and whether that is compatible with the original access conditions (in particular, derivatives of data accessed for research purposes should not be used outside of research contexts)? Yes (for the existing artifacts), in section 1 and 2 B4. Did you discuss the steps taken to check whether the data that was collected / used contains any information that names or uniquely identifies individual people or offensive content, and the steps taken to protect / anonymize it? No personal information that we are aware of B5. Did you provide documentation of the artifacts, e.g., coverage of domains, languages, and linguistic phenomena, demographic groups represented, etc.? it was not provided in the original paper B6. Did you report relevant statistics like the number of examples, details of train / test / dev splits, etc. for the data that you used / created? Even for commonly-used benchmark datasets, include the number of examples in train / validation / test splits, as these provide necessary context for a reader to understand experimental results. For example, small differences in accuracy on large test sets may be significant, while on small test sets they may not be. Sections 4 and 5"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Did you run computational experiments?",
+            "text": [
+                "Sections 4 and 5 C1. Did you report the number of parameters in the models used, the total computational budget (e.g., GPU hours), and computing infrastructure used? We did not train any models. The infrastructure is reported in Appendix A.",
+                "The Responsible NLP Checklist used at ACL 2023 is adopted from NAACL 2022, with the addition of a question on AI writing assistance.",
+                "C2. Did you discuss the experimental setup, including hyperparameter search and best-found hyperparameter values? Sections 4 and 5.",
+                "C3. Did you report descriptive statistics about your results (e.g., error bars around results, summary statistics from sets of experiments), and is it transparent whether you are reporting the max, mean, etc. or just a single run? For the manual annotations, we compute statistical significance of all the differences in the averages in the Appendix C.",
+                "C4. If you used existing packages (e.g., for preprocessing, for normalization, or for evaluation), did you report the implementation, model, and parameter settings used (e.g., NLTK, Spacy, ROUGE, etc.)? Appendix A D Did you use human annotators (e.g., crowdworkers) or research with human participants? section 5 D1. Did you report the full text of instructions given to participants, including e.g., screenshots, disclaimers of any risks to participants or annotators, etc.? appendix C D2. Did you report information about how you recruited (e.g., crowdsourcing platform, students) and paid participants, and discuss if such payment is adequate given the participants' demographic (e.g., country of residence)?",
+                "The annotators were members of our team and did the job within their normal working hours.",
+                "D3. Did you discuss whether and how consent was obtained from people whose data you're using/curating? For example, if you collected data via crowdsourcing, did your instructions to crowdworkers explain how the data would be used? Not applicable. We used an existing published dataset.",
+                "D4. Was the data collection protocol approved (or determined exempt) by an ethics review board?",
+                "We did not collect any data, except of annotating an already existing dataset D5. Did you report the basic demographic and geographic characteristics of the annotator population that is the source of the data? Left blank."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Massively multilingual sentence embeddings for zeroshot cross-lingual transfer and beyond",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Mikel Artetxe; Holger Schwenk"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Naver labs Europe's systems for the WMT19 machine translation robustness task",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Alexandre Berard; Ioan Calapodescu; Claude Roux"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Findings of the 2018 conference on machine translation (WMT18)",
+            "journal": "",
+            "year": "2018",
+            "authors": "Ond\u0159ej Bojar; Christian Federmann; Mark Fishel; Yvette Graham; Barry Haddow"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Unsupervised cross-lingual representation learning at scale",
+            "journal": "",
+            "year": "2020",
+            "authors": "Alexis Conneau; Kartikay Khandelwal; Naman Goyal; Vishrav Chaudhary; Guillaume Wenzek; Francisco Guzm\u00e1n; Edouard Grave; Myle Ott; Luke Zettlemoyer; Veselin Stoyanov"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Xnli: Evaluating crosslingual sentence representations",
+            "journal": "",
+            "year": "2018",
+            "authors": "Alexis Conneau; Ruty Rinott; Guillaume Lample; Adina Williams; Samuel R Bowman; Holger Schwenk; Veselin Stoyanov"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Language-agnostic BERT sentence embedding",
+            "journal": "Long Papers",
+            "year": "2022",
+            "authors": "Fangxiaoyu Feng; Yinfei Yang; Daniel Cer; Naveen Arivazhagan; Wei Wang"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Quality-aware decoding for neural machine translation",
+            "journal": "",
+            "year": "2022",
+            "authors": "Patrick Fernandes; Ant\u00f3nio Farinhas; Ricardo Rei; Jos\u00e9 De Souza; Perez Ogayo; Graham Neubig; Andre Martins"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Towards opening the black box of neural machine translation: Source and target interpretations of the transformer",
+            "journal": "UAE. Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Javier Ferrando; Gerard I G\u00e1llego; Belen Alastruey; Carlos Escolano; Marta R Costa-Juss\u00e0"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Multi-hypothesis machine translation evaluation",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Marina Fomicheva; Lucia Specia; Francisco Guzm\u00e1n"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Alon Lavie, and Ond\u0159ej Bojar. 2021. Results of the WMT21 metrics shared task: Evaluating metrics with expert-based human evaluations on TED and news domain",
+            "journal": "",
+            "year": "",
+            "authors": "Markus Freitag; Ricardo Rei; Nitika Mathur; Chi-Kiu Lo; Craig Stewart; George Foster"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Dropout as a bayesian approximation: Representing model uncertainty in deep learning",
+            "journal": "",
+            "year": "2016",
+            "authors": "Yarin Gal; Zoubin Ghahramani"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Looking for a needle in a haystack: A comprehensive study of hallucinations in neural machine translation",
+            "journal": "",
+            "year": "2022",
+            "authors": "M Nuno; Elena Guerreiro;  Voita; F T Andr\u00e9"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Bitext mining using distilled sentence representations for low-resource languages",
+            "journal": "",
+            "year": "2022",
+            "authors": "Kevin Heffernan; Onur \u00c7elebi; Holger Schwenk"
+        },
+        {
+            "ref_id": "b13",
+            "title": "The curious case of neural text degeneration",
+            "journal": "",
+            "year": "2020",
+            "authors": "Ari Holtzman; Jan Buys; Li Du; Maxwell Forbes; Yejin Choi"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Yejin Bang, Andrea Madotto, and Pascale Fung. 2022. Survey of hallucination in natural language generation",
+            "journal": "",
+            "year": "",
+            "authors": "Ziwei Ji; Nayeon Lee; Rita Frieske; Tiezheng Yu; Dan Su; Yan Xu; Etsuko Ishii"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Hitokazu Matsushita, and Arul Menezes. 2021. To ship or not to ship: An extensive evaluation of automatic metrics for machine translation",
+            "journal": "",
+            "year": "",
+            "authors": "Tom Kocmi; Christian Federmann; Roman Grundkiewicz; Marcin Junczys-Dowmunt"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Clara Fannjiang, and David Sussillo. 2019. Hallucinations in neural machine translation",
+            "journal": "",
+            "year": "",
+            "authors": "Katherine Lee; Orhan Firat; Ashish Agarwal"
+        },
+        {
+            "ref_id": "b17",
+            "title": "A simple, fast diverse decoding algorithm for neural generation",
+            "journal": "",
+            "year": "2016",
+            "authors": "Jiwei Li; Will Monroe; Dan Jurafsky"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Results of the WMT20 metrics shared task",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Nitika Mathur; Johnny Wei; Markus Freitag; Qingsong Ma; Ond\u0159ej Bojar"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Domain robustness in neural machine translation",
+            "journal": "",
+            "year": "2020",
+            "authors": "Mathias M\u00fcller; Annette Rios; Rico Sennrich"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Understanding the properties of minimum Bayes risk decoding in neural machine translation",
+            "journal": "",
+            "year": "2021",
+            "authors": "Mathias M\u00fcller; Rico Sennrich"
+        },
+        {
+            "ref_id": "b21",
+            "title": "fairseq: A fast, extensible toolkit for sequence modeling",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Myle Ott; Sergey Edunov; Alexei Baevski; Angela Fan; Sam Gross; Nathan Ng; David Grangier; Michael Auli"
+        },
+        {
+            "ref_id": "b22",
+            "title": "chrF++: words helping character n-grams",
+            "journal": "",
+            "year": "2017",
+            "authors": "Maja Popovi\u0107"
+        },
+        {
+            "ref_id": "b23",
+            "title": "The curious case of hallucinations in neural machine translation",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Vikas Raunak; Arul Menezes; Marcin Junczys-Dowmunt "
+        },
+        {
+            "ref_id": "b24",
+            "title": "Salted: A framework for salient long-tail translation error detection",
+            "journal": "",
+            "year": "2022",
+            "authors": "Vikas Raunak; Matt Post; Arul Menezes"
+        },
+        {
+            "ref_id": "b25",
+            "title": "COMET: A neural framework for MT evaluation",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Ricardo Rei; Craig Stewart; Ana C Farinha; Alon Lavie"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Unbabel's participation in the WMT20 metrics shared task",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Ricardo Rei; Craig Stewart; Ana C Farinha; Alon Lavie"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Is this translation error critical?: Classification-based human and automatic machine translation evaluation focusing on critical errors",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Katsuhito Sudoh; Kosuke Takahashi; Satoshi Nakamura"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Multilingual machine translation evaluation metrics fine-tuned on pseudonegative examples for wmt 2021 metrics task",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Kosuke Takahashi; Yoichi Ishibashi; Katsuhito Sudoh; Satoshi Nakamura"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Attention is all you need",
+            "journal": "Curran Associates, Inc",
+            "year": "2017",
+            "authors": "Ashish Vaswani; Noam Shazeer; Niki Parmar; Jakob Uszkoreit; Llion Jones; Aidan N Gomez; Illia Kaiser;  Polosukhin"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Diverse beam search: Decoding diverse solutions from neural sequence models",
+            "journal": "",
+            "year": "2016",
+            "authors": "K Ashwin; Michael Vijayakumar;  Cogswell; R Ramprasath; Qing Selvaraju; Stefan Sun; David Lee; Dhruv Crandall;  Batra"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Analyzing the source and target contributions to predictions in neural machine translation",
+            "journal": "Long Papers",
+            "year": "2021",
+            "authors": "Elena Voita; Rico Sennrich; Ivan Titov"
+        },
+        {
+            "ref_id": "b32",
+            "title": "On exposure bias, hallucination and domain shift in neural machine translation",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Chaojun Wang; Rico Sennrich"
+        },
+        {
+            "ref_id": "b33",
+            "title": "IST-unbabel 2021 submission for the quality estimation shared task",
+            "journal": "",
+            "year": "2021",
+            "authors": "Chrysoula Zerva; Ricardo Daan Van Stigt; Ana C Rei; Pedro Farinha;  Ramos; G C Jos\u00e9; Taisiya De Souza; Miguel Glushkova; Fabio Vera; Andr\u00e9 F T Kepler;  Martins"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Detecting hallucinated content in conditional neural sequence generation",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Chunting Zhou; Graham Neubig; Jiatao Gu; Mona Diab; Francisco Guzm\u00e1n; Luke Zettlemoyer; Marjan Ghazvininejad"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Taxonomy of translation types (based on the dataset by Guerreiro et al. (2022)).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure 2: Kernel density estimation of the distribution of the detection criteria by translation pathology type.For each method, the X axis shows the values of the criterion (higher are better), and the Y axis shows the density.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :3Figure 3: Distribution of translation types when selecting the worst 10% of the dataset according to each metric. While in the original dataset the annotations are multilabel (e.g. a translation could be annotated both as oscillatory hal. and as a NE error), we label with the most severe pathology type (with severity increasing clockwise from \"Correct\" to \"Fully detached\").",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 4 :4Figure 4: Recalls by translation types when selecting the worst 20% of the dataset according to each metric.Here, the types are presented in a multilabel manner, i.e. one translation may contribute to multiple axes.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 5 :5Figure 5: For all combinations of a generation strategy and a reranker, heatmaps show scores for the final translations (darker is better).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 6 :6Figure 6: COMET scores for each generation method and number of hypotheses. For each group of generation strategies, we show the best representative.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 7 :7Figure 7: Human annotation results: percentages of translation pathologies for different reranking methods.For hallucinations, all the differences are significant, except the one between ALTI vs COMET-QE. For correct translations, the difference between LaBSE and ALTI is statistically significant.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Average COMET scores (\u2191) after reranking MC dropout hypotheses by various methods. Pathologies: fully detached hallucinations (F.), strongly detached hallucinations (S.), other pathologies (O.). See Table3in the appendix for XNLI scores.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Average XNLI scores after reranking MC dropout hypotheses by various methods. Pathologies: fully detached hallucinations (F.), strongly detached hallucinations (S.), other pathologies (O.).",
+            "figure_data": "RerankerPathologies Correct Avg. F. S. O.No reranking2 30 809351Baseline COMET-QE59 69 859377Ours ALTI64 73 929180LASER72 73 929282LaBSE74 80 929485XNLI (oracle) 75 83 989788"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "Human annotations Guidelines",
+            "figure_data": "Method 1Method 2Rate 1 Rate 2 P-valueLABSE LABSE LABSE COMET-QE ALTI COMET-QE ALTI Default COMET-QE Default ALTI Default0.56 0.56 0.56 0.54 0.54 0.490.54 0.49 0.20 0.49 0.20 0.200.53 0.02 0.00 0.12 0.00 0.00"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Comparison between manually annotated rates of correct translation.",
+            "figure_data": "Method 1Method 2Rate 1 Rate 2 P-valueLABSE LABSE LABSE COMET-QE ALTI COMET-QE ALTI Default COMET-QE Default ALTI Default0.16 0.16 0.16 0.22 0.22 0.220.22 0.22 0.53 0.22 0.53 0.530.01 0.01 0.00 1.00 0.00 0.00"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Comparison between manually annotated rates of hallucinated translation.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [],
+    "doi": "10.1162/tacl_a_00288"
+}

@@ -1,0 +1,820 @@
+{
+    "title": "The Zipfian Challenge: Learning the statistical fingerprint of natural languages",
+    "authors": "Christian Bentz",
+    "pub_date": "",
+    "abstract": "Human languages are often claimed to fundamentally differ from other communication systems. But what is it exactly that unites them as a separate category? This article proposes to approach this problem -here termed the Zipfian Challenge -as a standard classification task. A corpus with textual material from diverse writing systems and languages, as well as other symbolic and non-symbolic systems, is provided. These are subsequently used to train and test binary classification algorithms, assigning labels \"writing\" and \"non-writing\" to character strings of the test sets. The performance is generally high, reaching 98% accuracy for the best algorithms. Human languages emerge to have a statistical fingerprint: large unit inventories, high entropy, and few repetitions of adjacent units. This fingerprint can be used to tease them apart from other symbolic and non-symbolic systems.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "\"If a Martian scientist [...] received from Earth the broadcast of an extensive speech [...] what criteria would [...]determine whether the reception represented the effect of an animate process on Earth, or merely the latest thunderstorm on Earth?\" (Zipf, 1936, p. 187) Zipf's ideas -condensed in the above quote -have spurred a whole research paradigm: the study of statistical laws of language. These have emerged as the best candidates for universals of language (Ferrer-i-Cancho, 2005, 2007;Bentz and Ferrer-i-Cancho, 2016;Takahira et al., 2016;D\u0119bowski, 2020;G. Torre et al., 2021;Tanaka-Ishii, 2021;Petrini et al., 2023). Beyond languages, many other systems have been found to follow similar statistical laws -to the extent that their \"meaningfulness\" has been sometimes called into question (Miller, 1957;Li, 1992;Suzuki et al., 2005). Most recently, experimental investigations have shown that Zipfian distributions facilitate learning of linguistic and visual input (Lavi-Rotbain and Arnon, 2021, 2022, 2023), that they arise from human cognitive biases (Shufaniya and Arnon, 2022), and that they help with learning new word-referent mappings (Wolters et al., 2023). In this sense, such statistical laws are quite literally \"meaningful\".",
+                "However, the challenge posed in the quote above is still only partially addressed by research into statistical laws. Namely, a statistical pattern might universally occur across languages, but this does not entail that it is a unique feature of languages. The Zipfian Challenge is ultimately the search for a statistical fingerprint: a feature, or set of features, which uniquely identify human languages. This is related to an age-old controversy of the language sciences: What makes human language special -if anything?",
+                "This challenge is here broken down into a standard classification task. Assume you are provided with strings of characters: 1 AALLAQQAASIUTA SSSSCSOFSPPPFPP",
+                "(1)",
+                "Is there an algorithm which robustly classifies these into \"writing\" and \"non-writing\"? -If yes, how? -If no, why not? Beyond pure scientific curiosity, there would be concrete applications for such an algorithm: a) cleaning of contaminated corpora, especially when large and automatically crawled (Blevins and Zettlemoyer, 2022); b) measuring similarity of undeciphered scripts to known writing systems in order to help decipherement (Rao et al., 2009(Rao et al., , 2010;;Lee et al., 2010;Sproat, 2014); c) providing tools to systematically compare human language with animal communication (Kershenbaum et al., 2016). given subcorpus (right panel). Note that the natural logarithm of 50k is roughly 11, while for 500 this is roughly 6.",
+                "In the following, a corpus of character strings labelled as \"writing\" and \"non-writing\" is introduced in Section 2. Given this corpus, a sampling procedure is defined to retrieve strings of predefined lengths (10, 100, 1000). Subsequently, features from quantitative linguistics and information theory are described an calculated on the strings (Section 3). A series of classification algorithms are trained on a subset of the feature values. Section 4 then gives the results in terms of performance of the algorithms on the test sets. Section 5 discusses the results with regards to the original research question of a statistical fingerprint, as well as some follow-up questions which arise from the results."
+            ],
+            "publication_ref": [
+                "b9",
+                "b10",
+                "b4",
+                "b34",
+                "b8",
+                "b12",
+                "b35",
+                "b23",
+                "b22",
+                "b33",
+                "b17",
+                "b32",
+                "b36",
+                "b5",
+                "b26",
+                "b27",
+                "b21",
+                "b31",
+                "b16"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Data",
+            "text": [
+                "The data stems from a corpus of overall 377 files, split into \"writing\" (170 files) and \"non-writing\" (207). 2 The standard definition of writing is applied here. It refers to the tight link between spoken language structure and the graphemes representing it: \"Broadly defined, writing represents speech. One must be able to recover the spoken word, unambiguously, from a system of visible marks in order for those marks to be considered writing,\" (Woods, 2010, p. 18). However, some transcriptions of sign languages are also included here. Arguably, unique structural features of a given sign language can be identified in a transcrip-2 Files and code can be found at https://github.com/ christianbentz/NaLaFi. tion system, in parallel to spoken language in its graphical form."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Writing",
+            "text": [
+                "The writing files in this corpus consist of 50 parallel translations of the Universal Declaration of Human Rights (UDHR), 3 transcriptions of interactions in American Sign Language (ASL) and Sign Language of the Netherlands (SLN) according to the Berkeley system, as well as transliterations of ancient languages (Akkadian, Cretan Hieroglyphs, Proto-Elamite, Prakrit, and Sumerian). 4"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "TeDDi sample",
+            "text": [
+                "To increase the diversity of genres, registers, and modalities (spoken vs. written) for modern day languages beyond the UDHR, we furthermore draw 100 files randomly from the TeDDi (Text Data Diversity) sample (Moran et al., 2022). It includes more than 20K texts from overall 89 languages and 15 writing systems, and aims to maximize the diversity of families and areas represented."
+            ],
+            "publication_ref": [
+                "b24"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Non-writing",
+            "text": [
+                "The files classified as \"non-writing\" are further subdivided into songs of different bird species (animal), DNA strings (natural), python code (pycode), heraldics (heraldics), weather symbols (weather), morse code (morse), and protocuneiform (procunei). Examples are given in Table 1.",
+                "Bird song transcriptions of five different species (black-headed grosbeak, chickadee, Cassin's vireo, California thrasher, and zebra finch) are collected from an online database (Bird-DB). 5 It provides a \"text\" coding of recurrent phrases, identified by short pauses, and annotated with regular UTF-8 character strings in Praat (Arriaga et al., 2015).",
+                "Heraldics here refers to the description of heraldry (coats of arms) according to the so-called Blazon system. It has its own syntax, and uses a mixture of English and French words. It is here considered \"non-writing\" following the discussion in Sproat (2023). However, it is a borderline case. The usage of English words, inflectional morphemes, and noun phrase structures partially link it to the spoken language.",
+                "Morse code is another borderline case. 6 Graphemes of actual writing are here recoded into three morse characters (plus pause character). Hence, the actual writing can be recovered, and the underlying spoken language can be identified. However, this is a two-stage process. If we accept morse code as writing, we also have to accept, for instance, binary code. Such artificial coding schemes are here rather classified as \"nonwriting\".",
+                "Proto-cuneiform is strictly speaking also \"nonwriting\". Take, for instance, the transcription of a tablet from the Uruk III period (c. 3200-3000 BC) 7 as given in Table 1. N14 and N19 are transcriptions of sumerograms representing numbers (which are repeated several times for enumeration purposes), SZE\u223ca is an iconic sign which stands for the concept of \"barley\", and LU2 for the concept of \"person\". In a strict sense, we do not know whether the scribe thought of the Sumerian spoken words for \"barley\" and \"person\" when they produced these iconic signs. They could have spoken any other language. As a consequence, the language feature of this tablet is assigned the value \"undetermined\" in the database.",
+                "Finally, two further sets of \"non-writing\" files are generated by a) randomly drawing up to 48 dif-ferent characters from a uniform distribution, and b) randomly shuffling the characters of the \"writing\" files. Note that the latter process does not impact certain text statistics, e.g. the frequency distributions of characters. An overview of the file counts in this corpus, as well as distributions of file lengths in UTF-8 characters are given in Figure 1."
+            ],
+            "publication_ref": [
+                "b0",
+                "b32"
+            ],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Methods",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Preprocessing",
+            "text": [
+                "The 377 files are preprocessed consistently to remove special characters which are used as annotations, rather than representing genuine information of the symbolic systems. For example, in Sumerian transliterations, curly brackets indicate so-called determinatives, as in {d}nansze, where d represents the star shaped sumerogram indicating that the next sumerogram is to be interpreted as the name of a deity, namely, the goddess nansze. 8 Note that the curly brackets are here already an interpretation of the person transliterating the original sumerograms, i.e. an annotation. The UTF-8 characters removed from all files include the tab character, as well as '{', '}', '(', ')', '[', ']', '+', and '*'. In fact, these characters also often cause problems in later processing steps, which is another -more practical -reason to remove them. Examples of preprocessed character strings are given in Table 1."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Sampling",
+            "text": [
+                "While the numbers of files in the \"writing\" versus \"non-writing\" categories are relatively balanced (170 versus 207), the average file lengths in terms of UTF-8 characters differ widely. These range from c. 100 characters in the case of weather symbols, to c. 50k characters in the case of DNA (see also Figure 1, right panel). In most cases, this is due to data availability issues.",
+                "To alleviate this problem, two strategies are applied: Firstly, a maximum number of 10 strings of characters is extracted from each file. Secondly, the lengths of strings (in terms of number of UTF-8 characters) are held constant: 10, 100, 1000. We thus achieve a consistent comparison of strings of a given length across the different types of writing and non-writing systems. Also, these lengths are chosen with potential later applications Given this sampling procedure, we arrive at several thousand character strings for each predefined length (Table 2). For each of these strings, values are calculated for four quantitative features outlined in the following."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Features",
+            "text": [
+                "The focus is here on quantitative features which have been explicitly proposed to distinguish different natural languages, and other symbolic systems (e.g. in Rao et al., 2009Rao et al., , 2010;;Lee et al., 2010;Sproat, 2014;Bentz et al., 2017). In particular, the measures chosen are the type-token ratio (TTR), the unigram entropy (H), and the entropy rate (h) of units (i.e. UTF-8 characters), as well as the repetition rate of adjacent units (R). The exact definitions for these measures are given below."
+            ],
+            "publication_ref": [
+                "b26",
+                "b27",
+                "b21",
+                "b31",
+                "b3"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Type-token ratio (TTR)",
+            "text": [
+                "The type-token ratio is defined as",
+                "T T R = C C i=1 f i , (2",
+                ")",
+                "where C is number of character types in an \"alphabet\" A, such that C = |A|, and f i is the token frequency of a given character type c i ."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Unigram character entropy (H)",
+            "text": [
+                "Compared to TTR, the unigram character entropy is a more nuanced measure of diversity, reflecting the distribution of units. In general, it is defined as (Cover and Thomas, 2006, p. 14)",
+                "H(X) = \u2212 x\u2208X p(x) log 2 p(x), (3",
+                ")",
+                "where X is a discrete random variable, X is the alphabet, and p(x) is the probability of a given type of the alphabet. In our case, we estimate the entropy with the maximum likelihood or 'plug in' method for a given string of characters S, such that",
+                "H(S) = \u2212 C i=1 p(c i ) log 2 p(c i ),(4)",
+                "where S is assumed to be an i.i.d discrete random variable drawn from the alphabet A, and p(c i ) is the estimated probability, i.e. the relative frequency of a character f i in S. The unigram character entropy takes values in the range [0, \u221e]. For an example sequence abcabcabc we have H(X) = (1/3 \u00d7 log 2 (1/3)) \u00d7 3 = 1.58 bits/unit."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Entropy rate (h)",
+            "text": [
+                "While TTR and unigram entropy only take into account the frequencies/probabilities of individual characters -independent of their co-text -the entropy rate is defined for a stochastic process {X i } reflecting the concatenation of random variables, which might or might not be independent of one another. In general, the entropy rate is defined as (Cover and Thomas, 2006, p. 74)",
+                "h(X ) = lim n\u2192\u221e 1 n H(X 1 , X 2 , X 3 , . . . , X n ). (5",
+                ")",
+                "This can be seen as the per symbol entropy growth.",
+                "Note that in the case of characters in natural language texts, we have co-occurence patterns which limit the entropy growth to a certain extent. To estimate the entropy rate we turn to an estimator proposed in Gao et al. (2008), and implemented in Bentz et al. (2017). It is defined as",
+                "\u0125(S) = 1 n n i=2 log 2 i L i , (6",
+                ")",
+                "where n is the length (number of characters) in a given string S, and L i is the length (+1) of the longest contiguous substring starting at position i which is also present in i = 2 to i \u2212 1.",
+                "The entropy rate also takes values in the range [0, \u221e]. For our regular abcabcabc string we get \u0125 = 0.84 bits/character. Notice that this is lower than the value for the unigram character entropy (1.58 bits/character). This is because the same substring abc is repeated several times. In a sense, this entropy rate estimator \"penalizes\" long substrings of repetitions when calculating the entropy of a given string."
+            ],
+            "publication_ref": [
+                "b13",
+                "b3"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Repetition rate (R)",
+            "text": [
+                "Finally, the repetition rate (for adjacent characters) is proposed in Lee et al. (2010) and Sproat (2014) as an alternative to entropy estimation for teasing apart writing from non-writing. The general idea is that consecutive repetitions of characters are dispreferred in genuine writing systemsprobably reflecting the avoidance of adjacent repetitions of phonemes in spoken languages. While there are some extreme examples like Schifffahrt in Standard German, we rarely encounter more than two repetitions of the same character in adjacency, and even these are relatively infrequent. The repetition rate is calculated as where r is the number of adjacent repetitions of characters c i in a given string, and the denominator is the possible number of adjacent repetitions. R takes values in the range [0, 1]. In the string abcabcabc we have zero adjacent repetitions of the same character, while there could be",
+                "R = r C i=1 f i \u2212 1 , (7",
+                "(3 \u2212 1) + (3 \u2212 1) + (3 \u2212 1) = 6 repetitions.",
+                "The repetition rate is then R = 0/6 = 0. For comparison, in the string baccbcaab (which has the same TTR and H as before), we have cc and aa as adjacent repetitions, and hence R = 2/6 = 0.33.",
+                "Overall, we thus have four vectors of feature values. The estimated values are visualized in Figure 2. Some general trends are already visible in these panels. For instance, the marginal density distributions of writing and non-writing overlap considerably for the TTR, such that it will be hard for a classification algorithm to distinguish these in this dimension. For the repetition rate R (y-axes on the right panels), on the other hand, the values of writing cluster more strongly towards low values, and are more spread out for non-writing. Interestingly, the shuffled strings seem to move away towards higher values in the R dimension compared to the original writing strings. This suggests that random shuffling of characters introduces systematically more adjacent repetitions than found in real text."
+            ],
+            "publication_ref": [
+                "b21",
+                "b31"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Training and test sets",
+            "text": [
+                "The feature values along with their labels (writing vs. non-writing) are split into a training and test set by the ratio 67% to %33. The resulting numbers for the training and test sets per string length are given in Table 2. The same training and test sets are used for all algorithms. of the class labels which the k neighbours nearest to the target point have. Ties are broken at random. This is a non-parametric and fast classification algorithm. It was proposed already in Fix and Hodges (1952), and is still competitive today for general classification problems such as the XOR distribution of data points. 9 The only hyperparameter to tune is k, which is here assumed to range in between 1 and 10."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Logistic regression",
+            "text": [
+                "Logistic regression is a parametric technique which was widely used in statistical learning for binary classification before the advent of neural networks. It is still used today in experimental studies in psychology and psycholinguistics (Baayen, 2013). For binary classification using feature values, we first need to estimate the coefficients of the logistic model, which is specified in our case as",
+                "logit(Y ) = log( P (Y = 1) 1 \u2212 P (Y = 1) ) = \u03b2 0 + \u03b2 1 X 1 + \u03b2 2 X 2 + \u03b2 3 X 3 + \u03b2 4 X 4 , (8",
+                ")",
+                "where X 1 , . . . , X 4 are random variables representing the feature values, Y is the binary outcome variable we want to predict, and \u03b2 0 , . . . , \u03b2 4 are the parameters (coefficients) of the model which are learned (estimated) using the feature values and labels of the training set. Once these parameters are estimated, we use them for prediction of labels in the test set given the formula",
+                "P (Y = 1) = 1 1 + e \u2212( \u03b2 0 + \u03b2 1 X 1 + \u03b2 2 X 2 + \u03b2 3 X 3 + \u03b2 4 X 4 ) ,(9)",
+                "with the decision rule: if P (Y = 1) > 0.5, then assign label \"writing\", otherwise assign label \"nonwriting\"."
+            ],
+            "publication_ref": [
+                "b1"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Support Vector Machines",
+            "text": [
+                "A support vector machine (Cortes and Vapnik, 1995) uses the input vectors of the training set -in our case (x T T R , x H , x h , x R ) -to find the hyperplane with dimensions n \u2212 1 (where n is the number of features, i.e. n \u2212 1 = 3), which maximizes the margins to the nearest data points (i.e. support vectors). Data points in the test set are then classified according to the position of the hyperplane established with the training set. If the training data cannot be separated without error (which is almost always the case), then instead the number of errors is minimzed. As pointed out by Goodfellow et al. (2016, p. 141), the original formulation of SVMs is very similar to the logistic regression model given in Equation 8. However, it was subsequently shown that the so-called kernel trick can be used to allow non-linear mappings.",
+                "The main hyperparameter is then the type of kernel used. Here, the linear, radial basis, sigmoid, and polynomial kernels are tested."
+            ],
+            "publication_ref": [
+                "b6"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Multilayer Perceptrons (MLP)",
+            "text": [
+                "Multilayer perceptrons (deep feedforward networks) are the archetype of deep learning (Bengio et al., 2000;LeCun et al., 2015). In its simplest form, a feedforward network for binary classification consists of the input units (four in our case), a single hidden unit, and an output unit. See Figure 3 (upper panel) for an illustration. Note that this is mathematically equivalent to the logistic regression model in Equation 8. Namely, the vector of weights (w) -multiplied with the input values of features (x) -is equivalent to the coefficients (\u03b2 1 , . . . , \u03b2 4 ), and the bias (indicated in blue in the figures) is equivalent to \u03b2 0 . However, a crucial question is which hidden layer architecture, activation function, error function, and backpropagation algorithm yield the best results for a given data set. These are the hyperparameters to tune. Here, a search of the space of possible architectures is performed by randomly drawing natural numbers in the range [1,4] for the hidden layers, and numbers in the range [1,5] for the number of units in each hidden layer. The maximal values are guided by local regression analyses of model performance (F1 score) given the depth and size of networks (see Appendix B). Overall, one hundred random values are drawn for the depth and size, yielding one hundred different architectures (out of 5 4 = 625). Moreover, different activation functions (logistic, ReLU, softplus, tanh), error functions (SSE, cross entropy), and backpropagation algorithms (Rumelhart et al., 1986;Riedmiller and Braun, 1993;Hinton et al., 2006) are considered."
+            ],
+            "publication_ref": [
+                "b2",
+                "b20",
+                "b29",
+                "b28",
+                "b15"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results",
+            "text": [
+                "For all classification algorithms the accuracy, precision, recall, and F1 score on the test set are reported alongside the respective hyperparameters. A condensed overview of classification results are given in Table 3. The best model overall is an MLP trained on feature values of strings with 1000 characters. It achieves an F1 score of 0.96, and an accuracy of 98%. In other words, for the 571 strings of the test set it assigns the correct label (writing vs. non-writing) in 560 cases, erring only in 11 cases. This performance drops to 93% accuracy when feature values of strings of length 100 are supplied, and to 73% with strings of length 10. The performance of the best KNNs is very similar, differing only by a max amount of 0.01. In gen- eral, the KNN and MLPs show very similar performance, while the performance of SVMs and logistic regression models is lower across the board."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3"
+            ]
+        },
+        {
+            "heading": "Discussion",
+            "text": [
+                "Overall, the classification results suggest that the Zipfian Challenge is indeed a solvable problem. Namely, given strings of characters of length 100, KNNs and MLPs reach performance values of 0.92 and 0.93 respectively. With 1000 characters, they are almost at the ceiling of performance. In fact, it is questionable whether humans would be able to correctly classify the respective strings with 100% accuracy. Mind you that more than 36 different scripts and 90 different languages are represented in this data sample. It would be an interesting project for future research to establish human performance on this task. In the following, some further follow-up questions are briefly discussed."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Why do algorithms perform differently?",
+            "text": [
+                "It is surprising to see a simple, non-parametric classification algorithm like KNN outperform other, much more complex algorithms such as logistic regression and SVMs, and perform on a par with the best MLPs. This is certainly related to the data set and problem at hand. The KNN has no parameters to \"learn\" from the training data. It directly assigns a label to a given vector of feature values by finding the vector of feature values closest to it in the training set. In comparison, the currently best MLP given in Figure 3 has 4\u00d74+4\u00d74+2\u00d71 = 34 weights and 4+4+1 = 9 biases to adjust. This amounts to overall 43 parameters to optimize in the \"learning\" process. In fact, few of the deeper networks with three or four hidden layers actually reach convergence with this data. And when they converge, they do not necessarily perform better than the simpler architectures (see Appendix B)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Why do longer strings yield better results",
+            "text": [
+                "than shorter strings?",
+                "The main reason for this is that the respective feature values have not converged for short strings of length 10. For strings of length 100, they start to converge in most cases, and at 1000 characters they have converged across the board. The convergence behavior of the different measures is given in Appendix C."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Which is the best feature?",
+            "text": [
+                "When feature value vectors are input separately -rather than together -into the KNN algorithm (with k = 1), then the repetition rate R performs best for 100 characters (F1-score: 0.  for long vowels (aa), lateral glides (ll), and ejectives (qq). In such cases, the other measures will help with correct classification."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "How are the results influenced by subcorpora?",
+            "text": [
+                "The corpus of strings is not fully balanced. To get an idea of the degree to which particular subcorpora influence the performance, they are removed individually in a post hoc experiment with the best KNN model (k = 5) for 100 characters.",
+                "The results are given in Appendix D. Generally, classification results are robust to removal of subcorpora. The strongest decrease in performance is associated with the removal of DNA (natural) strings. These have generally low entropies, and high repetition rates, and are hence easily classified as non-writing. The inverse effect holds for shuffled data. Shuffling the characters of genuine writing does not change the unigram entropy and TTR, and only marginally changes the entropy rate of strings. Hence, in this case, the repetition rate is the only feature useful for identifying the resulting strings as non-writing. Removing the shuffled strings increases the overall performance."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusions",
+            "text": [
+                "Compared to other symbolic and non-symbolic systems, natural languages seem to exhibit a unique fingerprint: relatively large unit inventories, relatively high entropy, and relatively few repetitions of adjacent units. This statistical fin-gerprint can be used to identify written language with high accuracy when more than 100 characters are provided. Interestingly, this seems to hold not only for writing reflecting spoken language but also for transcriptions of sign languages (though only small samples of ASL and SLN were used here). This suggests that humans have evolved the capacity of encoding information with a diverse, non-repetitive succession of units in three modalities: speech, manual signs, and graphical codes. If these results hold true, then it is not a single feature, and not a single modality, which defines human language, but a set of features related to rapid information transmission in the face of space and time limitations."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgements",
+            "text": [
+                "Thanks to Tanja Samard\u017ei\u0107, the CrossLingference working group, as well as the members of the Language Learning and Processing Lab led by Inbal Arnon for comments on earlier versions of these analyses. Thanks to Ximena Gutierrez-Vasques, Julia \u0141ukasiewicz-Pater, Olga Peroni, and Steven Moran for their collaboration on the TeDDi sample and other projects directly relevant to this topic. The help of Clara Garcia Baumg\u00e4rtner and Tim Wientzek with collecting non-linguistic data is also gratefully acknowledged. Finally, thanks to the anonymous reviewers who have helped to improve the manuscript."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Appendices",
+            "text": [
+                "See separate pdf file for Appendices. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Bird-db: A database for annotated bird song sequences",
+            "journal": "Ecological Informatics",
+            "year": "2015",
+            "authors": "G Julio;  Arriaga; L Martin; Edgar E Cody; Charles E Vallejo;  Taylor"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Multivariate statistics",
+            "journal": "Cambridge University Press",
+            "year": "2013",
+            "authors": "R ; Harald Baayen"
+        },
+        {
+            "ref_id": "b2",
+            "title": "A neural probabilistic language model. Advances in neural information processing systems",
+            "journal": "",
+            "year": "2000",
+            "authors": "Yoshua Bengio; R\u00e9jean Ducharme; Pascal Vincent"
+        },
+        {
+            "ref_id": "b3",
+            "title": "The entropy of words -learnability and expressivity across more than 1000 languages",
+            "journal": "Entropy",
+            "year": "2017",
+            "authors": "Christian Bentz; Dimitrios Alikaniotis; Michael Cysouw; Ramon Ferrer-I Cancho"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Zipf's law of abbreviation as a language universal",
+            "journal": "",
+            "year": "2016",
+            "authors": "Christian Bentz; Ramon Ferrer-I-Cancho"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Language contamination helps explains the cross-lingual capabilities of English pretrained models",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Terra Blevins; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Supportvector networks",
+            "journal": "Machine learning",
+            "year": "1995",
+            "authors": "Corinna Cortes; Vladimir Vapnik"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Elements of information theory",
+            "journal": "New Jersey",
+            "year": "2006",
+            "authors": "M Thomas; Joy A Cover;  Thomas"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Information theory meets power laws: Stochastic processes and language models",
+            "journal": "John Wiley & Sons",
+            "year": "2020",
+            "authors": "\u0141ukasz D\u0119bowski"
+        },
+        {
+            "ref_id": "b9",
+            "title": "The variation of Zipf's law in human language",
+            "journal": "The European Physical Journal B",
+            "year": "2005",
+            "authors": "Ramon Ferrer-I-Cancho"
+        },
+        {
+            "ref_id": "b10",
+            "title": "On the universality of Zipf's law for word frequencies",
+            "journal": "Mouton de Gruyter",
+            "year": "2007",
+            "authors": "Ramon Ferrer-I-Cancho"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Discriminatory analysis -nonparametric discrimination: Small sample performance",
+            "journal": "",
+            "year": "1952",
+            "authors": "Evelyn Fix; L Joseph;  Hodges"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Can Menzerath's law be a criterion of complexity in communication",
+            "journal": "Plos one",
+            "year": "2021",
+            "authors": "G Iv\u00e1n; \u0141ukasz Torre; Antoni D\u0119bowski;  Hern\u00e1ndez-Fern\u00e1ndez"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Estimating the entropy of binary time series: Methodology, some theory and a simulation study",
+            "journal": "Entropy",
+            "year": "2008",
+            "authors": "Yun Gao; Ioannis Kontoyiannis; Elie Bienenstock"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Deep learning",
+            "journal": "MIT press",
+            "year": "2016",
+            "authors": "Ian Goodfellow; Yoshua Bengio; Aaron Courville"
+        },
+        {
+            "ref_id": "b15",
+            "title": "A fast learning algorithm for deep belief nets",
+            "journal": "Neural computation",
+            "year": "2006",
+            "authors": "Geoffrey E Hinton; Simon Osindero; Yee-Whye Teh"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Acoustic sequences in nonhuman animals: a tutorial review and prospectus",
+            "journal": "Biological Reviews",
+            "year": "2016",
+            "authors": "Arik Kershenbaum; T Daniel; Marie A Blumstein; \u00c7aglar Roch; Gregory Ak\u00e7ay;  Backus; A Mark; Kirsten Bee; Yan Bohn; Gerald Cao; Cristiane Carter;  C\u00e4sar"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Visual statistical learning is facilitated in Zipfian distributions",
+            "journal": "Cognition",
+            "year": "2021",
+            "authors": "Ori Lavi-Rotbain; Inbal Arnon"
+        },
+        {
+            "ref_id": "b18",
+            "title": "The learnability consequences of zipfian distributions in language",
+            "journal": "Cognition",
+            "year": "2022",
+            "authors": "Ori Lavi-Rotbain; Inbal Arnon"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Zipfian distributions in child-directed speech",
+            "journal": "Open Mind",
+            "year": "2023",
+            "authors": "Ori Lavi-Rotbain; Inbal Arnon"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Deep learning",
+            "journal": "Nature",
+            "year": "2015",
+            "authors": "Yann Lecun; Yoshua Bengio; Geoffrey Hinton"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Pictish symbols revealed as a written language through application of Shannon entropy",
+            "journal": "",
+            "year": "2010",
+            "authors": "Rob Lee; Philip Jonathan; Pauline Ziman"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Random texts exhibit Zipf's-lawlike word frequency distribution",
+            "journal": "IEEE Transactions on information theory",
+            "year": "1992",
+            "authors": "Wentian Li"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Some effects of intermittent silence",
+            "journal": "The American journal of psychology",
+            "year": "1957",
+            "authors": "A George;  Miller"
+        },
+        {
+            "ref_id": "b24",
+            "title": "TeDDi sample: Text data diversity sample for language comparison and multilingual nlp",
+            "journal": "",
+            "year": "2022",
+            "authors": "Steven Moran; Christian Bentz; Ximena Gutierrez-Vasques; Olga Pelloni; Tanja Samardzic"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Christian Bentz, and Ramon Ferrer-i-Cancho. 2023. Direct and indirect evidence of compression of word lengths. zipf's law of abbreviation revisited",
+            "journal": "Glottometrics",
+            "year": "",
+            "authors": "Sonia Petrini; Antoni Casas-I-Mu\u00f1oz; Jordi Cluet-I-Martinell; Mengxue Wang"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Entropic evidence for linguistic structure in the Indus script",
+            "journal": "Science",
+            "year": "2009",
+            "authors": "P N Rajesh; Nisha Rao;  Yadav; N Mayank; Hrishikesh Vahia; R Joglekar; Iravatham Adhikari;  Mahadevan"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Entropy, the Indus script, and language: A reply to R",
+            "journal": "Sproat. Computational Linguistics",
+            "year": "2010",
+            "authors": "P N Rajesh; Nisha Rao;  Yadav; N Mayank; Hrishikesh Vahia; Ronojoy Joglekar; Iravatham Adhikari;  Mahadevan"
+        },
+        {
+            "ref_id": "b28",
+            "title": "A direct adaptive method for faster backpropagation learning: The RPROP algorithm",
+            "journal": "IEEE",
+            "year": "1993",
+            "authors": "Martin Riedmiller; Heinrich Braun"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Learning representations by backpropagating errors",
+            "journal": "Nature",
+            "year": "1986",
+            "authors": "Geoffrey E David E Rumelhart; Ronald J Hinton;  Williams"
+        },
+        {
+            "ref_id": "b30",
+            "title": "2022. A cognitive bias for zipfian distributions? uniform distributions become more skewed via cultural transmission",
+            "journal": "Journal of Language Evolution",
+            "year": "",
+            "authors": "Amir Shufaniya; Inbal Arnon"
+        },
+        {
+            "ref_id": "b31",
+            "title": "A statistical comparison of written language and nonlinguistic symbol systems",
+            "journal": "Language",
+            "year": "2014",
+            "authors": "Richard Sproat"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Symbols: An Evolutionary History from the Stone Age to the Future",
+            "journal": "Springer",
+            "year": "2023",
+            "authors": "Richard William Sproat"
+        },
+        {
+            "ref_id": "b33",
+            "title": "The use of Zipf's law in animal communication analysis",
+            "journal": "Animal Behaviour",
+            "year": "2005",
+            "authors": "Ryuji Suzuki; John R Buck; Peter L Tyack"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Entropy rate estimates for natural language -a new extrapolation of compressed largescale corpora",
+            "journal": "Entropy",
+            "year": "2016",
+            "authors": "Ryosuke Takahira; Kumiko Tanaka-Ishii; \u0141ukasz D\u0119bowski"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Statistical Universals of Language: Mathematical Chance vs. Human Choice",
+            "journal": "Springer Nature",
+            "year": "2021",
+            "authors": "Kumiko Tanaka-Ishii"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Zipfian distributions facilitate learning novel word-referent mappings",
+            "journal": "",
+            "year": "2023",
+            "authors": "Lucie Wolters; Ori Lavi-Rotbain; Inbal Arnon"
+        },
+        {
+            "ref_id": "b37",
+            "title": "The earliest Mesopotamian writing",
+            "journal": "",
+            "year": "2010",
+            "authors": "Christopher Woods"
+        },
+        {
+            "ref_id": "b38",
+            "title": "The psycho-biology of language. An introduction to dynamic philology. George Routledge & Sons, Oxon, UK. Limitations See separate pdf file",
+            "journal": "",
+            "year": "1936",
+            "authors": "George Kingsley; Zipf "
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure1: Number of files per subcorpus (left panel). Logarithm of the number of UTF-8 characters over files in a given subcorpus (right panel). Note that the natural logarithm of 50k is roughly 11, while for 500 this is roughly 6.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "52",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "3. 5 Figure 2 :52Figure 2: Distributions of feature values for strings of length 10, 100, and 1000 respectively. The main distinction between writing and non-writing is color-coded (blue and red). The subcorpora are indicated by different shapes of the dots.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :3Figure 3: Upper panel: A forward pass with logistic activation and output functions with the simplest possible MLP architecture for binary classification, with one hidden layer, consisting of a single hidden unit.Lower panel: MLP architecture with two layers of hidden units (four each) and a logistic output unit. This is the architecture which performs best on strings of 100 characters.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Examples of characters strings of genuine writing systems as well as systems here classified as nonwriting.",
+            "figure_data": "CorpusSubcorpusFile IDExampleWritingAncientakk_0001\u0161um-ma a-wi-lum ba-wi-lam u-ub-bi-ir-maSignlangtsl_0001-clVP-clTL-golVP_TOP-pstSTRmount-clUDHRcmn_0001\u5e8f\u8a00\u9274\u4e8e\u5bf9\u4eba\u7c7b\u5bb6\u5ead\u6240\u6709\u6210\u5458\u7684\u56fa\u6709\u5c0a\u4e25\u53ca\u5176eng_0001Preamble Whereas recognition of the inherentkal_0001AALLAQQAASIUTA taqqinassusermik inuupkor_0001\uc804 \ubb38\ubaa8\ub4e0 \uc778\ub958 \uad6c\uc131\uc6d0\uc758 \ucc9c\ubd80\uc758 \uc874\uc5c4\uc131\uacfc \ub3d9\ub4f1TeDDieng_nfi_242 It's not supposed to be like this.It's time.Non-Writing Animalbhg_0001uj kd ro su sv sw sx gf jr dw kd tc jt ag taHeraldicsbla_0001Or, a lion rampant within a double tressureMorsemoc_0001phh_pppp_p_hp_s_pp_hp_s_h_pppp_p_s_hphpNatural (DNA)dna_0001GGTAGTTAGGGTCTGAAAAAGATTTTGCGProto-Cuneiform prc_0001N14 [...] N19 N19 N19 SZE\u223ca LU2 MUD3\u223cdPython codepyc_0001class Person: pass p = Person() print(p) classRandomran_10hihhe bh fif cd gbgdiiigc ghigbbg af icegeebiifgShuffledeng_0001swr a j e eitimii hfeooa ti i d qs sfi roeviebg epWeatherwsy_0001SWCCSSSSSSSSSSCSOFSPPPFPPFPP"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": ") Number of character strings of a given length in the training and test sets.",
+            "figure_data": "Length (Chars.) Overall Training Test10374125431198100322321941029100018321261571"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "Classification results organised by number of characters and method. Only the best models (by F1 and Accuracy) for each number of characters is given. The baseline is the KNN algorithm (k=1) with strings of 10 characters and only TTR as a feature for training and testing.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "T T R = C C i=1 f i , (2",
+            "formula_coordinates": [
+                4.0,
+                139.81,
+                749.17,
+                145.08,
+                28.88
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": ")",
+            "formula_coordinates": [
+                4.0,
+                284.89,
+                756.78,
+                4.24,
+                9.59
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "H(X) = \u2212 x\u2208X p(x) log 2 p(x), (3",
+            "formula_coordinates": [
+                4.0,
+                346.09,
+                499.68,
+                174.08,
+                23.6
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": ")",
+            "formula_coordinates": [
+                4.0,
+                520.17,
+                501.25,
+                4.24,
+                9.59
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "H(S) = \u2212 C i=1 p(c i ) log 2 p(c i ),(4)",
+            "formula_coordinates": [
+                4.0,
+                346.44,
+                619.79,
+                177.97,
+                33.71
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "h(X ) = lim n\u2192\u221e 1 n H(X 1 , X 2 , X 3 , . . . , X n ). (5",
+            "formula_coordinates": [
+                5.0,
+                82.36,
+                202.74,
+                202.53,
+                24.43
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": ")",
+            "formula_coordinates": [
+                5.0,
+                284.89,
+                210.35,
+                4.24,
+                9.59
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "\u0125(S) = 1 n n i=2 log 2 i L i , (6",
+            "formula_coordinates": [
+                5.0,
+                132.79,
+                331.19,
+                152.1,
+                33.71
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": ")",
+            "formula_coordinates": [
+                5.0,
+                284.89,
+                343.05,
+                4.24,
+                9.59
+            ]
+        },
+        {
+            "formula_id": "formula_9",
+            "formula_text": "R = r C i=1 f i \u2212 1 , (7",
+            "formula_coordinates": [
+                5.0,
+                138.31,
+                749.17,
+                146.58,
+                28.88
+            ]
+        },
+        {
+            "formula_id": "formula_10",
+            "formula_text": "(3 \u2212 1) + (3 \u2212 1) + (3 \u2212 1) = 6 repetitions.",
+            "formula_coordinates": [
+                5.0,
+                304.87,
+                266.13,
+                198.64,
+                10.18
+            ]
+        },
+        {
+            "formula_id": "formula_11",
+            "formula_text": "logit(Y ) = log( P (Y = 1) 1 \u2212 P (Y = 1) ) = \u03b2 0 + \u03b2 1 X 1 + \u03b2 2 X 2 + \u03b2 3 X 3 + \u03b2 4 X 4 , (8",
+            "formula_coordinates": [
+                7.0,
+                97.02,
+                209.69,
+                187.87,
+                41.69
+            ]
+        },
+        {
+            "formula_id": "formula_12",
+            "formula_text": ")",
+            "formula_coordinates": [
+                7.0,
+                284.89,
+                226.12,
+                4.24,
+                9.59
+            ]
+        },
+        {
+            "formula_id": "formula_13",
+            "formula_text": "P (Y = 1) = 1 1 + e \u2212( \u03b2 0 + \u03b2 1 X 1 + \u03b2 2 X 2 + \u03b2 3 X 3 + \u03b2 4 X 4 ) ,(9)",
+            "formula_coordinates": [
+                7.0,
+                102.05,
+                385.24,
+                187.08,
+                42.08
+            ]
+        }
+    ],
+    "doi": "10.1140/epjb/e2005-00121-8"
+}

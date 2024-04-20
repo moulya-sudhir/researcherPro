@@ -1,0 +1,713 @@
+{
+    "title": "Investigating the Nature of Disagreements on Mid-Scale Ratings: A Case Study on the Abstractness-Concreteness Continuum",
+    "authors": "Urban Knuple\u0161; Diego Frassinelli; Sabine Schulte Im Walde",
+    "pub_date": "",
+    "abstract": "Humans tend to strongly agree on ratings on a scale for extreme cases (e.g., a CAT is judged as very concrete), but judgements on mid-scale words exhibit more disagreement. Yet, collected rating norms are heavily exploited across disciplines. Our study focuses on concreteness ratings and (i) implements correlations and supervised classification to identify salient multimodal characteristics of mid-scale words, and (ii) applies a hard clustering to identify patterns of systematic disagreement across raters. Our results suggest to either fine-tune or filter midscale target words before utilising them.",
+    "sections": [
+        {
+            "heading": "Motivation",
+            "text": [
+                "Across disciplines, researchers have collected and exploited human judgements on semantic variables such as concreteness, compositionality, emotional valence, and plausibility. Traditionally, those judgements are collected as a degree on a continuum between extremes. While humans tend to strongly agree on their ratings for extremes (e.g., a CAT is typically judged as extremely concrete; GLORY as extremely abstract; the compound CROCODILE TEARS as extremely non-compositional; WAR as extremely negative), we find considerable disagreement regarding human mid-range ratings, i.e., judging about semi-concreteness, semi-compositionality, seminegativity. Presumably, conceptual semi-properties are not easily graspable, thus generating stronger disagreement among raters. Nevertheless, the collected norms are heavily exploited in state-of-theart computational approaches, where the respective knowledge represents a crucial task-related component (such as concreteness information for figurative language detection, and emotional valence for sentiment analysis).",
+                "The current study provides a series of analyses on human mid-scale ratings, while focusing on the most prominent collection of concreteness ratings for English words (Brysbaert et al., 2014), henceforth Brysbaert norms. As basis for the Brysbaert norms, humans were asked to judge the concreteness (in contrast to abstractness) of English words on a 5-point rating scale from 1 (abstract) to 5 (concrete) regarding how strongly the participants thought the meanings of the targets can(not) be experienced directly through their five senses. Figure 1 illustrates the distribution of the mean concreteness ratings and standard deviations (SDs) across 25 raters and for the three word classes of nouns, verbs, and adjectives. These croissant 1 plots for ratings on a scale can exhibit \"only a finite number of possible combinations of means and standard deviations\" (Pollock, 2018): humans tend to agree on the extremes (\u2192 low SD) and to disagree on intermediate semi-values (\u2192 high SD).",
+                "In a first set of experiments, we analyse multimodal characteristics of the concreteness of target nouns in the Brysbaert norms (we provide additional materials for verbs and adjectives in the Appendix): perception strength for specific senses (auditory, gustatory, haptic, olfactory, visual), emotional dimensions (valence, affect, dominance), lexical properties (frequency, ambiguity) and association types as indicators of meaning diversity. We start with a holistic perspective via correlations between targets' concreteness and their characteristics, and then zoom into differences for words with mid-scale vs. extremely concrete/abstract mean concreteness ratings, by applying supervised classification and feature analyses. In a second set of experiments, we hypothesise that mid-scale ratings are due to different combinations of individual human judgements across the scale. We thus rely on the original per-participant ratings (i.e., 25 ratings per target) and apply exploratory cluster analyses to identify patterns of disagreement between the individual raters of targets with mid-scale ratings. 1 We use this term due to the shape of the distribution plots. Our contributions in this paper are two-fold. (i) We identify a range of target word characteristics that overall correlate with their degrees of concreteness ratings in different directions, and more specifically differ for mid-scale and extremely concrete or abstract target words. (ii) We identify a range of systematic disagreement patterns that clearly differ across target words with mid-scale mean ratings, thus pointing out fine-grained differences in judgements on semi-perception and suggesting to either filter or fine-tune mid-scale target words before utilising them in computational approaches.",
+                "In the remainder of this paper, we introduce previous related work (Section 2) and our concreteness targets (Section 3); we then report our analyses regarding general and mid-scale target characteristics (Section 4) and mid-scale disagreement patterns (Section 5)."
+            ],
+            "publication_ref": [
+                "b7",
+                "b33"
+            ],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": [
+                "Collecting human judgements on a rating scale is a popular means of constructing concept-specific datasets across languages, research disciplines and (computational) linguistics tasks. Prominent example tasks and collections targeting semantic variables include compositionality ratings for compound-constituent relatedness (Reddy et al., 2011;Schulte im Walde et al., 2016;Cordeiro et al., 2019;Gagn\u00e9 et al., 2019;G\u00fcnther et al., 2020, i.a.), affect ratings such as valence, arousal, dominance, emotion (Kanske and Kotz, 2010;K\u00f6per and Schulte im Walde, 2016a;Mohammad, 2018, i.a.), plausibility ratings (Wang et al., 2018;Eichel and Schulte Im Walde, 2023, i.a.), and concreteness ratings (Spreen and Schulz, 1966;Paivio et al., 1968;Algarabel et al., 1988;Della Rosa et al., 2010;Brysbaert et al., 2014;K\u00f6per and Schulte im Walde, 2016a;Bonin et al., 2018;Muraki et al., 2022, i.a.).",
+                "As a main motivation for collecting general conceptional ratings on a scale, Keuleers and Balota (2015) state that there is \"no reason for words to be rated for every single experiment\". Still, researchers across disciplines have pointed out problematic aspects of rating norms, because their reliability is unclear, especially when ratings have been collected via crowdsourcing or extrapolation (Keuleers and Balota, 2015;Mandera et al., 2015). Pollock (2018) describes the typical shape of ratings on a scale, pointing out that the mid-range concepts are the least agreed upon, and that the interpretation of the corresponding ratings conflates semi-properties and genuine disagreements. A midscale score in concreteness could thus refer to an average semi-perception (whatever this means), or to a specific semi-sense, such as vision, haptics, etc., as well as to disagreement about perceptual strength, or a combination of the above. Furthermore, many conceptual ratings have been collected by presenting the word in isolation without reference to the respective word class and out of context. For example, the Brysbaert norms rely on isolated target presentation, and part-of-speech information was added post-hoc from the SUBTLEX-US corpus (Brysbaert et al., 2012). Muraki et al. (2022) used the same setup as Brysbaert et al. (2014) but for multiword expressions, in which case part-ofspeech ambiguity did not arise, but the targets were also presented out of context. Despite these problems, ratings on a scale still remain the major strategy to collect human judgements on degrees of semantic variables, while alternatives such as best-worst scaling are available (Kiritchenko and Mohammad, 2017;Abdalla et al., 2023). The resulting norms are heavily exploited in state-of-the-art computational approaches; e.g., emotion and concreteness norms represent a crucial component in systems to detect figurative lan-guage usage (Turney et al., 2011;Tsvetkov et al., 2014;K\u00f6per and Schulte im Walde, 2016b;Mohammad et al., 2016;Aedmaa et al., 2018;K\u00f6per and Schulte im Walde, 2018;Maudslay et al., 2020). The current study encourages researchers to distinguish between degrees of (dis)agreement of such norms, and to identify a meaningful way of exploitation, in particular for mid-scale ratings."
+            ],
+            "publication_ref": [
+                "b34",
+                "b38",
+                "b8",
+                "b15",
+                "b18",
+                "b45",
+                "b40",
+                "b32",
+                "b2",
+                "b11",
+                "b7",
+                "b5",
+                "b23",
+                "b33",
+                "b31",
+                "b7",
+                "b0",
+                "b42",
+                "b41",
+                "b30",
+                "b1",
+                "b24"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Concreteness Targets and Ratings",
+            "text": [
+                "As materials for our experiments, we utilise the concreteness norms collected by Brysbaert et al. (2014), including approximately 40, 000 English target words. 2 The resource contains individual ratings by 25 participants on a 5-point scale ranging from 1 (abstract) to 5 (concrete), mean ratings and standard deviations. No context or part-of-speech (POS) were given; in a post-processing step, Brysbaert et al. (2012) added POS and frequency information from the SUBTLEX-US corpus.",
+                "We followed a further post-processing step suggested by Schulte im Walde and Frassinelli (2022), who assigned the most frequently occurring POS tag and frequency information to the target words using the ENCOW web corpus (Sch\u00e4fer and Bildhauer, 2012;Sch\u00e4fer, 2015), and then reduced the targets to a less ambiguous and less low-frequent subset by discarding words for which (i) the predominant POS did not represent at least 95% of all POS occurrences; (ii) the newly assigned EN-COW POS tag was not identical to the SUBTLEX-US POS tag, or (iii) for which the ENCOW target frequency was lower than 10, 000. Our subset includes 5, 448 nouns, 1, 280 verbs and 2, 205 adjectives, and is publicly available. 3"
+            ],
+            "publication_ref": [
+                "b7",
+                "b36",
+                "b35"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Target Words: Characteristics",
+            "text": [
+                "In our first set of experiments we analyse multimodal characteristics of our concreteness targets. After introducing these characteristics (Section 4.1), we start out with a holistic perspective by quantifying statistical relationships between degrees of concreteness and our selection of target characteristics (Section 4.2). We then zoom into differences in characteristics between mid-scale target words and extremely concrete/abstract target words, by applying a classifier that determines separability based on characteristics (Section 4.3)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Characteristics and Resources",
+            "text": [
+                "Sense Perception Given that the original concreteness ratings in the Brysbaert norms rely on the raters' perceptions across senses, the most intimately connected set of characteristics explores the relationships between concreteness ratings and the five senses that were used in the task definition by Brysbaert et al. (2014) when collecting judgements for the concreteness norms. While Brysbaert et al. did not ask for a reference to specific senses rather than a general strength of sense perception, Lynott et al. (2020) collected judgements on specific senses (auditory, gustatory, haptic, olfactory, and visual) for the same targets as Brysbaert et al., using a scale from 0 to 5.",
+                "Emotion Dimensions Abstract words are considered to be more emotionally valenced than concrete words (Kousta et al., 2011;Vigliocco et al., 2014;Pollock, 2018). We thus explore emotion dimensions of our target words by using the NRC VAD Lexicon (Mohammad, 2018) 4 with ratings on valence, arousal, and dominance for over 20, 000 commonly used English words. The ratings were obtained by asking participants to judge the VAD strength of words using a best-worst scaling method. For each emotion dimension, the scores range from 0 (lowest VAD) to 1 (highest VAD).",
+                "Frequency and Ambiguity Frequency and ambiguity represent two standard dimensions influencing language processing and comprehension (Ellis, 2002;Baayen et al., 2016, i.a.). For frequency information, we rely on the target frequencies extracted from the ENCOW web corpus (see Section 3), containing \u224810 billion words. In order to distinguish between degrees of ambiguity of the targets, we rely on WordNet (Miller and Fellbaum, 1991;Fellbaum, 1998), a standard lexical semantic taxonomy for English word senses developed at Princeton University. WordNet organises words into classes of synonyms (synsets) connected by lexical and conceptual semantic relations. We looked up the number of noun and verb (but not adjective) target senses in WordNet version 3.0 and then used these WordNet ambiguity values if in the range [1; 6]; targets with more than six senses in WordNet we assigned to a joint additional category. Free Word Associations Previous work suggested that free associations to abstract words differ from free associations to concrete words in terms of the number of types, thus pointing towards differences in conceptual semantic diversity. At the same time, associations to concrete words have been found weaker and more symmetric than for abstract words (Crutch and Warrington, 2010;Hill et al., 2014). The Small World Of Words Project SWOW (de Deyne et al., 2019) 5 provides large databases with free word associations across languages; for English, SWOW-EN includes more than 12, 000 cue words with responses from over 90, 000 participants. The associations were gathered from 2011-2018 by asking English speakers through crowd-sourcing to produce the first three response words that came to mind when presented with a cue word. We rely on SNOW-EN associations as indicators of diversity regarding our target words. Next to using only the first response R1, we aggregated the first two responses into a set R12, and all three responses into a set R123 to decrease sparsity, while accepting a minor association chain effect 6 (McEvoy and Nelson, 1982; Schulte  im Walde and Melinger, 2008). We measured the diversity of responses by counting the number of types (i.e., the number of distinct associations that were produced across participants) in R1, R12, and R123, and normalised by the respective total numbers of response tokens. we will refer to supporting evidence or differences regarding verb and adjective analyses in the text and in the Appendix."
+            ],
+            "publication_ref": [
+                "b7",
+                "b22",
+                "b20",
+                "b44",
+                "b33",
+                "b13",
+                "b27",
+                "b9",
+                "b17"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Word Classes and Resource Coverage",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Holistic Perspective",
+            "text": [
+                "Figure 2 visualises the relationships between mean noun concreteness ratings and standard deviations as introduced in Figure 1, in combination with heat maps indicating the rating strengths of auditory, gustatory, haptic, olfactory and visual perception (left to right). 8 Targets missing in a resource are plotted in grey. We can clearly observe an overall dominance of the visual perception (also see Table 5 in Appendix A for perception across senses), and that the strength of perception varies in different ways across the concreteness rating scale. We thus conclude that overall the concreteness ratings of our target nouns 9 correlate to different degrees -and differing in negative vs. positive directions -with specific senses and also with further characteristics previously attributed to abstract vs. concrete concepts. This is our starting point for analysing whether any of these characteristics is particularly different for mid-scale target words and might have influenced their concreteness ratings."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_1",
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Mid-Scale Peculiarities",
+            "text": [
+                "We now investigate more specifically genuine characteristics of words that received mid-scale ratings, by zooming into differences in characteristics of mid-scale in contrast to extremely concrete/abstract target words, to maximise contrasts. 9 See Tables 6-7 in Appendix C for verbs and adjectives. For this, we created three sets of 500 nouns each: the 500 most abstract nouns, the 500 most extreme nouns, and the 500 nouns with mean ratings closest to the rating-scale mean of 3 (with 250 nouns with mean \u2264 3 and 250 nouns with mean > 3). 10 We then applied a Random Forest classifier and defined the following classification variants: a ternary mid/extremes condition where the classifier had to distinguish between the two extreme sets of 500 concrete and abstract targets from the mid-scale; binary mid/abstract and binary mid/concrete conditions to zoom into the individual mid-scale vs. extreme differences. As a control condition providing an upper bound for our classifiers, we included binary extremes where we classify only the extreme target sets with stronger differences between the two classes, while disregarding the mid-scale sets. The respective baselines are 50% for the binary classifications and 33% for the ternary classification.",
+                "The classifier used as features those target characteristics described and analysed in Section 4.2, separately and combined, in order to identify the characteristics that differ for mid-scale words in contrast to clearly abstract or concrete words. If a target word lacks a feature for a specific vari- able, we assigned 0 as the respective feature value. We applied 10-fold cross-validation and report the average accuracy score. The classification results using all the features at the same time are shown in Table 3. Figure 3 shows the results per feature type.",
+                "As expected, the binary extremes classifications show the best results, with auditory, haptic, and visual sense perception as well as association diversity representing the strongest characteristics, in accordance with their overall correlation strengths in Section 4.2. The ternary mid/extremes results look like a miniature version of the binary extremes results with regard to accuracy across feature types, only on a lower scale (given the extra class). The results for the binary mid/abstract and binary mid/concrete conditions are lower than for binary extremes , as predicted, because the contrasts on the concreteness scale are less strong. Also, we observe an interesting difference between the two conditions: targets with mid-scale ratings are distinguished better from targets with extremely concrete in comparison to extremely abstract ratings (\u2192 higher accuracy); at the same time, feature contributions in binary mid/concrete are similar to those in binary extremes and ternary mid/extremes , while their contributions in binary mid/abstract are more uniform.",
+                "To further understand the differences between these two conditions, we inspected the contribution of each feature to the models' output using Shapley Additive Explanations (SHAP; Lundberg and Lee, 2017). Figure 4 shows the importance -as the magnitude of change -of each variable in predicting the concreteness scores of concrete (left plot) and abstract (right plot) nouns vs. mid-scale nouns.",
+                "The colours of the violin plots indicate the values of the features. For the binary mid/concrete model, the three most important features for the classification are haptic, visual, and dominance, in that order. Conversely, for the binary mid/abstract model, the most important features are visual, auditory, and haptic. Notably, visual and haptic features emerge as the most informative in both cases. Associations, instead, show a relatively small contribution to the performance of the classifier when together with other feature types (as opposed to Figure 3).",
+                "An analysis of the colour-coded information (i.e., the value of each feature) supports our previous evidence. In the left plot in Figure 4, we can see a clear distinction between concrete nouns that are characterised by high (magenta) visual and haptic values, and mid-concreteness nouns characterised by low (blue) visual and haptic values. Conversely, in the right plot in Figure 4 the visual and haptic nature of abstract versus mid-scale nouns exhibits less pronounced differences with magenta colour associated both with mid-scale (positive) and abstract (negative) nouns.",
+                "We thus infer from our classification experiments that mid-scale target nouns are more easily distinguishable from extremely concrete in comparison to extremely abstract targets, with regard to our set of features. In the next section, we will investigate why this is the case."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2",
+                "fig_2",
+                "fig_2"
+            ],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Mid-Scale Disagreement Patterns",
+            "text": [
+                "In our final analyses, we zoom into the numerical characteristics of mid-scale mean ratings. If there was substantial agreement behind the semiperception of a mid-scale target (i.e., if all human   raters had provided a rating of 3 or similar on the scale of 1 to 5), then we would see a standard deviation around 0 in the croissant plots in Figure 1. We however observe rather high standard deviations for targets with mean ratings of \u22483, thus indicating considerable disagreement across raters. The question we are asking is how these disagreements were triggered. We hypothesise that raters might have been influenced differently by their individual perceptions of target characteristics, and that we therefore find several patterns of disagreement across the mid-scale target words.",
+                "For this exploration of disagreement patterns, we make use of the original per-participant ratings in Brysbaert et al. (2014), and applied a standard k-means hard clustering approach to automatically assign the 500 mid-scale nouns to k = 3 clusters. As representations for the targets, we used 5-dimensional vectors with relative frequencies per rating categories 1, 2, 3, 4, 5, based on the original individual ratings, e.g., the vector for the noun discussion is \u20d7 v = \u27e80.15, 0.07, 0.48, 0.15, 0.15\u27e9, because 15% of the raters provided ratings of 1, 4 or 5, while 7% judged it as 2, and 48% judged it as 3.",
+                "Figure 5 presents two perspectives on the resulting clusters with rather homogeneous cluster sizes 170, 163, 167. On the left, 11 we can see that the three clusters are clearly separated, with relatively small overlapping areas, thus indicating that the underlying cluster features (i.e., the rating distributions) clearly differ. This is confirmed by the plot on the right, which shows the individual rating distributions (y-axis) of the three cluster centroids 1-3 (x-axis). The heatmap exhibits rather different patterns: in cluster 1, we find the strongest disagreements among raters, where each of the two extreme rating scores (1 and 5) were chosen by 26%, the mid-score by 19%, and the remaining scores are equally distributed over ratings 2 and 4 (14% each); in cluster 2, 32% of the raters judged the respective target nouns as 3 because they were completely undecided or they consciously chose a mid-scale semi-perception score, while the other raters decided for 1, 2, 4, 5 with almost identical proportions (16-18%); finally, in cluster 3 we find a more uniform rating distribution, while a score of 4 was given by most of the raters (26%).  Overall, Figure 5 thus provides very strong evidence in favour of our hypothesis that a mid-scale mean rating conflates rather different patterns of disagreements across human ratings. Figures 12  and 13 in Appendix E provide the respective plots for verbs and adjectives, where we find similar patterns of disagreement."
+            ],
+            "publication_ref": [
+                "b7"
+            ],
+            "figure_ref": [
+                "fig_0",
+                "fig_4",
+                "fig_4",
+                "fig_13"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Discussion & Conclusion",
+            "text": [
+                "We started out with the well-known observation that humans tend to strongly agree on ratings on a scale for extreme cases, but that judgements on mid-scale words exhibit more disagreement. This observation is well-described by the croissant-like shape of mean rating scores in relation to their standard deviations (cf. Figure 1). While individual studies have pointed out problems with such ratings on a scale (e.g., Kiritchenko and Mohammad (2017); Pollock (2018)) and also provided alternative settings (e.g., Kiritchenko and Mohammad (2017); Abdalla et al. ( 2023)), the scale-based norms are heavily exploited across disciplines, including state-of-the-art computational approaches.",
+                "In the current study, we first asked whether words with mid-scale concreteness ratings potentially exhibit specific characteristics that genuinely distinguish them from clearly concrete and clearly abstract words. The corresponding classification experiments and feature analyses demonstrated that mid-scale targets were indeed distinguishable from extreme targets with regard to a subset of the senses which were used as criteria for the concretenessabstractness distinction (mainly visual and haptic), and also with regard to emotional dimensions and meaning diversity (implemented on the basis of association types). In this first set of experiments mid-scale targets therefore established themselves as genuine intermediate concepts. We also saw, however, that mid-scale nouns are more easily distinguishable from extremely concrete in comparison to extremely abstract nouns, and this asymmetry flips with regard to verbs and adjectives, presumably because their underlying rating distributions exhibit different skews (cf. the croissant plots in Figure 1 and the different mid-scale ranges in Figure 9 in Appendix D). So overall, words with mid-scale mean ratings represent rather genuine intermediate concepts regarding our implementations of features and analyses.",
+                "In the second part of our study, we investigated whether mid-scale ratings are generally agreed upon across raters, or whether raters disagreed regarding their semi-perception. Relying on explorative cluster analyses using the original perparticipant rating distributions, we found clusters with obviously very different centroids. From this, we induce that a mid-scale rating mean of \u22483 conflates rather different yet systematic kinds of disagreements. This observation is in line with the mathematically-based observations by Pollock (2018) that \"there is only a finite number of possible combinations of means and standard deviations\", and at the same time it clearly demonstrated that mid-scale ratings indeed differ regarding their underlying rating combinations. So, on the one hand, our cluster analyses confirm a so-far rather theoretically-driven observation; on the other hand, we raise the question of whether and how this observation should influence the utilisation of ratings on a scale. We suggest two alternative routes: (i) either filter the norm targets and only keep those targets that are clearly attributable to one extreme, or (ii) fine-tune the mid-scale norm targets with regard to inherent disagreement patterns, because the set of mid-scale targets is itself rather inhomogeneous but nevertheless provides valuable information regarding specific differences in human perception.",
+                "Last but not least we would like to point out that inherent disagreements among human annotators are obviously not restricted to our particular focus on mid-scale ratings but represent a common issue under discussion across annotation tasks. In the past decade the field has moved from considering disagreements as pure noise towards zooming into disagreements in order to distinguish between noise and subjectivity, and to effectively exploit the value of disagreements in language modelling, see Alm (2011) and Uma et al. (2021) for a prominent opinion paper and a prominent survey, respectively. Our analyses and insights should be interpreted in the same vein: we attribute disagreements on concreteness mid-scale ratings to genuine intermediate concepts (see above) and suggest to take a finegrained approach when utilising them in language modelling tasks and applications."
+            ],
+            "publication_ref": [
+                "b33",
+                "b33",
+                "b43"
+            ],
+            "figure_ref": [
+                "fig_0",
+                "fig_0",
+                "fig_7"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "Our study is targeting ratings on a scale but currently restricted to a selection of target properties and a specific case study on concreteness. Future work will explore additional target properties that might influence concreteness mid-scale ratings (such as the mass-count distinction and register) as well as characteristics of ratings on a scale in further collections and other languages than English. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Dominance of Perception across Targets",
+            "text": [
+                "Table 5 shows how many of our target words (nouns, verbs, adjectives, overall) were perceived predominantly by any of the human senses auditory, gustatory, haptic, olfactory, visual, according to the analyses by Lynott et al. (2020).    "
+            ],
+            "publication_ref": [
+                "b22"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7"
+            ]
+        },
+        {
+            "heading": "D Mid-Scale Definitions, Ranges and Classifications across Word Classes",
+            "text": [
+                "Intuitively, the interpretation of mid-scale targets refers to somewhere in the middle of the mean concreteness ratings plots that we have presented in Figure 1, in contrast to extremely abstract targets on the left and extremely concrete targets on the right. Accordingly, we suggest three ways of capturing this intuition, given that the number of targets per part-of-speech (POS) and also the ranges of ratings and their skewness differ across POS. We created three sets of 500 mid-scale noun targets accordingly, and also three sets of 200 mid-scale verb and 200 mid-scale adjective targets.",
+                "Mid-Scale-Mean The mid-scale score is defined as the mean value on the rating scale, which is 3 in our scale [1; 5]. Mid-scale targets are then defined as those words whose mean ratings are closest to 3.",
+                "Mid-Scale-Median Given that the rating distributions differ across POS and with regard to their left vs. right skews, the mid-scale score is defined as the median, in our case: 3.54 for the nouns, 2.47 for the verbs, and 2.19 for the adjectives. Mid-scale targets are then defined as those words whose mean ratings are closest to these medians.",
+                "Mid-Scale-Median-SD Incorporating disagreement between raters, we refine the mid-scale-median taking into account as mid-scale targets only those words whose mean ratings are closest to the median and whose standard deviations are > 1.4.",
+                "In all three cases, we selected an equal number of targets with mean ratings above and below the respective mid-scale score. Figure 9 provides the mean-rating ranges of our mid-scale targets across these three mid-scale definitions, based on the respective 500/200/200 mid-scale noun/verb/adjective targets. The same figure shows the mean-rating ranges of the extremely concrete and extremely abstract targets, relying again on sets of 500/200/200 targets. We can see that the mid-scale ranges clearly differ across definitions and POS. Table 8 shows the classification results (accuracy) across these mid-scale definitions, word classes and target set constellations.      0.17 0.17 0.17  "
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0",
+                "fig_7"
+            ],
+            "table_ref": [
+                "tab_10"
+            ]
+        },
+        {
+            "heading": "Acknowledgements",
+            "text": [
+                "This research was supported by the Ad Futura Scholarship (305. JR) from the Public Scholarship, Development, Disability and Maintenance Fund of the Republic of Slovenia (Urban Knuple\u0161), and by the DFG Research Grant SCHU 2580/4-1 (MUD-CAT -Multimodal Dimensions and Computational Applications of Abstractness). We also thank the reviewers for suggesting additional perspectives regarding our analyses and interpretations."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethics Statement",
+            "text": [
+                "For our study, we used and cited publicly available datasets and libraries. The resources do not contain any information that uniquely identifies individuals. Our research does not raise any immediate ethical concerns."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "What Makes Sentences Semantically Related? A Textual Relatedness Dataset and Empirical Study",
+            "journal": "",
+            "year": "2023",
+            "authors": "Mohamed Abdalla; Krishnapriya Vishnubhotla; Saif Mohammad"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Combining Abstractness and Language-specific Theoretical Indicators for Detecting Non-Literal Usage of Estonian Particle Verbs",
+            "journal": "",
+            "year": "2018",
+            "authors": "Eleri Aedmaa; Maximilian K\u00f6per; Sabine Schulte Im Walde"
+        },
+        {
+            "ref_id": "b2",
+            "title": "The University of Valencia's Computerized Word Pool",
+            "journal": "Behavior Research Methods, Instruments, and Computers",
+            "year": "1988",
+            "authors": "Salvador Algarabel; Juan Carlos Ruiz; Jaime Sanmartin"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Subjective Natural Language Problems: Motivations, Applications, Characterizations, and Implications",
+            "journal": "",
+            "year": "2011",
+            "authors": "Cecilia Ovesdotter; Alm "
+        },
+        {
+            "ref_id": "b4",
+            "title": "Frequency in Lexical Processing",
+            "journal": "",
+            "year": "2016",
+            "authors": "R ; Harald Baayen; Petar Milin; Michael Ramscar"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Concreteness Norms for 1,659 French Words: Relationships with other Psycholinguistic Variables and Word Recognition Times",
+            "journal": "Behavior Research Methods",
+            "year": "2018",
+            "authors": "Patrick Bonin; Alain Meot; Aurelia Bugaiska"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Boris New, and Emmanuel Keuleers. 2012. Adding Part-of-Speech Information to the SUBTLEX-US Word Frequencies. Behavior Research Methods",
+            "journal": "",
+            "year": "",
+            "authors": "Marc Brysbaert"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Concreteness Ratings for 40 Thousand generally known English Word Lemmas. Behavior Research Methods",
+            "journal": "",
+            "year": "2014",
+            "authors": "Marc Brysbaert; Amy Beth Warriner; Victor Kuperman"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Unsupervised Compositionality Prediction of Nominal Compounds",
+            "journal": "Computational Linguistics",
+            "year": "2019",
+            "authors": "Silvio Cordeiro; Aline Villavicencio; Marco Idiart; Carlos Ramisch"
+        },
+        {
+            "ref_id": "b9",
+            "title": "The Differential Dependence of Abstract and Concrete Words upon Associative and Similarity-based Information: Complementary Semantic Interference and Facilitation Effects",
+            "journal": "Cognitive Neuropsychology",
+            "year": "2010",
+            "authors": "J Sebastian; Elizabeth K Crutch;  Warrington"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Amy Perfors, Marc Brysbaert, and Gert Storms. 2019. The \"Small World of Words\" English Word Association Norms for over 12,000 Cue Words",
+            "journal": "Behavior Research Methods",
+            "year": "",
+            "authors": "Danielle J Simon De Deyne;  Navarro"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Beyond the Abstract-Concrete Dichotomy: Mode of Acquisition, Concreteness, Imageability, Familiarity, Age of Acquisition, Context Availability, and Abstractness Norms for a Set of 417 Italian Words",
+            "journal": "Behavior Research Methods",
+            "year": "2010",
+            "authors": "Pasquale A Della Rosa; Eleonora Catricala; Gabriella Vigliocco; Stefano F Cappa"
+        },
+        {
+            "ref_id": "b12",
+            "title": "A Dataset for Physical and Abstract Plausibility and Sources of Human Disagreement",
+            "journal": "",
+            "year": "2023",
+            "authors": "Annerose Eichel; Sabine Schulte Im Walde"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Frequency Effects in Language Processing: A Review with Implications for Theories of Implicit and Explicit Language Acquisition",
+            "journal": "Studies in Second Language Acquisition",
+            "year": "2002",
+            "authors": "C Nick;  Ellis"
+        },
+        {
+            "ref_id": "b14",
+            "title": "WordNet -An Electronic Lexical Database. Language, Speech, and Communication",
+            "journal": "MIT Press",
+            "year": "1998",
+            "authors": ""
+        },
+        {
+            "ref_id": "b15",
+            "title": "LADEC: The Large Database of English Compounds",
+            "journal": "Behavior Research Methods",
+            "year": "2019",
+            "authors": "Christina L Gagn\u00e9; Thomas L Spalding; Daniel Schmidtke"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Semantic Transparency Effects in German Compounds: A Large Dataset and Multiple-Task Investigation",
+            "journal": "Behavior Research Methods",
+            "year": "2020",
+            "authors": "Fritz G\u00fcnther; Marco Marelli; Jens B\u00f6lte"
+        },
+        {
+            "ref_id": "b17",
+            "title": "A Quantitative Empirical Analysis of the Abstract/Concrete Distinction",
+            "journal": "Cognitive Science",
+            "year": "2014",
+            "authors": "Felix Hill; Anna Korhonen; Christian Bentz"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Leipzig Affective Norms for German: A Reliability Study",
+            "journal": "Behavior Research Methods",
+            "year": "2010",
+            "authors": "Philipp Kanske; Sonja A Kotz"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Analogies in Complex Verb Meaning Shifts: The Effect of Affect in Semantic Similarity Models",
+            "journal": "",
+            "year": "2018",
+            "authors": "Maximilian K\u00f6per; Sabine Schulte Im Walde"
+        },
+        {
+            "ref_id": "b20",
+            "title": "The Representation of Abstract Words: Why Emotion Matters",
+            "journal": "Journal of Experimental Psychology: General",
+            "year": "2011",
+            "authors": "Gabriella Stavroula-Thaleia Kousta; David P Vigliocco; Mark Vinson; Elena Del Andrews;  Campo"
+        },
+        {
+            "ref_id": "b21",
+            "title": "A unified approach to interpreting model predictions",
+            "journal": "Curran Associates, Inc",
+            "year": "2017",
+            "authors": "M Scott; Su-In Lundberg;  Lee"
+        },
+        {
+            "ref_id": "b22",
+            "title": "The Lancaster Sensorimotor Norms: Multidimensional Measures of Perceptual and Action Strength for 40,000 English Words",
+            "journal": "Behavior Research Methods",
+            "year": "2020",
+            "authors": "Dermot Lynott; Louise Connell; Marc Brysbaert; James Brand; James Carney"
+        },
+        {
+            "ref_id": "b23",
+            "title": "How useful are Corpus-based Methods for Extrapolating Psycholinguistic Variables?",
+            "journal": "The Quarterly Journal of Experimental Psychology",
+            "year": "2015",
+            "authors": "Pawel Mandera; Emmanuel Keuleers; Marc Brysbaert"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Metaphor Detection Using Context and Concreteness",
+            "journal": "",
+            "year": "2020",
+            "authors": "Tiago Rowan Hall Maudslay; Ryan Pimentel; Simone Cotterell;  Teufel"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Category Name and Instance Norms for 106 Categories of Various Sizes",
+            "journal": "American Journal of Psychology",
+            "year": "1982",
+            "authors": "Cathy L Mcevoy; Douglas L Nelson"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Umap: Uniform manifold approximation and projection",
+            "journal": "The Journal of Open Source Software",
+            "year": "2018",
+            "authors": "Leland Mcinnes; John Healy; Nathaniel Saul; Lukas Grossberger"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Semantic Networks of English",
+            "journal": "Cognition",
+            "year": "1991",
+            "authors": "George A Miller; Christiane Fellbaum"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Obtaining Reliable Human Ratings of Valence, Arousal, and Dominance for 20,000 English Words",
+            "journal": "",
+            "year": "2018",
+            "authors": "M Saif;  Mohammad"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Annual Meeting of the Association for Computational Linguistics",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b30",
+            "title": "How Translation Alters Sentiment",
+            "journal": "Journal of Artificial Intelligence Research",
+            "year": "2016",
+            "authors": "M Saif; Mohammad Mohammad; Svetlana Salameh;  Kiritchenko"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Concreteness Ratings for 62 Thousand English Multiword Expressions. PsyArXiv",
+            "journal": "",
+            "year": "2022",
+            "authors": "Emiko J Muraki; Summer Abdalla; Marc Brysbaert; Penny M Pexman"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Concreteness, Imagery, and Meaningfulness Values for 925 Nouns",
+            "journal": "Journal of Experimental Psychology (Monograph Supplement)",
+            "year": "1968",
+            "authors": "Allan Paivio; John C Yuille; Stephen A Madigan"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Statistical and Methodological Problems with Concreteness and other Semantic Variables: A List Memory Experiment Case Study",
+            "journal": "Behavior Research Methods",
+            "year": "2018",
+            "authors": "Lewis Pollock"
+        },
+        {
+            "ref_id": "b34",
+            "title": "An Empirical Study on Compositionality in Compound Nouns",
+            "journal": "",
+            "year": "2011",
+            "authors": "Siva Reddy; Diana Mccarthy; Suresh Manandhar"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Processing and Querying Large Web Corpora with the COW14 Architecture",
+            "journal": "",
+            "year": "2015",
+            "authors": "Roland Sch\u00e4fer"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Building Large Corpora from the Web Using a New Efficient Tool Chain",
+            "journal": "",
+            "year": "2012",
+            "authors": "Roland Sch\u00e4fer; Felix Bildhauer"
+        },
+        {
+            "ref_id": "b37",
+            "title": "Distributional Measures of Abstraction",
+            "journal": "",
+            "year": "2022",
+            "authors": "Sabine Schulte Im Walde; Diego Frassinelli"
+        },
+        {
+            "ref_id": "b38",
+            "title": "G h ost-NN: A Representative Gold Standard of German Noun-Noun Compounds",
+            "journal": "",
+            "year": "2016",
+            "authors": "Sabine Schulte Im Walde; Anna H\u00e4tty; Stefan Bott; Nana Khvtisavrishvili"
+        },
+        {
+            "ref_id": "b39",
+            "title": "An In-Depth Look into the Co-Occurrence Distribution of Semantic Associates",
+            "journal": "",
+            "year": "2008",
+            "authors": "Sabine Schulte Im Walde; Alissa Melinger"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Parameters of Abstraction, Meaningfulness, and Pronunciability for 329 Nouns",
+            "journal": "Journal of Verbal Learning Behavior",
+            "year": "1966",
+            "authors": "Otfried Spreen; Rudolph W Schulz"
+        },
+        {
+            "ref_id": "b41",
+            "title": "Metaphor Detection with Cross-Lingual Model Transfer",
+            "journal": "",
+            "year": "2014",
+            "authors": "Yulia Tsvetkov; Leonid Boytsov; Anatole Gershman; Eric Nyberg; Chris Dyer"
+        },
+        {
+            "ref_id": "b42",
+            "title": "Literal and Metaphorical Sense Identification through Concrete and Abstract Context",
+            "journal": "",
+            "year": "2011",
+            "authors": "D Peter; Yair Turney; Dan Neuman; Yohai Assaf;  Cohen"
+        },
+        {
+            "ref_id": "b43",
+            "title": "Learning from Disagreement: A Survey",
+            "journal": "Journal of Artificial Intelligence Research",
+            "year": "2021",
+            "authors": "Alexandra N Uma; Tommaso Fornaciari; Dirk Hovy; Silviu Paun; Barbara Plank; Massimo Poesio"
+        },
+        {
+            "ref_id": "b44",
+            "title": "The Neural Representation of Abstract Words: The Role of Emotion",
+            "journal": "Cerebral Cortex",
+            "year": "2014",
+            "authors": "Gabriella Vigliocco;  Stavroula-Thaleia; Pasquale Anthony Kousta; Della Rosa; David P Vinson; Marco Tettamanti; Joseph T Devlin; Stefano F Cappa"
+        },
+        {
+            "ref_id": "b45",
+            "title": "Modeling Semantic Plausibility by Injecting World Knowledge",
+            "journal": "",
+            "year": "2018",
+            "authors": "Su Wang; Greg Durrett; Katrin Erk"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Croissant plots -Mean concreteness scores and standard deviations of ratings in Brysbaert et al. (2014).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure 2: Mean noun ratings and standard deviations overlaid with the respective sense perception scores.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 4 :4Figure 4: SHAP values -Importance of each feature for the output of the binary mid/concrete model (on the left) and the binary mid/abstract model (on the right). Extreme nouns are coded as negative, mid-scale nouns as positive.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 5 :5Figure 5: k-Means clustering (k = 3) of 500 mid-scale nouns based on original individual per-participant rating distributions. Cluster sizes are 170, 163, and 167. The heatmap shows the rating distributions of the centroid vectors.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "67",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 6 :Figure 7 :67Figure 6: Mean noun ratings and standard deviations overlaid with the respective VAD scores.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 8 :8Figure 8: Mean noun ratings and standard deviations overlaid with a normalised number of the association types in the sets R1, R12, and R123.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "Figure 9 :9Figure 9: Distributions of concreteness scores across mid-scale definitions and POS.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "figure",
+            "figure_id": "fig_8",
+            "figure_caption": "Figure 10 :10Figure 10: Results of classifications across characteristics and mid-scale/extreme experiments. The dotted and horizontal line patterns indicate the amount of abstract and concrete verbs correctly classified.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "figure",
+            "figure_id": "fig_9",
+            "figure_caption": "Figure 11 :11Figure 11: Results of classifications across characteristics and mid-scale/extreme experiments. The dotted and horizontal line patterns indicate the amount of abstract and concrete adjectives correctly classified.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_10",
+            "figure_caption": "FiguresFigures 12 and 13 present the clusters and the heat maps of rating distributions of the cluster centroids for verbs and adjectives. The clusters are based on the same k-Means clustering setup as those for nouns in Section 5.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "12",
+            "figure_type": "figure",
+            "figure_id": "fig_12",
+            "figure_caption": "Figure 12 :12Figure 12: k-Means clustering (k = 3) of 200 mid-scale verbs based on original individual per-participant rating distributions. Cluster sizes are 71, 68, and 61. The heatmap shows the rating distributions of the centroid vectors.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "13",
+            "figure_type": "figure",
+            "figure_id": "fig_13",
+            "figure_caption": "Figure 13 :13Figure 13: k-Means clustering (k = 3) of 200 mid-scale adjectives based on original individual per-participant rating distributions. Cluster sizes are 68, 62, and 70. The heatmap shows the rating distributions of the centroid vectors.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Coverage of target characteristics.",
+            "figure_data": "Table 1provides an overview of how many of our targetsare covered by the various resources across wordclasses. Note that from now on the main body ofthis paper will focus on nouns, and additionally"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Results of classifications across characteristics and mid-scale/extreme experiments. The dotted and horizontal line patterns indicate the amount of abstract and concrete nouns correctly classified.",
+            "figure_data": "informs us that visual, haptic, and olfac-tory sense perception (positively), as well as audi-tory (negatively), correlate with the noun concrete-ness scores. Regarding further target characteris-tics, the table reports a negative correlation withemotion regarding affect and dominance, as well asnegative correlations with concept diversity regard-ing association types. The lexical characteristicsdo not show any correlations with concreteness."
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Overall classification results (accuracy).",
+            "figure_data": "Classification variants Baseline Accuracybinary extremes0.500.98binary mid/abstract0.500.75binary mid/concrete0.500.93ternary mid/extremes0.330.79"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Table4provides a few example targets for each of the three clusters, together with their rating distributions.",
+            "figure_data": "C TargetDistributiondefinition\u27e80.32, 0.11, 0.14, 0.11, 0.32\u27e91hero\u27e80.22, 0.11, 0.26, 0.19, 0.22\u27e9percentage \u27e80.40, 0.03, 0.10, 0.20, 0.27\u27e9coward\u27e80.17, 0.20, 0.30, 0.20, 0.13\u27e92discussion \u27e80.15, 0.07, 0.48, 0.15, 0.15\u27e9labor\u27e80.16, 0.12, 0.40, 0.12, 0.20\u27e9booster\u27e80.32, 0.07, 0.14, 0.29, 0.18\u27e93election\u27e80.20, 0.10, 0.23, 0.27, 0.20\u27e9hour\u27e80.23, 0.07, 0.23, 0.30, 0.17\u27e9"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Examples of rating distributions for noun target words across clusters C.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "Distribution of dominant perceptual modalities of our target words, based onLynott et al. (2020).",
+            "figure_data": "Auditory Gustatory Haptic Olfactory Visual TotalN61019910238 4,491 5,440V2698274972 1,280A34131647 1,759 2,202all1,22023819349 7,222 8,922"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "C Correlations between Target Characteristics and Concreteness: Verbs and Adjectives Spearman's rank-order correlation coefficient \u03c1 for the statistical relationships between degrees of concreteness and strengths of target verb characteristics; significance level is p < 0.05.",
+            "figure_data": "Target characteristics\u03c1Auditory-0.28  *Gustatory-0.09  *Sense perceptionHaptic0.47  *Olfactory0.01  *Visual0.47  *Valence-0.11  *EmotionAffect0.04  *Dominance -0.15  *LexiconFrequency -0.01  *  Ambiguity 0.13  *R1-0.30  *Diversity: associationsR12-0.31  *R123-0.31  *Target characteristics\u03c1Auditory-0.37  *Gustatory-0.01  *Sense perceptionHaptic0.35  *Olfactory0.04  *Visual0.39  *Valence-0.03  *EmotionAffect-0.07  *Dominance -0.08  *LexiconFrequency -0.04  *R1-0.28  *Diversity: associationsR12-0.32  *R123-0.31  *"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "Spearman's rank-order correlation coefficient \u03c1 for the statistical relationships between degrees of concreteness and strengths of target adjective characteristics; significance level is p < 0.05.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "Results of the classifications across mid-scale definitions and target set constellations.",
+            "figure_data": "Mid-Scale DefinitionMeanMedian Median-SD"
+        }
+    ],
+    "formulas": [],
+    "doi": "10.3758/BF03202684"
+}

@@ -1,0 +1,655 @@
+{
+    "title": "ToMChallenges: A Principle-Guided Dataset and Diverse Evaluation Tasks for Exploring Theory of Mind",
+    "authors": "Xiaomeng Ma; Lingyu Gao; Qihui Xu",
+    "pub_date": "",
+    "abstract": "Theory of Mind (ToM), the capacity to comprehend the mental states of distinct individuals, is essential for numerous practical applications. With the development of large language models (LLMs), there is a heated debate about whether they are able to perform ToM tasks. Previous studies have used different tasks and prompts to test the ToM on LLMs and the results are inconsistent: some studies asserted that these models are capable of exhibiting ToM, while others suggested the opposite. In this study, we present TOMCHALLENGES, a dataset for comprehensively evaluating the Theory of Mind based on the Sally-Anne and Smarties tests with a diverse set of tasks. In addition, we also propose an auto-grader to streamline the answer evaluation process. We tested three models: davinci, turbo, and gpt-4. Our evaluation results and error analyses show that LLMs have inconsistent behaviors across prompts and tasks. Performing the ToM tasks robustly remains a challenge for the LLMs. In addition, our paper wants to raise awareness in evaluating the ToM in LLMs and we want to invite more discussion on how to design the prompts and tasks for ToM tasks that can better assess the LLMs' ability. 1",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "With the recent advancement of large language models (LLMs; Devlin et al., 2019;Brown et al., 2020;Raffel et al., 2020), expectations for artificial intelligence systems to effectively interact with people have significantly increased. This may necessitate the development of human-like capabilities in these systems, such as reasoning not only about their own observations and beliefs but also understanding the mental states of others. This ability, termed as Theory of Mind (ToM), refers to the capacity to attribute mental states-such as beliefs, 1 The data and code are available at https://github.com/xiaomeng-ma/ToMChallenges. emotions, and intentions-to oneself and others (Wimmer and Perner, 1983;Gallese and Sinigaglia, 2011). In psychology, it is an essential milestone in the social development of a child. However, the challenges that persist are whether LLMs have already developed ToM capabilities and how to identify the appropriate tool to accurately assess these capabilities.",
+                "Recent studies addressing those issues often draw inconsistent conclusions, some studies asserting that models exhibit ToM (Kosinski, 2023;Wu et al., 2023;Bubeck et al., 2023), some suggest the opposite (Le et al., 2019;Nematzadeh et al., 2018;Sap et al., 2022;Ullman, 2023a;Shapira et al., 2023), and others maintain caution and questions (Sileo and Lernould, 2023;Aru et al., 2023).",
+                "These varied results could be due to different evaluation methods. First, these studies have tested the models on different tasks, ranging from tasks of perspective-taking reasoning (i.e., does the other person know what I know; e.g., Kosinski, 2023) to intention ascription (i.e., what does a movie character intend to do at the end of an open-ended movie; e.g., Shapira et al., 2023). Additionally, the type of prompts varies across studies. For in-stance, Le et al. (2019) and Sap et al. (2022) used question answering prompts, while Kosinski (2023) employed sentence completion prompts. This lack of clear principles in approaches poses challenges to the validity of ToM assessments for LLMs. If only specific prompts lead to high-performance results while others do not, it becomes questionable whether the correct responses truly reflect ToM or are simply the result of algorithmic shortcuts. Similarly, if some tasks are not valid for assessing ToM, the results cannot be interpreted in terms of models' ToM capability regardless of the conclusions drawn.",
+                "What is considered a valid ToM test? A valid test should be both theoretically grounded and methodologically validated to ensure it measures the intended subject, and the results are not skewed by other factors. From a theoretical standpoint, ToM theories in child development (Wellman et al., 2001;Quesque and Rossetti, 2020;Navarro, 2022) suggest that valid tests should focus on assessing the respondent's ability to a) represent mental states of one's own and others based on physical events (but not other factors such as emotions and intentions) (mentalizing), and b) differentiate one's own mental state and other's (false-belief understanding). Tasks not meeting these criteria might not be considered valid assessments because they either introduce confounding factors such as emotional or social ascription or fail to contrast the respondent's mental state and other's mental state.",
+                "From a methodological perspective, both psychology and NLP studies demand rigorous evaluation to ensure measurement validity. Unlike psychology studies where individual subjects can be randomly assigned to experimental and control conditions to yield reproducible results, LLMs like GPT-4, being a single 'subject', lack the capacity for reproducibility in the traditional sense. Therefore, any claims about an LLM possessing humanlike capabilities must be substantiated after validation with a variety of prompts and tasks, provided these tasks align with the theoretical framework of the intended measurement."
+            ],
+            "publication_ref": [
+                "b6",
+                "b3",
+                "b17",
+                "b26",
+                "b7",
+                "b12",
+                "b27",
+                "b4",
+                "b15",
+                "b18",
+                "b23",
+                "b21",
+                "b22",
+                "b0",
+                "b12",
+                "b21",
+                "b18",
+                "b12",
+                "b25",
+                "b16",
+                "b14"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Validity issues of current neural ToM tests",
+            "text": [
+                "Testing a few examples on a single format, as done by Kosinski (2023) and Bubeck et al. (2023), raises methodological questions and uncertainty about whether responses are shortcut-driven. In fact, Shapira et al. (2023) recently showed LLMs' inconsistent performance across ToM tasks, further indicating possible shortcuts and the idiosyncrasy of specific prompts. If relied upon singularly, these could lead to misinterpretations.",
+                "Meanwhile, several tasks from previous studies (e.g., Ullman, 2023b;Shapira et al., 2023) may not sufficiently adhere to Mentalizing and False-Belief Understanding criteria, casting doubt on whether these tasks genuinely reflect ToM or other capacity such as social ascription. In the study conducted by Ullman (2023b), adversarial variations such as transparent access and uninformative labels were used to evaluate the robustness of LLMs' ToM capability. For example, when the model is presented with a context where a transparent bag is filled with popcorn, but the label on the bag reads \"chocolate,\" the model was likely to suggest that a person seeing the bag for the first time would believe it's full of chocolate, not popcorn, despite the bag's transparency. However, this variation might not be directly related to ToM. Successfully answering those questions may also require conceptual knowledge (e.g., what information can a transparent bag provide) and inferential biases (will the person trust the label or rely on their direct observation through the transparent bag?). Such issues could lead to evaluations straying from the Mentalizing and False-Belief Understanding criteria.",
+                "Likewise, certain tasks implemented in the Shapira et al. (2023) study, such as inferring another person's intention, did not distinguish between representations of self and others. Consequently, the model may depend on empathy (see Section 2 for differences between empathy and ToM) rather than ToM to accomplish the task, thereby failing to fulfill the Nonmerging criteria.",
+                "Auto-grader: Enabling diverse and large-scale evaluations One potential challenge to establishing a principle-guided yet diverse evaluation system is the intense human labor involved in evaluating models' responses. It may not be a significant issue when the task is in a constrained format such as true or false questions. However, when the diversity and the amount of tasks increase, which is necessary for a valid ToM test (e.g., ask models to provide reasoning so that one can better understand how the model reaches such a conclusion), a more efficient evaluation method becomes essential.",
+                "Present study To improve the validity of ToM tests, we propose a principle-guided dataset with a diverse set of tasks. In an effort to dissect the underpinnings of incorrect responses, we also conducted error analyses, particularly focusing on questions demanding reasoning. This approach offers a deeper insight into the cognitive process of the models when they arrive at incorrect conclusions. Finally, addressing the need for efficient evaluations, we have developed an autograder based on GPT-4 to streamline the evaluation process. This tool allows us to efficiently evaluate models' responses across a broader spectrum of tasks and on a larger scale, bringing a higher degree of accuracy and efficiency to the ToM testing process.",
+                "Our evaluations and error analyses show that current LLMs struggle to perform robustly on ToM tasks or reason in a manner characteristic of subjects possessing ToM. Moreover, we demonstrate that our auto-grader is highly proficient at automatically evaluating LLMs' responses across various tasks, paving the way for more efficient, largerscale analyses for neural ToM."
+            ],
+            "publication_ref": [
+                "b12",
+                "b4",
+                "b21",
+                "b24",
+                "b21",
+                "b24",
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": [
+                "ToM in humans ToM in children significantly influences various facets of their development, including social competence, peer acceptance, and academic achievement (Carlson et al., 2013). Research has revealed substantial changes in children's understanding of mental states by the age of five (Wellman et al., 2001). Although ToM is often linked to cognitive abilities like empathy and visual-spatial attention, it's crucial to note that these are separate constructs involving distinct neurological and cognitive processes (Kanske et al., 2015;Schurz et al., 2021;Zaki and Ochsner, 2012). These abilities also yield largely divergent effects on other aspects of social and cognitive development (Happ\u00e9 et al., 2017). Take for instance an individual with ToM but not empathy. They have the intellectual ability to interpret and understand the thoughts, intentions, and beliefs of others. Nevertheless, when tasked with sharing or connecting with others' emotions, they may encounter difficulty.",
+                "ToM tasks Quesque and Rossetti (2020) reviewed tasks frequently employed to assess ToM. Among these, the False Belief task, one of the most widely utilized tasks in human and language model studies, fulfills the criteria. This task requires participants to infer the belief of a character who holds a false belief about a particular scenario, which contrasts with the participants' updated belief of the same scenario. The Smarties and the Sally-Ann tests are the two most frequently employed False Belief tasks. For instance, in the Smarties Test, a child is shown a box labeled as 'candies'. After revealing that the box indeed contains crayons rather than candies, the child is asked what another person, unaware of the box's contents, would guess is inside. Younger children often answer 'crayons', while older children, understanding others would base their belief on the box's label, answer 'candies' (Gopnik and Astington, 1988).",
+                "On the other hand, several tasks either do not demand the distinction between one's own mental state and that of others or they actually measure processes not directly related to ToM. The tasks in Shapira et al. ( 2023) -Intention Ascription (included in the SOCIAL IQA dataset; Sap et al., 2019) and Animated Shapes -fall under this category. These tasks often foster shared representations between self and others, rather than creating a distinction (Brass et al., 2009). For example, in the Animated Shapes task, participants watch short animated films featuring geometrical shapes, and they are then asked to interpret the thoughts or feelings of these shapes. However, this task probes more into empathy rather than ToM.",
+                "Evaluations of ToM in LLMs ToM evaluations in LLMs vary greatly in terms of tasks and prompts. Nematzadeh et al. (2018) was the first work for evaluating ToM in LLMs, finding all models unsuccessful. In 2019, Le et al. (2019) found that the question-answer benchmarks of the time were prone to data biases, allowing models to develop corner-cutting heuristics due to a rigid event sequence template for each task type. To mitigate this, they introduced new evaluation methods along with a novel dataset. Sap et al. (2022) later evaluated GPT-3 (Brown et al., 2020) on this dataset, reporting only 55 -60% accuracy, even after fewshot fine-tuning with GPT-3-Davinci.",
+                "Recent two studies tested GPT-4 on a few False Belief examples using sentence completion Kosinski (2023) and question-answer prompts Bubeck et al. (2023). Both studies reported GPT-4 achieving \u2265 90% accuracy, leading to suggestions of spontaneous ToM emergence in LLMs. However, this claim was disputed by subsequent research (Ullman, 2023a;Shapira et al., 2023). As noted in Section 1, Ullman (2023a) introduced adversarial variations to the false belief questions used in Kosinski (2023), which resulted in a significant decrease in LLMs' performance. Shapira et al. (2023) evaluated LLMs across a range of tasks ToM, finding that current LLMs, including GPT-4, struggled to perform consistently. The tasks included the False Belief task from Kosinski (2023), the False Belief task with adversarial variations (Ullman, 2023a), the Animated Shapes task adapted from Heider and Simmel (1944), and a set of common sense reasoning tasks including the Intention Ascription task (Sap et al., 2019). Their findings indicated that current LLMs struggle to consistently perform well on these tasks. The high performance of GPT-4 observed in the initial studies (Kosinski, 2023;Bubeck et al., 2023) may reflect shallow heuristics, not robust ToM capabilities."
+            ],
+            "publication_ref": [
+                "b5",
+                "b25",
+                "b11",
+                "b20",
+                "b28",
+                "b9",
+                "b8",
+                "b19",
+                "b2",
+                "b15",
+                "b18",
+                "b3",
+                "b12",
+                "b4",
+                "b23",
+                "b21",
+                "b12",
+                "b21",
+                "b12",
+                "b23",
+                "b10",
+                "b19",
+                "b12",
+                "b4"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "TOMCHALLENGES and Tasks",
+            "text": [
+                "We aim to build a corpus based on two types of tests: Sally-Anne Test and Smarties Test, which fit the ToM test criteria. Below we describe how we construct TOMCHALLENGES data, and how we design our evaluation tasks."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Dataset Construction",
+            "text": [
+                "While Le et al. (2019) proposed the inclusion of distractors to prevent models from adopting cornercutting heuristics, it is important to note that distractors are more relevant for fine-tuning rather than zero-shot probing. Given the ongoing discussions surrounding the zero-shot performance of models in recent studies (Kosinski, 2023;Ullman, 2023b) and we care more about the model's inherent capabilities, we introduce a dataset without distractors as below to maintain our focus, with examples displayed in Tables 1 and 2. We created 30 variations of each test (e.g., changing the person's name, location, and items), and the details of the tests and variables are described as follows.",
+                "Sally-Anne Test The Sally-Anne Test was first introduced by Baron-Cohen et al. (1985) and has been widely used in psychology studies. The test typically involves two characters, Sally and Anne, where Anne hides an object while Sally's away. The children were usually asked where would Sally look for the object when she returns. The narrative consists of the following components: (1) a location L, where the event takes place, (2) two agents, A and B, where A moved the object while B one is away (3)   agents' mental states: REALITY focuses on the updated/current position of O, and BELIEF focuses on the initial/previous position. The first-order belief (1STA and 1STB) questions ask the agents' beliefs, and the second-order belief (2NDA and 2NDB) questions ask one agent's belief regarding the other agent's mental state."
+            ],
+            "publication_ref": [
+                "b12",
+                "b24",
+                "b1"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Smarties Test",
+            "text": [
+                "The Smarties Test was first introduced by Gopnik and Astington (1988) and has also been widely adopted in psychology studies. In a typical Smarties test, the child is presented with a 'Smarties' box that actually contains something else. The child is then asked what they think another person, who has not seen the contents of the box, would believe is inside. The narrative consists of the following components: (1) two agents, A and B, where A saw the contents and B didn't, (2) one container C that holds the object, and (3) two objects, O1 and O2, where O1 is the labeled content and O2 is the actual content. Using these components, we construct narratives for the Smarties Test as shown in Table 2. The questions of the Smarties Test narrative are similar in nature to those of the Sally-Anne Test, but the REALITY question focuses on the actual object in the container, and the BELIEF question focuses on the container's label."
+            ],
+            "publication_ref": [
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Task Formulation",
+            "text": [
+                "Previous studies have used a single task (e.g. question-answering task or sentence completion) task to evaluate the model's performance. In order to test the robustness of the model's performance, it is necessary to adapt the questions into a variety of tasks. We construct different prompts to create 6 task formats, as demonstrated in Table 3. These tasks can be categorized into three groups based on the level of freedom in generation:",
+                "Fully-Constrained Fully-constrained generation limits the model's output to specific predefined structures or responses. In this group, we design 3 tasks, i.e., Fill-in-the-Blank, Multiple Choice, and True or False questions.",
+                "Semi-Constrained Semi-constrained generation involves partial guidance by specific rules or structures, while still allowing some flexibility in the model's responses. This group consists of 2 tasks, i.e., Chain-of-Thought (CoT) True or False questions and Question Answering (Q&A) tasks.",
+                "Open-Ended Open-ended generation enables the model to generate responses without being restricted by predefined rules or structures, leading to more diverse and varied outputs. An example of this group is Text Completion."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Experimental Setup",
+            "text": [
+                "We evaluate the zero-shot performance of three models: text-davinci-003 and gpt -3.5-turbo-0301, and gpt-4-0613 (OpenAI, 2022). For the hyperparameters of all models, we set the temperature as 0, top_p as 1, and both frequency penalty and presence penalty as 0. Due to the different natures of our task design, we choose different maximum token limits for each task as follows: 10 tokens for Fill-in-the-Blank, 2 tokens for Multiple Choice, 20 tokens for True or False, 100 tokens for CoT True or False, and 50 tokens for both Question Answering and Text Completion."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Answer Evaluation and Auto-grader",
+            "text": [
+                "For the fully-constrained tasks, the models' answers can be graded easily since there are standard answers. We first apply a python function to grade these answers, and the results are double checked by human annotators. For the semi-constrained and open-ended tasks, the answers don't necessarily follow a standard form and are graded by human annotators. The rubrics to grade these answers include: 1) the answer is correct; 2) the answer doesn't contain any information that can not be inferred from the narrative.",
+                "In order to improve the efficiency of grading, we develop an auto-grader based on the gpt-4-0613 model with a grading prompt. The grading prompt consists of a general template of the narrative and guidelines of how to construct gold answers for the 6 questions. The model then grades the generated answers based on the gold answers. In addition, an example of a generated answer and grading pair was also included in the prompt for in-context learning. An example of the prompt is included in Appendix A. The output of the autograder consists of two parts: the reasoning part, where it outputs the gold answers to 6 questions; and the grade part, where it grades the generated answer. An example of the auto-grader's output is shown in Table 4.",
+                "We apply the auto-grader to evaluate the answers in two tasks: Q&A and Text Completion. First, we evaluate the gold answers output by the autograder. The auto-grader achieved 100% accuracy on all Sally-Anne and Smarties narratives, showing it can effectively produce gold answers for the 6 questions. Then we evaluated the grading results by comparing them to the human annotated results. The auto-grader achieved 100% accuracy on Q&A task and over 90% accuracy on Text Completion task. These results demonstrated that the auto-grader could be an effective tool in evaluating more freely generated answers."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3"
+            ]
+        },
+        {
+            "heading": "Results and Analyses",
+            "text": [
+                "In this section, we present the results of our evaluation for all models on Sally-Anne and Smarties tests. As we create 30 variations of the narrative for each test, and each narrative comes with 6 questions (REALITY, BELIEF, 1STA, 1STB, 2NDA, 2NDB), and each question is tested on 6 tasks, an idealized model that is capable to solve Theory of Mind tasks should be able to achieve high accuracy on all questions across different tasks and in most of the narratives."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Accuracy by Question and Task",
+            "text": [
+                "The accuracy of each question type is calculated by averaging the accuracy over 30 narratives (e.g., an accuracy of 50% for 1STA question means that the model answered correctly for 15 out of the 30 narratives). Figure 2 and 3 show the average accuracy of 6 types of questions in different prompts for Sally-Anne Test and Smarties Test.",
+                "For the Sally-Anne tests, all three models are able to achieve near-perfect accuracy on REALITY, BELIEF, and 1STA questions for all prompts, indicating that the models can reason based on facts. For 1STB question that requires reasoning both the belief of A and B, the gpt-4 model achieved better performance than the gpt-3.5 models (davinci and turbo). For 2NDA and 2NDB questions, gpt-3.5 models struggled to understand one person's belief about another person's belief, while gpt-4 answered most of the narratives correctly. For different tasks, the models behaved differently. All three models achieved the best overall performance with the Text Completion task, followed by the Fill-inthe-Blank task. In addition, introducing Chain-of-Thought did not improve the model's performance on True/False task.",
+                "The Smarties test showed a different accuracy pattern from the Sally-Anne test. All three models showed some difficulties answering the fact-based questions, REALITY, BELIEF, and 1STA questions correctly. For the 1STB questions, all three models had worse performance than the 1STB questions in the Sally-Anne test. For 2NDA and 2NDB questions, gpt-4 model and turbo model had similar performance as in the Sally-Anne test, while the davinci model achieved better performance than the Sally-Anne test. We observe that the davinci model performed best on the Text Completion task, the turbo model performed best on the Multiple-Choice task, and gpt-4 model performed best on the Fill-in-the-Blank task.",
+                "By comparing the different tests, questions, and tasks, it is clear that the models can not reliably perform ToM tasks well. The models are generally good at fact-based questions and struggle more    with questions that require reasoning through different agents' beliefs. The models are also sensitive to the prompts and framing the question into different tasks could significantly affect the model's performance."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Accuracy by Narratives",
+            "text": [
+                "The accuracy of each narrative is calculated as the average accuracy over six question types. Although the narratives are generated through the same template, the models produced different answers. For example, for some narratives, the model is able to answer all the questions correctly, while for others the model's accuracy drops. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Error Analysis",
+            "text": [
+                "We further looked into the errors the models made, especially for the questions that the models had low accuracy. We focused our error analysis on the Q&A and Text Completion tasks, since the output of these two tasks contains more information to analyze. The errors can be divided into three major types:  8. The errors of True Failure are similar to the errors the younger children would make, where the model assumed that an agent knew something they shouldn't know. An example of the wrong answer is 'Hillary would most likely look in the bucket where Sabra moved the mitten.' This type of error is more common in the davinci and turbo models, and more frequently occurs in Sally-Anne's narrative than the Smarties narrative.",
+                "Overly conservation errors happen when the model is being too conservative and refuses to make inferences about the agent's belief. This type of error is common in the turbo and the gpt-4 models, where the model produces answers like 'The context does not provide information on where Juanita would look for the towel when she returns.'. In addition, this error is more common in the Smar-  ties narrative than in the Sally-Anne narrative.",
+                "Hallucination error is identified when the answer includes information that can not be inferred from the narrative, or the answer contains contradicting information than the narrative. An example error would be: 'In the backpack, there was a note that said, \"This backpack belongs to Norina\".', where 'note' was not mentioned in the narrative at all. This type of error is more frequently found in the turbo model.",
+                "The error analyses showed that the models failed on the ToM tasks not only because they could not reason about reality and people's beliefs, but also because of the inherent limitation of LLMs. For example, the hallucination errors and the overly conservative errors are related to the inference process of the LLMs, which has always been a challenging part of the NLP field."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_9"
+            ]
+        },
+        {
+            "heading": "Conclusions",
+            "text": [
+                "In this study, we proposed TOMCHALLENGES to comprehensively test the ToM on LLMs. The dataset is constructed based on the Sally-Anne and Smarties tests. For each test, we created a template to generate variations of the test. In addition, we incorporated 6 types of questions to examine the model's understanding of reality, belief, 1st order belief, and 2nd order belief. We also included 6 tasks with different prompts for evaluation, considering the impact of prompts on model performance. This evaluation method serves a dual purpose: it not only measures whether the model has ToM capacity, but also measures the robustness of the model in performing the ToM tasks. In addition, we also create an effective auto-grader that achieved high accuracy in evaluating the more free-formed answers of the ToM tasks.",
+                "Using 30 variations of Sally-Anne and Smarties tests, we found that the GPT-based models can not reliably perform the ToM tasks, since the accuracy varies across different tasks, questions, and narratives. Through error analysis, we found that the failure of the models can not be simply concluded as they lack the ability to reason reality and beliefs. Instead, many of the errors reflect the inherent limitations of the LLMs, which might not be related to the cognitive explanations of the ToM.",
+                "We hope our study could invite more discussions on evaluating the ToM in LLMs. Further studies could investigate how and why different prompt types would affect the model's performance, how to improve the robustness of the model's performance, how to interpret the results more appropriately, etc. In addition, one limitation of our study is that we did not conduct human experiments. It is unclear if human adults are able to achieve (almost) perfect performance across different stories, prompts and tasks. Future studies could also compare human results and the LLMs' behaviors side by side for evaluation. We hope that future discussions could not only focus on whether LLMs exhibit the ToM, but also attend to the significance and implications of the ToM in LLMs."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Reasoning:",
+            "text": [
+                "This is a Sally-Anne story. Person A is Sabra and Person B is Hillary. The item is a mitten. Location X is the briefcase and Location Y is the bucket. Gold Answers: 1. reality: The mitten is currently in the bucket because Sabra moved it there. 2. belief: The mitten was in the briefcase before. 3. 1st order belief of Sabra: Sabra would look for the mitten in the bucket because she moved it there. 4. 1st order belief of Hillary: Hillary would look for the mitten in the briefcase because she didn't know that Sabra moved it. 5. 2nd order belief of Sabra: Sabra would think that Hillary looks for the mitten in the briefcase because she knew that Hillary didn't see her move the mitten to the bucket. 6. 2nd order belief of Hillary: Hillary would think that Sabra looks for the mitten in the briefcase because she didn't know that Sabra already moved it. The response to the prompts suggests that Hillary would look for the mitten in the bucket. The answer is incorrect because it is contradicting gold answer 4. Grade: Incorrect."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Mind the gap: Challenges of deep learning approaches to theory of mind",
+            "journal": "Artificial Intelligence Review",
+            "year": "2023",
+            "authors": "Jaan Aru; Aqeel Labash"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Does the autistic child have a \"theory of mind",
+            "journal": "Cognition",
+            "year": "1985",
+            "authors": "Simon Baron-Cohen; Alan M Leslie; Uta Frith"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Inhibition of imitative behaviour and social cognition",
+            "journal": "Philosophical Transactions of the Royal Society B: Biological Sciences",
+            "year": "1528",
+            "authors": "Marcel Brass; Perrine Ruby; Stephanie Spengler"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Ilya Sutskever, and Dario Amodei. 2020. Language models are few-shot learners",
+            "journal": "",
+            "year": "2020-12-06",
+            "authors": "Tom B Brown; Benjamin Mann; Nick Ryder; Melanie Subbiah; Jared Kaplan; Prafulla Dhariwal; Arvind Neelakantan; Pranav Shyam; Girish Sastry; Amanda Askell; Sandhini Agarwal; Ariel Herbert-Voss; Gretchen Krueger; Tom Henighan; Rewon Child; Aditya Ramesh; Daniel M Ziegler; Jeffrey Wu; Clemens Winter; Christopher Hesse; Mark Chen; Eric Sigler; Mateusz Litwin"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Sparks of artificial general intelligence: Early experiments with gpt-4",
+            "journal": "",
+            "year": "2023",
+            "authors": "S\u00e9bastien Bubeck; Varun Chandrasekaran; Ronen Eldan; Johannes Gehrke; Eric Horvitz; Ece Kamar; Peter Lee; Yin Tat Lee; Yuanzhi Li; Scott Lundberg"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Theory of mind",
+            "journal": "Wiley Interdisciplinary Reviews: Cognitive Science",
+            "year": "2013",
+            "authors": "Melissa A Stephanie M Carlson; Madeline B Koenig;  Harms"
+        },
+        {
+            "ref_id": "b6",
+            "title": "BERT: Pre-training of deep bidirectional transformers for language understanding",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Jacob Devlin; Ming-Wei Chang; Kenton Lee; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b7",
+            "title": "What is so special about embodied simulation?",
+            "journal": "Trends in cognitive sciences",
+            "year": "2011",
+            "authors": "Vittorio Gallese; Corrado Sinigaglia"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Children's understanding of representational change and its relation to the understanding of false belief and the appearance-reality distinction",
+            "journal": "Child development",
+            "year": "1988",
+            "authors": "Alison Gopnik; Janet W Astington"
+        },
+        {
+            "ref_id": "b9",
+            "title": "The structure of social cognition: In (ter) dependence of sociocognitive processes",
+            "journal": "Annual review of psychology",
+            "year": "2017",
+            "authors": "Francesca Happ\u00e9; Jennifer L Cook; Geoffrey Bird"
+        },
+        {
+            "ref_id": "b10",
+            "title": "An experimental study of apparent behavior",
+            "journal": "The American journal of psychology",
+            "year": "1944",
+            "authors": "Fritz Heider; Marianne Simmel"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Dissecting the social brain: Introducing the empatom to reveal distinct neural networks and brain-behavior relations for empathy and theory of mind",
+            "journal": "NeuroImage",
+            "year": "2015",
+            "authors": "Philipp Kanske; Anne B\u00f6ckler; Tania Fynn-Mathis Trautwein;  Singer"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Theory of mind may have spontaneously emerged in large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Michal Kosinski"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Revisiting the evaluation of theory of mind through question answering",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Matthew Le; Y-Lan Boureau; Maximilian Nickel"
+        },
+        {
+            "ref_id": "b14",
+            "title": "What is theory of mind? a psychometric study of theory of mind and intelligence",
+            "journal": "Cognitive Psychology",
+            "year": "2022",
+            "authors": "Ester Navarro"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Evaluating theory of mind in question answering",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Aida Nematzadeh; Kaylee Burns; Erin Grant; Alison Gopnik; Tom Griffiths"
+        },
+        {
+            "ref_id": "b16",
+            "title": "What do theory-of-mind tasks actually measure? theory and practice",
+            "journal": "Perspectives on Psychological Science",
+            "year": "2020",
+            "authors": "Fran\u00e7ois Quesque; Yves Rossetti"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Exploring the limits of transfer learning with a unified text-to-text transformer",
+            "journal": "J. Mach. Learn. Res",
+            "year": "2020",
+            "authors": "Colin Raffel; Noam Shazeer; Adam Roberts; Katherine Lee; Sharan Narang; Michael Matena; Yanqi Zhou; Wei Li; Peter J Liu"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Neural theory-of-mind? on the limits of social intelligence in large LMs",
+            "journal": "",
+            "year": "2022",
+            "authors": "Maarten Sap; Le Ronan;  Bras"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Social IQa: Commonsense reasoning about social interactions",
+            "journal": "",
+            "year": "2019",
+            "authors": "Maarten Sap; Hannah Rashkin; Derek Chen; Yejin Ronan Le Bras;  Choi"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Toward a hierarchical model of social cognition: A neuroimaging meta-analysis and integrative review of empathy and theory of mind",
+            "journal": "Psychological Bulletin",
+            "year": "2021",
+            "authors": "Matthias Schurz; Joaquim Radua; Matthias G Tholen; Lara Maliske; S Daniel;  Margulies; B Rogier; Jerome Mars; Philipp Sallet;  Kanske"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Clever hans or neural theory of mind? stress testing social reasoning in large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Natalie Shapira; Mosh Levy; Xuhui Seyed Hossein Alavi; Yejin Zhou; Yoav Choi; Maarten Goldberg; Vered Sap;  Shwartz"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Mindgames: Targeting theory of mind in large language models with dynamic epistemic modal logic",
+            "journal": "",
+            "year": "2023",
+            "authors": "Damien Sileo; Antoine Lernould"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Large language models fail on trivial alterations to theory-of-mind tasks",
+            "journal": "",
+            "year": "2023",
+            "authors": "Tomer Ullman"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Large language models fail on trivial alterations to theory-of-mind tasks",
+            "journal": "",
+            "year": "2023",
+            "authors": "D Tomer;  Ullman"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Meta-analysis of theory-of-mind development: The truth about false belief",
+            "journal": "Child development",
+            "year": "2001",
+            "authors": "David Henry M Wellman; Julanne Cross;  Watson"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Beliefs about beliefs: Representation and constraining function of wrong beliefs in young children's understanding of deception",
+            "journal": "Cognition",
+            "year": "1983",
+            "authors": "Heinz Wimmer; Josef Perner"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Coke: A cognitive knowledge graph for machine theory of mind",
+            "journal": "",
+            "year": "2023",
+            "authors": "Jincenzi Wu; Zhuang Chen; Jiawen Deng; Sahand Sabour; Minlie Huang"
+        },
+        {
+            "ref_id": "b28",
+            "title": "The neuroscience of empathy: progress, pitfalls and promise",
+            "journal": "Nature neuroscience",
+            "year": "2012",
+            "authors": "Jamil Zaki; Kevin N Ochsner"
+        },
+        {
+            "ref_id": "b29",
+            "title": "You will be given a series of Prompt and Response pairs about Theory of Mind. The core of grading rubric is to see if the answer can correctly reason the reality and the knowledge of the people in the story. You first need to reason about the context in the Prompt and figure out the key facts",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b30",
+            "title": "The Sally-Ann story is about two people (Person A and Person B) found an item in location X. Person B left the room and Person A moved the item to location Y. Key facts for Sally-Ann story include: 1. reality: the current location of the item",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b31",
+            "title": "1st order belief of Person B: what Person B thinks the current location of the item",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b32",
+            "title": "1st order belief of Person A: what Person A thinks the current location of the item",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b33",
+            "title": "2nd order belief of Person B: what Person B thinks that Person A thinks the current location of the item",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b34",
+            "title": "2nd order belief of Person A: what Person A thinks that Person B thinks the current location of the item",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b35",
+            "title": "The label on the container says item X, but there's no item X in the container. Person A opened the container and found item Y. Later, Person B entered the room and saw the container. Key facts for Smarties story include: 1. reality: what's inside the container",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b36",
+            "title": "1st order belief of Person B: what Person B expects to find in the container",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b37",
+            "title": "1st order belief of Person A: what Person B expects to find in the container, which is item Y (because Person A already opened the bag and found Y)",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b38",
+            "title": "2nd order belief of Person B: what Person B thinks that Person A expects to find in the container",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b39",
+            "title": "A: what Person A thinks that Person B thinks is in the container, which is item X. After identifying the key facts of the context, you can take a look at the response to see if that is align with the key facts. If the response is align with the key facts and does not contain any information that cannot be inferred from the context",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b40",
+            "title": "Neila couldn't see what was inside the bag. Neila opened the bag and found a vest. There is no plate in the bag. Neila closed the bag and put it back. Juanita entered the attic and saw the bag. In the bag, there was Response: a vest. assistant: Reasoning: This is a Smarties story. Person A is Neila and Person B is Juanita. The container is a bag. Item X is plate and item Y is vest",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b41",
+            "title": "Juanita expects fo find a plate in the bag because the label says plate and doesn't know there's actually a vest in the bag",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b42",
+            "title": "1st order belief of Neila: Neila expects to find a vest in the bag because she already opened the bag and found a vest",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b43",
+            "title": "Juanita thinks that Neila expects to find a plate in the bag, because she doesn't know that Neila already opened the bag and found a vest",
+            "journal": "",
+            "year": "",
+            "authors": "Juanita "
+        },
+        {
+            "ref_id": "b44",
+            "title": "Neila thinks that Juanita expects to find a plate in the bag, because she knows that Juanita doesn't know there's actually a vest in the bag. The response to the prompt suggests that there was a vest in the bag",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: An example of Smarties test, as well as Mentalizing and False-Belief Understanding criteria.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2: The average accuracy for questions in Sally-Anne test for different prompts.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :3Figure 3: The average accuracy of questions in Smarties test for different prompts.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "3 a) True Failure of ToM, b) Overly conservative, c) Hallucination. The summary of the error counts of each type of error in Q&A and Text Completion tasks is shown in Table",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "an object O, whose position changed in the narrative, and (4) two containers, C1 and Variables L: attic, A: Neila, B: Juanita, O: towel, C1: closet, C2: cabinet Narrative N Neila and Juanita were hanging out in the attic. They saw a closet and a cabinet. They found a towel in the closet. Juanita left the attic. Neila moved the towel to the cabinet. An example for Sally-Anne Test.",
+            "figure_data": "REALITY Where is the towel currently?Answer: The cabinet.BELIEFWhere was the towel previously?Answer: The closet.After Juanita came back to the attic,  \u20201STAwhere would Neila look for the towel?Answer: The closet.1STBwhere would Juanita look for the towel?Answer: The cabinet.2NDAwhere would Neila think Juanita would look forthe towel?Answer: The cabinet.2NDBwhere would Juanita think Neila would look forthe towel?Answer: The cabinet."
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "An example for Smarties Test. Neila and Juanita were hanging out in the attic. They saw a closet and a cabinet. They found a towel in the closet. Juanita left the attic. Neila moved the towel to the cabinet. Fill-in-the-Blank Fill in the blank (<>): N After Juanita came back to the attic, Neila would think Juanita would look for the towel in the < >. Answer: Multiple Choice Choose the correct answer from A or B for the following question: Question: N After Juanita came back to the attic, where would Neila think Juanita would look for the towel? A. cabinet B. closet True/False Given the context, judge True or False of the given statements A and B respectively: N Statements: A. Juanita would look for the towel in the cabinet. B. Juanita would look for the towel in the closet. After Juanita came back to the attic, Neila would think Juanita would look for the towel in",
+            "figure_data": "C2, representing the object's initial and updatedpositions, respectively. Using these components,we construct narratives as shown in Table 1. 2For each narrative, we create 6 questions follow-ing Le et al. (2019) to comprehensively evaluatethe model's understanding of the narrative and the"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "An illustrative example for different task templates of the Sally-Anne Test using 2NDA question as an example, ignoring line breaks in templates for space saving.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "An example of Auto-grader output on answer 1STB question.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "The accuracy of auto-grader on Gold Answer, Q&A and Text Completion.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Table 7 show the average accuracy of Sally-Anne and Smarties tests across narratives. For both tests, the gpt-4 model has the best and most stable performance, which has the highest average accuracy and lowest standard deviation.",
+            "figure_data": "Sally-Annedavinciturbogpt-4MC0.50\u00b100.82\u00b10.170.91\u00b10.10FB0.61\u00b10.130.93\u00b10.090.99\u00b10.03TF0.5\u00b100.65\u00b10.101\u00b10CoT-TF0.5\u00b100.57\u00b10.120.99\u00b10.03QA0.5\u00b100.68\u00b10.170.84\u00b10.04Comp0.72\u00b10.150.92\u00b10.100.92\u00b10.12"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "The average accuracy and standard deviation for narratives in the Sally-Anne test for different prompts.",
+            "figure_data": "Smartiesdavinciturbogpt-4MC0.84\u00b10.030.95\u00b10.070.88\u00b10.08FB0.78\u00b10.120.96\u00b10.100.88\u00b10.10TF0.33\u00b10.110.46\u00b10.120.92\u00b10.08CoT-TF0.44\u00b10.150.34\u00b10.060.92\u00b10.08QA0.79\u00b10.120.37\u00b10.100.90\u00b10.08Comp0.85\u00b10.090.78\u00b10.130.84\u00b10.13"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "The average accuracy for stories in the Smarties test for different prompts.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "The total error counts of 6 questions in Q&A and Text Completion tasks for 3 models.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [],
+    "doi": "10.18653/v1/N19-1423"
+}

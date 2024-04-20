@@ -1,0 +1,809 @@
+{
+    "title": "Holistic Inter-Annotator Agreement and Corpus Coherence Estimation in a Large-scale Multilingual Annotation Campaign",
+    "authors": "Nicolas Stefanovitch; Jakub Piskorski",
+    "pub_date": "",
+    "abstract": "In this paper we report on the complexity of persuasion technique annotation in the context of a large multilingual annotation campaign involving 6 languages and approximately 40 annotators. We highlight the techniques that appear to be difficult for humans to annotate and elaborate on our findings on the causes of this phenomenon. We introduce Holistic IAA, a new word embedding-based annotator agreement metric and we report on various experiments using this metric and its correlation with the traditional Inter Annotator Agreement (IAA) metrics. However, given somewhat limited and loose interaction between annotators, i.e., only a few annotators annotate the same document subsets, we try to devise a way to assess the coherence of the entire dataset and strive to find a good proxy for IAA between annotators tasked to annotate different documents and in different languages, for which classical IAA metrics can not be applied.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "In the recent years we have observed an emergence of automated tools for facilitating online media analysis for better understanding of the presented narratives around certain topics across countries, and to identify manipulative, deceptive and propagandistic content. Developing such tools requires annotated data of high quality.",
+                "We report on the complexity of annotating such manipulative devices, i.e., persuasion techniques, in the context of a large annotation campaign involving 6 languages and approximately 40 annotators, whose details are described in (Piskorski et al., 2023c). The persuasion technique taxonomy used in the campaign is an extension of the taxonomies used in different shared tasks, contains 23 techniques, and includes i.a., the techniques appealing to emotions, justifications and some forms of logical fallacies. The resulting dataset has been used in the SemEval 2023 Task 3: Detecting the Category, the Framing, and the Persuasion Techniques in Online News in a Multi-lingual Setup (Piskorski et al., 2023b). The primary objective of the work reported in this paper is threefold, namely:",
+                "\u2022 share some lessons learned from this large multi-lingual annotation campaign that might be beneficial for other researchers planing similar tasks,",
+                "\u2022 present a detailed analysis of the disagreements between annotators and potential causes thereof and try to measure the complexity of the annotation task, and",
+                "\u2022 propose a new concept of measuring Inter-Annotator Agreement (IAA) in a multilingual set-up, to overcome the limitations of the classical IAA metrics in such scenario.",
+                "We first highlight the techniques that appear to be difficult for humans to annotate using the classical Cohen's \u03ba (McHugh, 2012), and Krippendorff's \u03b1 (Krippendorff, 2009).",
+                "Classical IAA measures impose certain limitations. First, they only capture the coherence of the annotations in texts written in the same language. Secondly, considering annotations done for a single language, there were many annotators, but annotating totally different subsets of documents. The classical IAA metrics are computed using a tiny fraction of the whole dataset: the one where the annotators annotated the same articles, despite the fact that the exact same text could be annotated in different articles by different annotators. Finally, the classical IAA measures only capture agreement at the time of the annotation, but do not tell us anything about the coherence and quality of the final curated dataset.",
+                "In order to overcome the aforementioned limitations, we introduce Holistic IAA, a new multilingual word embedding-based IAA metric and we report on various experiments using it and its correlation with the traditional IAA metrics. However, given somewhat limited and loose interaction between annotators, i.e., only a few annotators annotate the same document subsets, we try to devise a way to assess the coherence of the entire dataset and strive to find a good proxy for IAA between annotators tasked to annotate different documents and in different languages. We present our preliminary results on this research problem with an ultimate goal of establishing a mechanism that allows to compare all annotators no matter which document they annotated, and to detect diverging annotations across languages. Our contributions can be summarized as follows: (i) we measure how confusing were the persuasion technique labels for different groups of annotators; (ii) we assess the coherence of the dataset using standard IAA measures; (iii) we introduce a new mutlilingual pancorpus IAA measure based on semantic similarity; (iv) we exploit this new measure on the raw and curated annotations of the annotators, and compare the resulting ranking of annotators to the one obtained by standard IAA measurements; (v) we comment on the self-coherence of the annotators using the new measure, as well as of the dataset language-wise.",
+                "This paper focuses primarily on the annotation agreement and complexity, whereas the description of the resulting dataset is kept to the minimum necessary for understanding the content. For further details please refer to (Piskorski et al., 2023c).",
+                "The paper is organized as follows. Section 2 reports on the related work. Section 3 introduces the persuasion technique taxonomy and describes the annotation process. Next, Section 4 reports on the annotation coherence computed using traditional IAA metrics and highlights the hard-to-annotate techniques. Subsequently, Section 5 introduces a new word embedding-based annotator agreement metric and reports on various experiments using it and correlating it with the traditional IAA metrics. We end with some concluding remarks in Section 6."
+            ],
+            "publication_ref": [
+                "b23",
+                "b22",
+                "b17",
+                "b16",
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": [
+                "Persuasion detection in text is related to work on propaganda detection. The work in the latter area initially focused on document-level analysis and predictions, e.g., Rashkin et al. (2017) reports on prediction of 4 classes (trusted, satire, hoax, and propaganda) of documents, whereas Barr\u00f3n-Cedeno et al. (2019) presented a corpus of tagged either as propaganda or non-propaganda).",
+                "In parallel, other efforts focused on the detection of specific persuasion techniques. Habernal et al. (2017Habernal et al. ( , 2018) ) presented a corpus annotated with 5 fallacies that directly relate to propaganda techniques. A more fine-grained analysis was done by Da San Martino et al. (2019b), who developed a corpus of English news articles labelled with 18 propaganda techniques at span/sentence level. Somewhat related work on detection of use of propaganda techniques in memes is presented in (Dimitrov et al., 2021a), the relationship between propaganda and coordination (Hristakieva et al., 2022), and work studying COVID-19 related propaganda in social media (Nakov et al., 2021a,b). Bonial et al. (2022) reported on the creation of annotated text snippet dataset with logical fallacies for Covid-19 domain. Sourati et al. (2022) presents three-stage evaluation framework of detection, coarse-grained, and fine-grained classification of logical fallacies through adapting existing evaluation datasets, and evaluate various state-of-the-art models using this framework. Jin et al. (2022) proposed the task of logical fallacy detection and a new dataset of logical fallacies found in climate change claims. All the persuasion techniques and logical fallacy taxonomies introduced in the aforementioned works do overlap to a very high degree, but are structured differently, and use different naming conventions.",
+                "Various related shared tasks on the detection of persuasion techniques were organized recently, and various taxonomies were introduced (Da San Martino et al., 2020Martino et al., , 2019a;;Dimitrov et al., 2021b;Alam et al., 2022;Piskorski et al., 2023b).",
+                "Related work on IAA which explores going beyond the limitation of standard measures was reported in (Passonneau and Carpenter, 2014), proposing an idea similar to our in that they are able to compare all annotators between themselves, however, this comparison is done statistically on label distribution while we look at actual content of the annotate textd. Moreover, they are interested in assessing the gold label uncertainty, which is a similar concern to our effort of capturing the label definition difficulty. However, they treat it in a statistical fashion, while we provide simple descriptors. It would be an interesting future work to explore the combination of both approaches."
+            ],
+            "publication_ref": [
+                "b24",
+                "b1",
+                "b9",
+                "b10",
+                "b5",
+                "b7",
+                "b11",
+                "b2",
+                "b13",
+                "b3",
+                "b4",
+                "b8",
+                "b0",
+                "b22",
+                "b20"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Persuasion Technique Annotation",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Taxonomy",
+            "text": [
+                "The taxonomy used in our annotation endeavour is an extension of the taxonomy introduced in Da San Martino et al. (2019b,c). At the top level, there are 6 coarse-grained types of persuasion techniques, namely: Attack on Reputation, Justification, Distraction, Simplification, Call, and Manipulative Wording, whose full definitions are provided in Appendix A. These core types are further subdivided into 23 fine-grained techniques. The 5 new techniques vis-a-vis the taxonomy presented in Da San Martino et al. (2019b,c) are: Appeal to Hypocrisy, Questioning the Reputation, Appeal to Values, Consequential Oversimplification, and Appeal To Time. The main drive beyond introducing these 5 new techniques is due to their frequent presence in news articles based on our empirical observations. The full two-tier taxonomy, including short definitions, and examples of each finegrained technique are provided in Figure 3 and 4 in Appendix A respectively."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Annotation Process",
+            "text": [
+                "Our annotation task consisted of annotating persuasion techniques in a corpus consisting of circa 1600 news articles revolving around various globally discussed topics in six languages: English, French, German, Italian, Polish, and Russian, using the taxonomy introduced earlier. A balanced mix of mainstream media and \"alternative\" media sources that could potentially spread mis/disinformation were considered for the sake of creating the dataset. Furthermore, sources with different political orientation were covered as well.",
+                "The pool of annotators consisted of circa 40 persons, all native or near-native speakers of the language they annotated. Most of the annotators were either media analysts or researchers and experts in (computational) linguistics, where approximately 80% of the annotators had prior experience in performing linguistic annotations of news-like texts. A thorough training was provided to all annotators which consisted of: (a) reading a 60-page annotation guidelines (Piskorski et al., 2023a) -an excerpt thereof is provided in Appendix C), (b) participating in online multi-choice question-like training, (c) carrying out pilot annotations on sample documents, and (d) joint sharing experience with other annotators and discussions with the organisers of the annotation task. Subsequently, each document was annotated by at least two annotators independently. On a weekly basis reports were sent to annotator pairs highlighting complementary and potentially conflicting annotations in order to converge to a common understanding of the task, and regular meetings were held with all annotators to align and to discuss specific annotation cases.",
+                "Annotations were curated in two steps. In the first step (document-level curation) the independent annotations were jointly discussed by the annotators and a curator, where the latter was a more experienced annotator, whose role was to facilitate making a decision about the final annotations, including: (a) merging the complementary annotations (tagged only by one annotator), and (b) resolving the identified potential label conflicts. In the second step (corpus-level curation) a global consistency analysis was carried out. The rationale behind this second step was to identify inconsistencies that are difficult to spot using single-document annotation view and do comparison at corpus level, e.g., comparing whether identical or near-identical text snippets were tagged with the same or a similar label (which should be intuitively the case in most situations). The global consistency analysis sketched above proved to be essential to ensure the high quality of the annotations.",
+                "The annotation resulted in annotation of approx. 1600 documents with ca. 37K text spans annotated. The dataset is highly imbalanced. The class distribution and some statistics are provided in Annex B"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Annotation Coherence & Complexity",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Traditional IAA",
+            "text": [
+                "We measured the Inter-Annotator Agreement (IAA) using Krippendorff's \u03b1, achieving a value of 0.342. This is lower than the recommended threshold of 0.667, but we should note that this value represents the agreement level before curation, and as such, it is more representative of the curation difficulty rather than of the quality of the final consolidated annotations. We used the IAA during the campaign to allocate curation roles and to remove low-performing annotators.",
+                "We further studied the IAA by ranking the annotators by their performance with respect to the ground truth on the subset of documents they annotated. We split then the annotators into two groups: top and low based on subjective assessment by the curators after the end of the curation campaign, this assessment was then further confirmed numerically (see Annex E for details). Their respective average \u03b1 were 0.415 and 0.250. Finally, we considered the \u03b1 of the group of the curators, in order to make an approximate estimation of the coherence of the curated dataset, as we expect these curators to consistently curate the data with at least the same coherence they had when annotating documents. There are only two such curators, whose \u03b1 is of 0.588, which is lower but close to the recommended value."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Confusion matrix",
+            "text": [
+                "In Figure 1 we present the confusion matrix between the annotations of annotators. A high count denotes both a frequent class and a tendency to confuse the given pair of labels.",
+                "One can see that Loaded Language (MW:LL) is the single label that is most confused with any other label, and the Name Calling (AR:NCL) is the label with which it co-occurs most, and indeed, these two labels have a very similar definition. The same applies to the pair Casting Doubt (AR:D) and Questioning the Reputation (AR:QCR). "
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Techniques' Annotation Complexity",
+            "text": [
+                "In order to study which persuasion techniques are more difficult to annotate we again divided the annotators in 3 groups: all which contains all the annotators, top which contains half of the annotators whose performance are the highest as measured by their average Cohen's \u03ba agreement, and low which contains the rest of the annotators.",
+                "For each of these groups, and for each of the persuasion techniques, we measured how annotators in a given group tend to disagree with each otherirrespective of the actual ground truth. More precisely, we compute for each pair of annotators and for all their overlapping annotations the percentage of disagreeing annotations for a given label divided by the total number of annotations between them with that label. Here, annotations of two annotators are considered overlapping if one is at most 10% longer or shorter than the other one, taking into account the exact position of the annotations in the text. We report these numbers in Table 1.",
+                "In order to interpret the results, it is also important to take into account that the 2 sub-groups, namely, top and low, also do interact with each other. We consider the following indicator of complexity: for each of the group if the disagreement is above a given threshold c that we fixed for illustration purpose at 0.25 in the table, the corresponding values are boldfaced. We also divide the techniques in the table (column 'difficulty') into four general annotation complexity classes based on the overall disagreement: very easy (all \u2264 .1, in light green), easy (all \u2264 .25, in green), moderate (all \u2264 .4, in orange), and difficult (all > .4, in red).",
+                "Additionally, we consider the following indicator: if top > all or if top > low (the techniques for which this applies are marked with an asterisk in the table ).",
+                "One can see that a high low value does not necessarily mean that the label is actually hard, for instance, the label False Dilemma is very well understood by the top group. High low value and low top value denotes a label whose understanding is not straightforward but does not pose special learning problem, in such case improving annotations for this label requires simply insisting on more basic training.",
+                "On the contrary, when the top value is higher than the others (techniques marked with an asterisk), it means that at least one of the groups agrees more with the other group than top group with itself, meaning that there is an inconsistent understanding of the label within the group. This could indicate a difficult label requiring additional clarification to be made to all annotators, or a potential inconsistency in the label definition. This is, for instance, the case for the label Repetition, which is indeed inconsistent as it includes two very different definitions of repetition.",
+                "The overall picture of the annotation complexity classes resembles to the per-label performances of classifier systems reported in (Piskorski et al., 2023c), where with a few exceptions the \"easiest\" labels are the ones with the highest F 1 score. It is important to note that these values are computed on the annotated labels before any curation had taken place, and as such do not reflect the quality of the final dataset, but are more and indication of the intrinsic difficulty of the labels for new annotators.",
+                "The class Doubt has one of the best reported F 1 scores, however, it has a difficult annotation complexity, the reason being that it is one of the most confused classes, as it is often a subpart of other techniques.",
+                "Some hard labels remain a challenge even for top annotators, and as such selecting 'reliable' annotators solely based on their overall IAA might not be sufficient to ensure the best quality of annotations, it is also important to identify for which labels additional training might be necessary.",
+                "Quantifying the annotation complexity of an annotation campaign in such a way gives an understanding of the difficulty of the task, and allows to identify incoherent understanding of the guidelines early on, and gives a more refined understanding of the quality of the annotations than considering IAA measures alone. "
+            ],
+            "publication_ref": [
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Disagreement sources",
+            "text": [
+                "On top of the findings on annotation complexity we additionally summarize here our findings on the sources of disagreements and annotation complexity from the continuous meetings with annotators and curators:",
+                "\u2022 disregarding small nuances in the definition of Loaded Language and Name Calling we noticed that disagreements and annotation or non-annotation of some instances were due to subjective perception linked to cultural differences, which was apparent when comparing annotations across languages,",
+                "\u2022 some annotators had problems with the Justification techniques, including, in particular, Appeal to Popularity, Appeal to Values, Appeal to Authority due to not understanding upfront that one subjective opinions on what is considered a value or an authority does not play a role for definition of these techniques, and not considering the role of negation, e.g., not understanding that making a reference to something not being popular falls per definition under Appeal to Popularity too,",
+                "\u2022 many annotators, who probably did not read the guidelines thoroughly, literally interpreted some persuasion technique definitions, e.g., in the context of Simplification techniques, instead of detecting certain logic patterns in text (see Annex A for definitions), the annotators literally interpreted the word 'simplification' and reasoned based on the base of whether the presentation of the information is too simplistic and certain facts were downplayed or exaggerated, which is actually linked to a different technique, i.e., Exaggeration-Minimisation,",
+                "\u2022 some of the media analysts who served as annotators were often using background knowledge (professional bias) to make decisions whether some text fragments are instances of persuasion techniques, which was strictly prohibited by the guidelines; this was mainly related to Simplifications and Distractions,",
+                "\u2022 some of the annotators, in particular, media analysts were making a direct link of persuasion technique labeling with fact verification, which was not in line with the guidelines.",
+                "To sum up, for the major fraction of persuasion techniques the disagreements resulted not from subjective perceptions of the annotators, but mainly due to not sticking strictly to the definitions provided in the 60-page guidelines and/or professional background bias that lead to misinterpretation of the persuasion technique definitions.",
+                "5 Embedding-based IAA Assessment"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Holistic IAA",
+            "text": [
+                "We introduce a new measure, namely, Holistic IAA, which allows to compare an annotator with any other, even if they did not annotate a single document in common and annotated documents in different languages. This metric exploits the property of multilingual aligned sentence embeddings, which are able to encode with similar vector representations sentences in different language with the same meaning, and different sentences with a similar meaning in a given language.",
+                "Formally, we introduce the following holistic agreement between two annotators as o \u03b8 l ,\u03b8s (a 1 , a 2 ) where a i is the function that maps input texts to label for a given annotator a i ; and for any two pair of strings \u03b8 l is the threshold on the length ratio and \u03b8 s is the threshold on the similarity measure defined for any embedding model M using the cosine distance between the embedding vector of the input strings (we denote it with o for the first letter of the word \"holos\" in Greek).",
+                "We define the set of Comparable Text Pairs (CTP) between two sets of texts X and Y as:",
+                "CT P \u03b8 l ,\u03b8s,M X,Y = {x,y\u2208X\u00d7Y : min(|x|,|y|) max(|x|,|y|) >\u03b8 l , sim(M (x),M (y))>\u03b8s}",
+                "Using this definition and defining S(a i ) as the function returning all the sentences annotated by annotator a i , we define the Holistic IAA for 2 annotators:",
+                "o \u03b8 l ,\u03b8s,M (a 1 ,a 2 ) =",
+                "x,y\u2208CT P \u03b8 l ,\u03b8s S(a 1 ),S(a 2 ) I a 1 (x)=a 2 (y)",
+                "|CT P \u03b8 l ,\u03b8s S(a 1 ),S(a 2 ) |",
+                "Extending to groups of annotators A and B, we get the more generic formulation: In a first step, the embedding for each annotated text span by each annotator is computed and stored in a vector database, and is associated with the following metadata: the document id, the annotator and the label. We use FAISS for the vector database, without quantization and with cosine distance (Johnson et al., 2019). While any multilingual embeddings could be used, we specifically use LASER embeddings (Schwenk and Douze, 2017) for simplicity reasons, i.e., our aim is to introduce a new paradigm to IAA computation, and we do not aim at determining which embeddings are the best, which is an exercise of more limited interest given the pace at which new embeddings emerge. Moreover, LASER embeddings do not require language specific thresholds. As such, one single cutoff to discriminate similar sentences can be used for all the languages, which is not generally the case for semantic similarity models (Isono, 2022). The drawback of these embeddings is that they are less discriminating than other models as the range of values corresponding to true positives largely intersects with the range of values corresponding to false positives. In a second step, for each annotator and corresponding annotated text spans, we consider the set of all similar text spans. In Figure 2 we illustrate in detail the behaviour of LASER on two sample queries reporting the L2 similarity. For the more complex query Q2, all but one retrieved spans are correct, but a divergence in meaning can be seen with decreasing semantic similarity. We use cosine distance in order to avoid the length of the vector to impact the measure. Moreover, in order to avoid comparing sentences of extremely different sizes, the length of the retrieved span and the query span is constrained by a threshold on the ratio of their respective lengths, i.e., \u03b8 l .",
+                "o \u03b8 l ,\u03b8s,M (A,B) = a,",
+                "Q1 \"\u043d\u0435\u0434\u043e\u043f\u0443\u0441\u0442\u0438\u043c\u044b\u043c\" (ru, unacceptable) : insupportable (fr, 0.03, unbearable), invisibile (it, 0.03, invisible), insostenibile (it, 0.04, unsustainable), Inacceptable (fr, 0.05, unacceptable) Q2 \"tout simplement, un mensonge\" (fr, all simply a lie) : \u00c8 tutta una menzogna (it, 0.04, it is all a lie), jawne k\u0142amstwo (pl, 0.06, a clear lie), questa \u00e8 una bugia (it, 0.06, this is a lie), \u00c9norme mensonge (fr, 0.07, an enormous lie), alles wieder eine gro\u00dfe L\u00fcge (de, 0.08, again a big lie), Wir glauben, dass wir belogen werden (de, 0.09, we believe we are being lied to), obficie ok\u0142amuj \u0105c (pl, 0.09, lying profusely), fatiscenti menzogne (it, 0.09, crumbling lies), \u043e\u0433\u043e\u043b\u0442\u0435\u043b\u043e\u0435 \u0432\u0440\u0430\u043d\u044c\u0435 (ru, 0.09, rabid lies), n'en faire qu'une bouch\u00e9e (fr, 0.09, deal with it easily), mensonges \u00e9hont\u00e9s (fr, 0.09, shameless lies)",
+                "Figure 2: Example of a query and retrieved sentences, for each span we report the language, L2 similarity and the English translation.",
+                "In Table 2 we provide an example of how text spans and their associated metadata can be queried and retrieved from the database. In this example, the retrieved texts all refer to the same concept as the query text, despite spelling variations in one language and different languages being used. How- ever, we can observe that the labels can disagree: This illustrates at the same time the difficulty of distinguishing between Loaded language and Name Calling, and that some annotators are not consistent in their annotations. Notably, the high rate of confusion between Loaded language (MW:LL) and Name Calling (AR:NCL) is observable."
+            ],
+            "publication_ref": [
+                "b14",
+                "b25",
+                "b12"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Validation: Methodology",
+            "text": [
+                "In order to validate the approach, we perform rank correlation analysis between the ranking computed by standard IAA techniques and the ones with our approach using Kendall's Tau rank correlation coefficient (Kendall, 1938). We consider 2 datasets: the raw annotations of the annotators, and the corpus (dataset of curated documents by curators).",
+                "The raw annotations allow us to compute pairwise IAA with Cohen's \u03ba between annotators, who have annotated the exact same documents. For each annotator, we consider the ranking of the annotators he can be compared to and which have at least 10 annotations in common.",
+                "Given the raw annotations dataset, we compute the Holistic IAA o value, and for each annotator we rank all the other annotators to which it can be compared to, as measured by the average level of agreement on labels for semantically similar text spans."
+            ],
+            "publication_ref": [
+                "b15"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Validation: Results",
+            "text": [
+                "We compare the ranking of most 'similar' annotators for each annotator computed using Cohen's \u03ba with the ranking computed using Holistic IAA on the same subset of annotators. We consider 3 rankings: strict Cohen's \u03ba; same ranking is done on the same set of documents and annotators as the one used to compute Cohen's \u03ba; diff ranking is done on the same pair of annotators, but strictly on documents that were not jointly annotated by them.",
+                "We perform a simple grid search over the hyper-parameters \u03b8 s and \u03b8 l . In Table 3 we show a sample of the parameters searched, in Annex F we report the results of the full grid search performed. The correlation between strict and same is on overall higher than when comparing diff and strict as well as same and diff, and is even perfect or near perfect for a subset of the parameters. We selected the parameter as \u03b8 l = 0 and \u03b8 s = 0.75 for the rest of the paper, despite these being not the optimal.",
+                "Optimal parameters are too conservative and as such the CTP set was too small in order to compare all annotators or groups of annotators, and a such prevented from further studying the properties of Holistic IAA. This proves that the Holistic IAA can be used as a proxy for the pan-document pan-annotators agreement for some specific set of parameters, however, without the possibility to precisely link its value to other standard IAA measures, and with the caveat that the correlation is positive yet not perfect. As such, Holistic IAA can be used mainly to comment on the qualitative difference in agreement between different subsets of annotations. Table 3: Rank correlation between: Cohen's \u03ba computed on the original data (strict), Holistic IAA computed on the same documents as Cohen (same), Holistic IAA computed on all the other documents (diff)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Validation: Error Analysis",
+            "text": [
+                "We performed an error analysis of the confusions found using Holistic IAA: using the 33k+ confusions found by the approach over the dataset, for each pair of labels we evaluate up to 5 alleged confusions and graded the similarity between the corresponding texts on a 3-tier scale. Two texts are considered: identical if the meaning is so close that minor nuance in text would not alter the label chosen (e.g. \"op\u00e9ration sp\u00e9ciale\" (fr) and \"Spezialoperation\" (de) both meaning \"special operation\"); close if the meaning is substantially different, but semantically close enough making the label debatable and worthy to be flagged to a curator for review, for instance one text could be more generic than the other one (e.g. \"fin\u00ec molto male\" (it) =",
+                "\"it ended badly\" and \"durement mise \u00e0 mal\" (fr) = \"badly impacted\"); unrelated if the meaning is unrelated -even if the texts contain the same elements.",
+                "A total of 502 data points were annotated. Note that only texts containing at least one space were considered. In Table 4 we report the count in each category, and the mean, min and max similarity measure as given by the LASER embeddings. When adding the close and identical classes, we get that in a bit more than half of the cases the approach is able to correctly flag potential incoherent annotations.",
+                "We can also see the difficulty of setting cutoff boundaries as the range of minimum and maximum semantic distance is overlapping between all the 3 classes, and with close and identical having almost the same mean boundaries. We can nevertheless observe that the mean value of close is 0.75, making it a reasonable candidate for \u03b8 l .",
+                "These results show that about half of the annotations flagged by the system were indeed of interest to the curators. However, as such, the results are highly dependent on the model used. Future work will require to identify embeddings with a larger margin between the classes in order to make the work of the curators more efficient. Table 4: Statistics on the distance for 3 similarity classes using the LASER embeddings and cosine distance on a set of potential confusions flagged by Holistic IAA"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Impact of the second curation step",
+            "text": [
+                "In order to further evidentiate the behavior of Holistsic IAA, we use it to quantify the impact of the corpus-level curation step. This step was performed per-language after the usual documentlevel curation step was accomplished. The data was sorted per-label and the master curators looked at the overall coherence of the annotated text-span label pairs, the context of the spans was also provided. This step lead to several corrections and is understood to have boosted the overall coherence of the dataset, and should be reflected with a higher o value for the corpus.",
+                "In Table 5 we consider the agreement as measured by Holistic IAA after step 1 and 2 of the curation by considering the 4 most active cura-tors: a i and s i denote respectively the agreement percentage between annotators and the support at step i. For step 2, the o value is higher, and the average IAA is 1.6 pts higher, while the average intra-annotator agreement (self-agreement) is 3.5 pts higher. This demonstrates that Holistic IAA is able to capture and quantify the positive impact of the corpus-level curation.",
+                "In Table 6 we illustrate the impact of excluding Loaded Language (MW:LL) and Name Calling (AR:NCL) from the dataset as these labels constitute nearly half of the annotations and are frequently confused with each other by annotators in terms of absolute number (but not in proportion) as shown in Figure 1 and Table 1. We observe that the agreement between annotators can be label specific.",
+                "In Figure 8 we consider the whole curated dataset and measure the o value between pairs of languages. The columns a i report the value after step 1 and 2 considering the whole range of labels, while the columns a \u2032 i exclude the two labels MW:LL and AR:NCL. Doing so gives us an understanding of the agreement for the lower populated labels. Please note that all the Attacks on Reputation (AR:*) and Manipulative Wordings (MW:*) were excluded from the second step of the curation due to time constraints -except for DE and PL. The impact of the second curation step is almost always positive for all pairs of languages, except notably for one language for which the related o values deteriorate and which drags down the intra-language coherence score.",
+                "Overall, when considering the corpus we observe a quality increase as measured by the o value. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": [
+                "tab_4",
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Multilingual Dataset Coherence Estimation",
+            "text": [
+                "Knowing the dataset coherence computed using standard IAA measures in a monolingual setting, and comparing it with values computed using Holistic IAA, we extrapolate from it the coherence of the entire multilingual dataset. Only two curators have jointly annotated the same set of documents while acting as annotators before the curation phase and taking on the curator role, as such we can compute the Krippendorff's \u03b1 between them, which is 0.588, a little under the recommended value. The o value between them on the same data is 0.420. A group of 3 \"master curators\" covered all the languages and curated most of the dataset. Their average o value on the raw annotations is of 0.565. This higher value illustrates the fact that the coherence of the annotations in the final dataset is higher than when measured on the raw annotations. We now consider only the curated dataset. In Figure 8 we can observe that the o value intra-language range has an average value of 0.538, slightly above the o value of 0.420 of the two reference annotators for which Krippendorff's \u03b1 could be computed. We can conclude that the coherence of the dataset restricted to each language is above the coherence of the reference annotators.",
+                "However, most of the inter-language o values are much lower than the intra-language values. We believe this to be due to 2 factors: 1) each curation was performed per-language, ignoring the others, thereby increasing the self coherence of each language; 2) as in the case of the diff vs. strict in Figure 3 Holistic IAA is less able to capture agreement than in the case of same vs. strict, thereby denoting a limitation of our approach. This could be partially alleviated by using 'better' embeddings. Nevertheless, even with a lower performance, a tool based on Holistic IAA to check for annotation coherence across languages would help to increase the quality of the dataset by flagging potential inconsistent annotations.",
+                "In Table 7 we can observe that the o value for the dataset is consistently higher after the second curation step vis-a-vis after the first step, suggesting that this new curation approach is of interest to increase the quality of annotations. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_6"
+            ]
+        },
+        {
+            "heading": "Conclusions",
+            "text": [
+                "We reported on the complexity of annotating persuasion techniques in a large-scale multilingual annotation campaign. We introduced the Holistic IAA paradigm, a new measure to serve as a proxy of the estimation of inter-annotator agreement and actual corpus coherence in settings that are fundamentally outside the scope of usual IAA measures. We demonstrate that annotator ranking computed using this new measure is positive and can highly correlates with ranking computed using Cohen's Kappa in some settings. Using it, we can observe the beneficial impact of the second step of our 2step curation phase, and also identify similarity and divergence between annotators for some subsets of labels. The experiment conducted in this study supports what was informally remarked regarding the estimation of the performance of the annotators and increased our confidence in the coherence of the final corpus. We believe that using Holistic IAA as part of the monitoring of multilingual or monolingual large-scale annotation campaigns could help to spot problems by flagging potential incoherence in the labels of semantically similar sentences at an early stage. In future work we envisage exploration of thresholds for finer interpretation and exploring the use of other semantic similarity models."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "Distribution Representativeness Although the underlying corpus of annotated news articles covers a wide range of topics as well as media from all sides of the political spectrum it should neither be seen as representative nor balanced in any specific way w.r.t. media in any country. Consequently, the distribution of the annotated persuasion techniques might, in principle, not be fully representative as well.",
+                "Biases Given that human data annotation involves some degree of subjectivity we created a comprehensive 60-page annotation guidelines document to clarify important cases during the annotation process. Nevertheless, some degree of intrinsic subjectivity might have impacted the techniques picked up by the annotators during the annotation, and impacted so the distribution thereof in the final dataset. Furthermore, although the taxonomy used in this annotation campaign covers most of the 'popular' techniques used in the media, we identified some persuasive attempts which could not have been matched with any of the techniques in the existing taxonomy, and were tagged as OTHER (less than 3% of all annotations) and were not considered in the reported work, which once again poses a certain limitation with respect to the representativeness of persuasion technique types used in the media. Methodology Soundness Our results are limited to certain extent, in particular, the introduced IAA metric should be considered as a proof of concept since certain approximations and simplifications were made and parameters were chosen, e.g., the choice for cutoff of maximal retrieved similar sentences, the length ratio to select sentence to be compared is constrained, and the choice of similarity metrics for computing semantic similarity that exploits a specific sentence embeddings model. Different settings and choices could yield different results. Disregarding of these shortcomings, the new metric helped to circumvent the limited scope and utility of classical IAA in such a large-scale multilingual campaign. We believe that the proposed methodology presented in this paper is too some extent generic, and would be of great interest to the community. The approach considers only the text of the annotation, as such their context is ignored. This limitation is mitigated in case the annotation guidelines do not specify that the span of annotation must contain all necessary information to unambiguously determine the label, which is the case in the campaign whose data was used to illustrate our approach."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethics Statement",
+            "text": [
+                "Biases The news articles for the creation of the underlying dataset were sampled in such a way in order to have a balanced representation with respect to different points of view and type of media. We also strived to engage a mix of annotators with different backgrounds, i.e., both media analysts and computational linguists. Furthermore, the annotators were explicitly instructed not take their personal feeling about the particular topic and to objectively focus on identifying whether specific persuasion techniques were used. Disregarding the aforementioned efforts, the distribution of the various persuasion techniques annotated might not perfectly reflect the broader spectrum of the media landscape in the target languages, which should be taken into account in exploiting the related statistical information for any kind of analysis, etc. Analogously, the findings and statistics related to the annotation complexity are linked to the specific pool of annotators engaged in the campaign, and, consequently, they should be considered as approximative.",
+                "Intended Use and Misuse Potential The reported work focuses solely on sharing experience with the research community on annotating persuasion techniques in news articles in a large campaign, analysis of the difficulty of annotating such techniques, and ways of measuring annotation agreement and consistency across languages. The reported work is not linked to a release of the underlying annotated dataset, which is a subject of different publication and related ethical considerations."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Persuasion Techniques",
+            "text": [
+                "The two-tier persuasion technique taxonomy has 6 coarse-grained categories: Attack on reputation: The argument does not address the topic, but rather targets the participant (personality, experience, deeds) in order to question and/or to undermine their credibility. The object of the argumentation can also refer to a group of individuals, an organization, an object, or an activity. Justification: The argument is made of two parts, a statement and an explanation or an appeal, where the latter is used to justify and/or to support the statement. Simplification: The argument excessively simplifies a problem, usually regarding the cause, the consequence or the existence of choices. Distraction: The argument takes focus away from the main topic or argument to distract the reader. Call: The text is not an argument, but an encouragement to act or to think in a particular way. Manipulative wording: the text is not an argument, but uses specific language, which contains words or phrases that are either non-neutral, confusing, exaggerating, loaded, etc., in order to impact the reader emotionally. They are further subdivided into 23 fine-grained persuasion techniques. The full list of the finegrained techniques is presented in 3, whereas some examples of text snippets representing various persuasion techniques are provided in Figure 4."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "B Dataset Statistics",
+            "text": [
+                "In Figure 5 we provide the distribution of the persuasion techniques per language. Name Calling and Loaded Language are by far the most populated classes across all languages, and are followed by Doubt and Questioning the Reputation. In total there were approx. 9K text spans (with persuasion techniques) annotated for English (536 documents), 7.2K for French (211 documents), 5.7K for German (177 documents), 8K for Italian (303 documents), 3.8K for Polish (194 documents), and 4.1K for Russian (191 documents)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_3"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "C Annotation guidelines excerpt",
+            "text": [
+                "This section provides an excerpt from the annotation guidelines (Piskorski et al., 2023a). The following general rules should be applied when annotating persuasion techniques:",
+                "\u2022 if one has doubts whether a given text fragment contains a persuasion technique then do not annotate it, (conservative approach)",
+                "\u2022 select the minimal amount of text 1 to annotate in case of doubts whether to include a longer text fragment or not,"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ATTACK ON REPUTATION",
+            "text": [
+                "Name Calling or Labelling [AR:NCL]: a form of argument in which loaded labels are directed at an individual, group, object or activity, typically in an insulting or demeaning way, but also using labels the target audience finds desirable.",
+                "Guilt by Association [AR:GA]: attacking the opponent or an activity by associating it with a another group, activity or concept that has sharp negative connotations for the target audience.",
+                "Casting Doubt [AR:D]: questioning the character or personal attributes of someone or something in order to question their general credibility or quality.",
+                "Appeal to Hypocrisy [AR:AH]: the target of the technique is attacked on its reputation by charging them with hypocrisy/inconsistency. Questioning the Reputation [AR:QR]: the target is attacked by making strong negative claims about it, focusing specially on undermining its character and moral stature rather than relying on an argument about the topic."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "JUSTIFICATION",
+            "text": [
+                "Flag Waiving [J:FW]: justifying an idea by exhaling the pride of a group or highlighting the benefits for that specific group. Appeal to Authority [J:AA]: a weight is given to an argument, an idea or information by simply stating that a particular entity considered as an authority is the source of the information.",
+                "Appeal to Popularity [J:AP]: a weight is given to an argument or idea by justifying it on the basis that allegedly \"everybody\" (or the large majority) agrees with it or \"nobody\" disagrees with it.",
+                "Appeal to Values [J:AV]: a weight is given to an idea by linking it to values seen by the target audience as positive.",
+                "Appeal to Fear, Prejudice [J:AF]: promotes or rejects an idea through the repulsion or fear of the audience towards this idea."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "DISTRACTION",
+            "text": [
+                "Strawman [D:SM]: consists in making an impression of refuting an argument of the opponent's proposition, whereas the real subject of the argument was not addressed or refuted, but instead replaced with a false one.",
+                "Red Herring [D:RH]: consists in diverting the attention of the audience from the main topic being discussed, by introducing another topic, which is irrelevant. Whataboutism [D:W]: a technique that attempts to discredit an opponent's position by charging them with hypocrisy without directly disproving their argument."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "SIMPLIFICATION",
+            "text": [
+                "Causal Oversimplification [S:CaO]: assuming a single cause or reason when there are actually multiple causes for an issue.",
+                "False Dilemma or No Choice [S:FDNC]: a logical fallacy that presents only two options or sides when there are many options or sides. In extreme, the author tells the audience exactly what actions to take, eliminating any other possible choices.",
+                "Consequential Oversimplification [S:CoO]: is an assertion one is making of some \"first\" event/action leading to a domino-like chain of events that have some significant negative (positive) effects and consequences that appear to be ludicrous or unwarranted or with each step in the chain more and more improbable. Appeal to Authority: Since the Pope said that this aspect of the doctrine is true we should add it to the creed."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "CALL",
+            "text": [
+                "Appeal to Popularity: Because everyone else goes away to college, it must be the right thing to do.",
+                "Appeal to Values: It's standard practice to pay men more than women so we'll continue adhering to the same standards this company has always followed.",
+                "Appeal to Fear, Prejudice: It is a great disservice to the Church to maintain the pretense that there is nothing problematical about Amoris laetitia. A moral catastrophe is self-evidently underway and it is not possible honestly to deny its cause.",
+                "Strawman: Referring to your claim that providing medicare for all citizens would be costly and a danger to the free market, I infer that you don't care if people die from not having healthcare, so we are not going to support your endeavour.",
+                "Red Herring: Lately, there has been a lot of criticism regarding the quality of our product. We've decided to have a new sale in response, so you can buy more at a lower cost!.",
+                "Whataboutism: A nation deflects criticism of its recent human rights violations by pointing to the history of slavery in the United States.",
+                "Causal Oversimplification: School violence has gone up and academic performance has gone down since video games featuring violence were introduced. Therefore, video games with violence should be banned, resulting in school improvement."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "False Dilemma or No Choice:",
+            "text": [
+                "There is no alternative to Pfizer Covid-19 vaccine. Either one takes it or one dies.",
+                "Consequential Oversimplification: If we begin to restrict freedom of speech, this will encourage the government to infringe upon other fundamental rights, and eventually this will result in a totalitarian state where citizens have little to no control of their lives and decisions they make Slogans: \"Immigrants welcome, racist not! Conversation Killer: I'm not so naive or simplistic to believe we can eliminate wars. You can't change human nature.",
+                "Appeal to Time: This is no time to engage in the luxury of cooling off or to take the tranquilizing drug of gradualism. Now is the time to make real the promises of democracy. Now is the time to rise from the dark and desolate valley of segregation to the sunlit path of racial justice.",
+                "Loaded Language: They keep feeding these people with trash. They should stop.   \u2022 avoid personal bias (i.e., opinion and emotions) on the topic being discussed as this has nothing to do with the annotation of persuasion techniques,",
+                "\u2022 do not exploit external knowledge to decide whether given text fragment should be tagged as a persuasion technique,",
+                "\u2022 do not confuse persuasion technique detection with fact checking. A given text fragment might contain a claim which is known to be true, but that does not imply there are no persuasion techniques to annotate in this particular text fragment,",
+                "\u2022 often, authors use irony (not being explicitly part of the taxonomy), which in most cases serves a purpose to persuade the reader, most frequently to attack the reputation of someone or something. In such cases the respective persuasion technique type should be used, or other if the use of irony does not fall under any persuasion technique type in the taxonomy,",
+                "\u2022 in case of quotations or reporting of what a given person said the annotation of the persuasion techniques within the boundaries of that quotation should be done from the perspective of that person who is making some statement or claim (point of reference) and not from the author perspective.",
+                "For each persuasion technique we have also specified what text fragment should be annotated in the document. The general rule is to annotate the minimum amount of text that can be considered as a trigger to spot the technique, even if it requires an understanding of the context that spans over more than one of the preceding sentences. Sometimes, the to-be-annotated text fragment might go beyond the boundaries of one single sentence. In the following we briefly summarize the rules for all the techniques.",
+                "Name Calling or Labelling: The noun phrase, the adjective that constitutes the label and/or the name. If quotation marks are used, they should be included in the annotation as well.",
+                "Guilt by Association: The part of text that refers to an entity and a mention of someone else (considered evil/negative) doing the same or similar thing that is considered negative. The mention of the activity of the target entity might be implicit.",
+                "Casting Doubt: Only the text fragment that questions the credibility and the object whose credibility is being questioned. There is no need to include the full context.",
+                "Appeal to Hypocrisy: The text phrase embracing a certain activity, and another one which is used as an argument to accuse the former as being a hypocrite.",
+                "Questioning the Reputation: Only the text fragments that refer to something negative being mentioned about the person/group/object.",
+                "Flag Waving: The part of the text that refers to patriotism or other group related values, and the conclusion/action it is supposed to support if it is present in the text.",
+                "Appeal to Authority: The part of the text that refers to the authority (and potentially some of his/her statement/opinion/action), and the conclusion it supports, in case the latter is present in the text.",
+                "Appeal to Popularity: The part of the text that refers to something that a majority does or seems to be widely supported and/or is popular together with the conclusion it is supposed to support.",
+                "Appeal to Values: The part of the text that refers to values, and include the conclusion it is supposed to support, in case the latter is included explicitly in the text. or a false conclusion drawn therefrom should be annotated, although, often not all parts of the pattern above are explicitly mentioned in the text.",
+                "False Dilemma or No Choice: The minimal text fragment that matches one of the following logical patterns should be annotated:",
+                "(a) Black & White Fallacy:",
+                "There are only two alternatives A and B to a given problem/task. It cannot be A. Therefore, the only solution is B (since A is not an option)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "(b) Dictatorship",
+            "text": [
+                "The only solution to a given problem/task is A.",
+                "although, often not all parts of the pattern above are explicitly mentioned in the text."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Consequential Oversimplification:",
+            "text": [
+                "The entire text fragment that matches the above logical pattern should be annotated:",
+                "if A will happen then B, C, D, ... will happen where:",
+                "-A is something one is trying to reject (support) -B, C, D are perceived as some potential negative (positive) consequences happening if A happens."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Slogans:",
+            "text": [
+                "The slogan only (no need to annotate the conclusion it supports), and in case it is surrounded Conversation Killer: A minimal text span that triggers ending the conversation, discussion, etc.",
+                "Appeal to Time: A minimal text span referring to the argument of time that calls for some action.",
+                "Both the call and the action should be annotated.",
+                "Loaded Language: Only the phrase containing loaded words, the context in which they appear should not be annotated. As a general rule one should consider to tag longer text fragment if and only if each of the words adds more emotional 'load' to the text fragment."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Obfuscation, Intentional Vagueness, Confusion:",
+            "text": [
+                "The minimal text fragment that introduces confusion: it could be a word, but also a longer piece of text that requires to be read in order to understand the confusion it causes.",
+                "Exaggeration or Minimisation: The text fragment that provides the description that downplays or exaggerates the object of criticism. The latter should be included in the annotated text as well.",
+                "Repetition: All text fragments that repeat the same message or information that was introduced earlier.",
+                "The first occurrence of the message/information is to be annotated as well. If it is not clear what exactly to annotate then the entire sentence should be annotated. Furthermore, it is important to emphasize that a repetition of something per se is not always a persuasion technique, but could sometimes be used only to refer to a topic/issue being discussed."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "D Confusion Matrix based on Holistic IAA",
+            "text": [
+                "In Figure 7 we report the confusion matrix found using Holistic IAA on the final curated dataset. De- In Figure 6 we report the confusion matrix on the set of annotations. It is closer the Figure 1 than Figure 7. This indicates that the curation process actually eliminated some common confusion in the annotations. The magnitude are different for two reasons that can not be measure independently: it contains less errors, and there are less overall pair-wise comparison performed as the total set of annotation considered is about two times smaller."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_5",
+                "fig_4",
+                "fig_0",
+                "fig_5"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "E Identifying the top and low groups of annotators",
+            "text": [
+                "In order to split the annotators into two groups, in a first time the curators based on their subjective assessments established 2 groups of equal size. This was further corroborated in a second step using the following approach: the curated data was taken as ground truth and the annotators were considered as classifiers, whose annotations are considered as prediction. As such we computed the micro F 1 for each annotator, and ranking them along that measure, the median split validated the first subjective assessment which contained a few more annotators, which all ranked the highest in the lower split. The average micro F 1 score of the top and low groups are respectively of 0.603 +-0.119 and 0.284 +-0.081."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgements",
+            "text": [
+                "We are greatly indebted to all the annotators from different organizations, who participated in the annotation campaign, and without whom carrying out the reported study would not have been possible.",
+                "The work presented in this paper is financed by the Joint Research Centre of the European Commission."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "F Parameter search",
+            "text": [
+                "We conducted an exhaustive parameter search in order to determine the optimal parameter \u03b8 l and \u03b8 s which maximise the rank correlation between the ranking of annotators produces by Cohen's Kappa and the one produces by Holistic IAA. We consider 3 groups of document-annotators pairs: strict, for which Cohen's \u03ba can be computed; same any document annotated by previous annotators; diff any documents not annotated jointly by previous annotators. The pairwise comparison of these sets with Kendall's Tau rank correlation is consider as 3 dimensions of a multi-criteria decision problem: A minimal number of 10 annotations in common is required for a pair of annotator to be considered, support is the total number of pairs being compared.",
+                "The table with the result of the parameter search are reported in Table 9."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Overview of the WANLP 2022 shared task on propaganda detection in Arabic",
+            "journal": "",
+            "year": "2022",
+            "authors": "Firoj Alam; Hamdy Mubarak; Wajdi Zaghouani; Giovanni Da San; Preslav Martino;  Nakov"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Proppy: Organizing the news based on their propagandistic content",
+            "journal": "Information Processing & Management",
+            "year": "2019",
+            "authors": "Alberto Barr\u00f3n-Cedeno; Israa Jaradat; Giovanni Da San; Preslav Martino;  Nakov"
+        },
+        {
+            "ref_id": "b2",
+            "title": "The search for agreement on logical fallacy annotation of an infodemic",
+            "journal": "",
+            "year": "2022",
+            "authors": "Claire Bonial; Austin Blodgett; Taylor Hudson; Stephanie M Lukin; Jeffrey Micher; Douglas Summers-Stay; Peter Sutor; Clare Voss"
+        },
+        {
+            "ref_id": "b3",
+            "title": "SemEval-2020 task 11: Detection of propaganda techniques in news articles",
+            "journal": "",
+            "year": "2020",
+            "authors": "Giovanni Da San; Alberto Martino; Henning Barr\u00f3n-Cede\u00f1o; Rostislav Wachsmuth; Preslav Petrov;  Nakov"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Findings of the NLP4IF-2019 shared task on fine-grained propaganda detection",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Giovanni Da San; Alberto Martino; Preslav Barr\u00f3n-Cede\u00f1o;  Nakov"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Fine-grained analysis of propaganda in news articles",
+            "journal": "",
+            "year": "2019",
+            "authors": "Giovanni Da San; Seunghak Martino; Alberto Yu; Rostislav Barr\u00f3n-Cede\u00f1o; Preslav Petrov;  Nakov"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Fine-grained analysis of propaganda in news articles",
+            "journal": "",
+            "year": "2019",
+            "authors": "Giovanni Da San; Seunghak Martino; Alberto Yu; Rostislav Barron-Cedeno; Preslav Petrov;  Nakov"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Detecting propaganda techniques in memes",
+            "journal": "",
+            "year": "2021",
+            "authors": "Dimitar Dimitrov; Shaden Bishr Bin Ali; Firoj Shaar; Fabrizio Alam; Hamed Silvestri; Preslav Firooz; Giovanni Da San Nakov;  Martino"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Task 6 at SemEval-2021: Detection of persuasion techniques in texts and images",
+            "journal": "",
+            "year": "2021",
+            "authors": "Dimiter Dimitrov; Shaden Bishr Bin Ali; Firoj Shaar; Fabrizio Alam; Hamed Silvestri; Preslav Firooz; Giovanni Da San Nakov;  Martino"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Argotario: Computational argumentation meets serious games",
+            "journal": "",
+            "year": "2017",
+            "authors": "Ivan Habernal; Raffael Hannemann; Christian Pollak; Christopher Klamm; Patrick Pauli; Iryna Gurevych"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Adapting serious game for fallacious argumentation to German: Pitfalls, insights, and best practices",
+            "journal": "",
+            "year": "2018",
+            "authors": "Ivan Habernal; Patrick Pauli; Iryna Gurevych"
+        },
+        {
+            "ref_id": "b11",
+            "title": "The spread of propaganda by coordinated communities on social media",
+            "journal": "",
+            "year": "2022",
+            "authors": "Kristina Hristakieva; Stefano Cresci; Giovanni Da San; Mauro Martino; Preslav Conti;  Nakov"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Language agnostic multilingual sentence embedding models for semantic search",
+            "journal": "",
+            "year": "2022",
+            "authors": "Fumika Isono"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Logical fallacy detection",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Zhijing Jin; Abhinav Lalwani; Tejas Vaidhya; Xiaoyu Shen; Yiwen Ding; Zhiheng Lyu; Mrinmaya Sachan; Rada Mihalcea; Bernhard Schoelkopf"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Billion-scale similarity search with GPUs",
+            "journal": "IEEE Transactions on Big Data",
+            "year": "2019",
+            "authors": "Jeff Johnson; Matthijs Douze; Herv\u00e9 J\u00e9gou"
+        },
+        {
+            "ref_id": "b15",
+            "title": "A new measure of rank correlation",
+            "journal": "Biometrika",
+            "year": "1938",
+            "authors": "G Maurice;  Kendall"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Testing the reliability of content analysis data. The content analysis reader",
+            "journal": "",
+            "year": "2009",
+            "authors": "Klaus Krippendorff"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Interrater reliability: the kappa statistic",
+            "journal": "Biochemia medica",
+            "year": "2012",
+            "authors": "L Mary;  Mchugh"
+        },
+        {
+            "ref_id": "b18",
+            "title": "COVID-19 in Bulgarian social media: Factuality, harmfulness, propaganda, and framing",
+            "journal": "",
+            "year": "2021",
+            "authors": "Preslav Nakov; Firoj Alam; Shaden Shaar; Giovanni Da San; Yifan Martino;  Zhang"
+        },
+        {
+            "ref_id": "b19",
+            "title": "A second pandemic? Analysis of fake news about COVID-19 vaccines in Qatar",
+            "journal": "",
+            "year": "2021",
+            "authors": "Preslav Nakov; Firoj Alam; Shaden Shaar; Giovanni Da San; Yifan Martino;  Zhang"
+        },
+        {
+            "ref_id": "b20",
+            "title": "The benefits of a model of annotation",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2014",
+            "authors": "J Rebecca; Bob Passonneau;  Carpenter"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Firoj Alam, and Preslav Nakov. 2023a. News categorization, framing and persuasion techniques: Annotation guidelines",
+            "journal": "",
+            "year": "",
+            "authors": "Jakub Piskorski; Nicolas Stefanovitch; Valerie-Anne Bausier; Nicolo Faggiani; Jens Linge; Sopho Kharazi; Nikolaos Nikolaidis; Giulia Teodori; Brian Bertrand De Longueville; Jason Doherty; Camelia Gonin; Bonka Ignat; Eleonora Kotseva; Lorena Mantica; Enrico Marcaletti; Alessio Rossi; Marco Spadaro; Giovanni Verile;  Da San;  Martino"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Semeval-2023 task 3: Detecting the category, the framing, and the persuasion techniques in online news in a multilingual setup",
+            "journal": "",
+            "year": "2023",
+            "authors": "Jakub Piskorski; Nicolas Stefanovitch; Giovanni Da San; Preslav Martino;  Nakov"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Multilingual multifaceted understanding of online news in terms of genre, framing, and persuasion techniques",
+            "journal": "Long Papers",
+            "year": "2023",
+            "authors": "Jakub Piskorski; Nicolas Stefanovitch; Nikolaos Nikolaidis; Giovanni Da San; Preslav Martino;  Nakov"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Truth of varying shades: Analyzing language in fake news and political fact-checking",
+            "journal": "",
+            "year": "2017",
+            "authors": "Eunsol Hannah Rashkin; Jin Yea Choi; Svitlana Jang; Yejin Volkova;  Choi"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Learning joint multilingual sentence representations with neural machine translation",
+            "journal": "",
+            "year": "2017",
+            "authors": "Holger Schwenk; Matthijs Douze"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Filip Ilievski, H\u00f4ng-\u00c2n Sandlin, and Alain Mermoud. 2022. Robust and explainable identification of logical fallacies in natural language arguments",
+            "journal": "",
+            "year": "",
+            "authors": "Zhivar Sourati;  Vishnu Priya Prasanna; Darshan Venkatesh; Himanshu Deshpande;  Rawlani"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Confusion matrix between single annotations of annotators, thereby denoting tendencies in confusion between the given pairs of labels. Values lower than 10 are blanked.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "b\u2208A\u00d7B x,y\u2208CT P \u03b8 l ,\u03b8s S(a 1 ),S(a 2 ) I a 1 (x)=a 2 (y) a,b\u2208A\u00d7B |CT P \u03b8 l ,\u03b8s S(a),S(b) | Finally, let An(D) denote the set of annotators of a dataset D. We can now define the Holistic IAA value for a dataset as: o \u03b8 l ,\u03b8s,M D = o \u03b8 l ,\u03b8s,M (An(D),An(D))",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 4 :4Figure 4: Examples of text snippets with persuasion techniques. The text fragments highlighted in bold are the actual text spans annotated.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 5 :5Figure 5: Distribution of the persuasion techniques per language (in percentage).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 6 :6Figure 6: Confusion matrix on the annotations, as per Holistic IAA, for a minimal support of 50",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 7 :7Figure 7: Confusion matrix on final corpus, as per Holistic IAA, for a minimal support of 10",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Per-label disagreement of three groups of annotators: all, top and low and related complexity markers. The colours reflect the respective annotation complexity class. The techniques considered as potentially requiring additional clarification or whose definitions might exhibit inconsistencies are marked with an asterisk.",
+            "figure_data": "Doubt AR:D Appeal to Hypocrisy AR:AH Questioning the Reputation AR:QR Flag Waving J:FW Appeal to Authority J:AA Appeal to Values J:AV Appeal to Popularity J:AP Appeal to Fear-Prejudice J:AF Causal Oversimplification S:CaO Consequential Oversimplification S:CoO False Dilemma-No Choice D:FDNC .400 .154 1.00 \u25a0 .426 .286 .456 \u25a0 .025 .033 .111 \u25a0 * .266 .213 .372 \u25a0 .286 .667 1.00 \u25a0 * .222 .100 1.00 \u25a0 .190 .133 .667 \u25a0 .231 .200 1.00 \u25a0 .091 .095 .158 \u25a0 * .368 .154 1.00 \u25a0 .250 .182 .078 \u25a0 * Strawman D:S .200 .429 1.00 \u25a0 * Red Herring D:RH .500 .600 1.00 \u25a0 * Whataboutism D:W .500 .500 1.00 \u25a0 Slogans C:S .200 .333 .200 \u25a0 * Conversation Killer C:CK .148 .100 .400 \u25a0 Appeal to Time C:AT .333 .750 .333 \u25a0 * Loaded Language MW:LL .042 .048 .089 \u25a0 * Obfuscation-Vagueness-Confusion MW:OVC .400 .600 1.00 \u25a0 * Exaggeration-Minimisation MW:EM .208 .176 .429 \u25a0 Repetition MW:R .444 .667 .400 \u25a0 *"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Example of a query span and result span fetched from the database, L2 similarity is reported, as well as the associated labels and the annotator identifier.",
+            "figure_data": "type query reply 0.036 fanatyk\u00f3w religijnych PL dist. span lang. label -religi\u00f6s-fanatische DE MW:LL E an. AR:NCL Dtype query reply 0.027 fascista sim. span -fassisti reply 0.031 faszyst \u0105 reply 0.036 Faschismus reply 0.038 faszy\u015bci reply 0.038 \u0444\u0430\u0448\u0438\u0441\u0442\u044b reply 0.043 fascistilang. label IT MW:LL A an. IT MW:LL F PL AR:NCL D DE MW:LL G PL AR:NCL D RU MW:R H IT MW:LL A"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Curated dataset, agreement after step 1 and 2, where a i and s i denote respectively the o value between annotators and the support at step i.",
+            "figure_data": "cur1cur2a1s1a2s2A A A A B B B C C DA B C D B C D C D D0.597 0.5 0.586 0.544 0.49 0.451 0.61 0.597 0.471 0.771193778 57351 45694 51327 10319 8575 11688 3185 6163 54730.603 0.517 0.595 0.548 0.523 0.434 0.625 0.647 0.41 0.798177604 54503 183937 123539 10210 29189 27113 54566 62387 35248o inter intra0.567 0.483 \u00b1 0.093 0.606 \u00b1 0.0930.574 0.499 \u00b1 0.101 0.641 \u00b1 0.090"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "o value for the curated data after each curation step for different values of \u03b8 s and fixed \u03b8 l = 0",
+            "figure_data": "\u03b8s0.750.800.850.900.95step 1 step 20.537 0.5600.580 0.5920.729 0.7560.738 0.7620.828 0.851lang1 lang2 a1a2a1'a2'change change'FR FR FR FR IT IT IT PL PL RUFR IT PL RU IT PL RU PL RU RU0.612 0.653 0.45 0.585 0.592 0.168 0.223 +0.007 0.47 +0.041 0.435 0.401 0.451 0.484 -0.034 0.43 0.443 0.245 0.288 +0.013 0.593 0.6 0.458 0.458 +0.007 0.545 0.549 0.384 0.346 +0.004 0.509 0.524 0.229 0.234 +0.015 0.771 0.798 0.625 0.476 +0.027 0.608 0.618 0.312 0.255 +0.01 0.501 0.531 0.343 0.373 +0.03+0.02 +0.055 +0.033 +0.043 0.0 -0.038 +0.005 -0.149 -0.057 +0.03o inter intra0.567 0.574 0.323 0.346 +0.013 0.519 0.521 0.298 0.305 +0.002 0.619 0.646 0.469 0.444 +0.027+0.023 +0.007 -0.025Table 8: Curated dataset: impact of the two curation steps on the overall agreement between languages (inter) and inside languages (intra), when the labels MW:LL and AR:NCL are included (a1 and a2) and excluded (a1' and a2')"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "Guilt by Association: Manohar is a big supporter for equal pay for equal work. This is the same policy that all those extreme feminist groups support. Extremists like Manohar should not be taken seriously.",
+            "figure_data": "Name Calling or Labelling: 'Fascist' Anti-Vax Riot Sparks COVID Outbreak in Australia.Casting Doubt: This task is quite complex. Is his professional background, experience and the time left sufficient to accomplish the task at hand?Appeal to Hypocrisy: How can you demand that I eat less meat to reduce my carbon footprint if you yourself drive a big SUV and fly for holidays to Bali?Questioning the Reputation: I hope I presented my argument clearly. Now, my opponent will attempt to refute my argument by his own fallacious, incoherent, illogical version of historyFlag Waiving: We should make America great again, and restrict the immigration laws.Slogans [C:S]: a brief and striking phrase, often acting like emotional appeals, that may include labeling and stereotyping. Conversation Killer [A:CK]: words or phrases that discourage critical thought and meaningful discussion about a given topic. Appeal to Time [C:AT]: the argument is centred around the idea that time has come for a particular action.MANIPULATIVE WORDINGLoaded Language [MW:LL]: use of specific words and phrases with strong emotional implications (either positive or negative) to influence and convince the audience that an argument is valid. Obfuscation, Intentional Vagueness, Confusion [MW:OVC]: use of words that are deliberately not clear, vague or ambiguous so that the audience may have its own interpretations. Exaggeration or Minimisation [MW:EM]: consists of either representing something in an excessive manner or making something seem less important or smaller than it really is. Repetition [MW:R]: the speaker uses the same phrase repeatedly with the hopes that the repetition will lead to persuade the audience.Figure 3: Persuasion techniques taxonomy. The six coarse-grained techniques are subdivided into 23 fine-grained ones. An acronym for each technique is given in squared brackets."
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "Obfuscation, Intentional Vagueness, Confusion: Feathers can not be dark, because all feathers are light! Exaggeration or Minimisation: From the seminaries, to the clergy, to the bishops, to the cardinals, homosexuals are present at all levels, by the thousand Repetition: Hurtlocker deserves an Oscar. Other films have potential, but they do not deserve an Oscar like Hurtlocker does. The other movies may deserve an honorable mention but Hurtlocker deserves the Oscar.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "Appeal to Fear, Prejudice: The part of the text that refers to the fears, prejudices, e.g., of something that might happen. Strawman: When this technique is used, usually the relevant context might span across more sentences. However, one should only annotate the text fragment (sentence or part thereof), which introduces the distraction. Red Herring: When this technique is used, usually the relevant context might span across more sentences. However, one should only annotate the text fragment (sentence or part thereof), which introduces the distraction. Whataboutism: When this technique is used, usually the relevant context might span across multiple sentences. However, one should only annotate the text fragment (sentence or part thereof) that introduces the distraction. Causal Oversimplification: The minimal text fragment that matches the logical pattern should be annotated:",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "CT P \u03b8 l ,\u03b8s,M X,Y = {x,y\u2208X\u00d7Y : min(|x|,|y|) max(|x|,|y|) >\u03b8 l , sim(M (x),M (y))>\u03b8s}",
+            "formula_coordinates": [
+                6.0,
+                92.97,
+                420.43,
+                174.06,
+                27.85
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "o \u03b8 l ,\u03b8s,M (a 1 ,a 2 ) =",
+            "formula_coordinates": [
+                6.0,
+                74.18,
+                523.02,
+                73.45,
+                10.04
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "o \u03b8 l ,\u03b8s,M (A,B) = a,",
+            "formula_coordinates": [
+                6.0,
+                71.56,
+                592.37,
+                79.57,
+                18.54
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/D19-5024"
+}

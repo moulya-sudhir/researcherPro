@@ -1,0 +1,979 @@
+{
+    "title": "Evaluating the Rationale Understanding of Critical Reasoning in Logical Reading Comprehension",
+    "authors": "Akira Kawabata; Saku Sugawara; Tom Brown; Benjamin Mann; Nick Ryder; Melanie Subbiah; Jared D Kaplan; Prafulla Dhariwal; Arvind Neelakantan; Pranav Shyam; Girish Sastry; Amanda Askell; Sandhini Agarwal; Ariel Herbert-Voss; Gretchen Krueger; Tom Henighan; Rewon Child; Aditya Ramesh; Daniel Ziegler; Jeffrey Wu; Clemens Winter; Chris Hesse; Mark Chen; Eric Sigler; Ma- Teusz Litwin; Scott Gray; Benjamin Chess; Jack Clark; Christopher Berner; Sam Mccandlish; Alec Radford; Ilya Sutskever; Dario 2020 Amodei; Dallas Card; Peter Henderson; Urvashi Khandelwal; Robin Jia; Kyle Mahowald; Dan 2020 Jurafsky; Wei-Lin Chiang; Zhuohan Li; Zi Lin; Ying Sheng; Zhanghao Wu; Hao Zhang; Lianmin Zheng; Siyuan Zhuang; Yonghao Zhuang; Joseph E Gonzalez; Ion Stoica; Eric P 2023 Xing;  Vicuna; Hyung Won; Le Hou; Shayne Longpre; Barret Zoph; Yi Tay; William Fedus; Yunxuan Li; Xuezhi Wang; Mostafa Dehghani; Siddhartha Brahma; Al- Bert Webson; Shane Shixiang; Zhuyun Gu; Mirac Dai; Xinyun Suzgun; Aakanksha Chen; Alex Chowdh- Ery; Marie Castro-Ros; Kevin Pellat; Dasha Robinson; Sharan Valter; Gaurav Narang; Adams Mishra; Vincent Yu; Yanping Zhao; Andrew Huang; Hongkun Dai; Slav Yu; Ed H Petrov; Jeff Chi; Ja- Cob Dean; Adam Devlin; Denny Roberts; Quoc V Zhou;  Le; Bhavana Dalvi; Peter Jansen; Oyvind Tafjord; Zhengnan Xie; Hannah Smith; Leighanna Pipatanangkura; Matt Gardner; Yoav Artzi; Victoria Basmov; Jonathan Berant; Ben Bogin; Sihao Chen; Pradeep Dasigi; Dheeru Dua; Yanai Elazar; Ananth Gottumukkala; Nitish Gupta; Hannaneh Hajishirzi; Gabriel Ilharco; Daniel Khashabi; Kevin Lin; Jiangming Liu; Nel- Son F Liu; Phoebe Mulcaire; Qiang Ning; Sameer Singh; Noah A Smith; Sanjay Subramanian; Reut Tsarfaty; Eric Wallace; Ally Zhang; Ben Zhou; Long Ouyang; Xu Jiang; Diogo Almeida; Carroll Wainwright; Pamela Mishkin; Chong Zhang; Katarina Slama; Alex Ray; John Schulman; Jacob Hilton; Fraser Kelton; Luke Miller; Maddie Simens; Peter Welinder; Paul F Christiano; Jan Leike; Ryan 2022 Lowe; Danilo Neves Ribeiro; Shen Wang; Xiaofei Ma; Swarnadeep Saha; Peter Hase; Nazneen Rajani; Prateek Yadav; Lisa Bauer; Mohit Bansal;  Explagraphs; Freda Shi; Xinyun Chen; Kanishka Misra; Nathan Scales; David Dohan; Ed H Chi; Nathanael Sch\u00e4rli; Denny Zhou;  Large; Vinh Q Tran; Xavier Garcia; Jason Wei; Won Chung; Dara Bahri; Tal Schuster; Steven Zheng; Neil Houlsby; Donald Metzler;  Ul2; Hugo Touvron; Thibaut Lavril; Gautier Izacard; Xavier Martinet; Marie-Anne Lachaux; Timoth\u00e9e Lacroix; Baptiste Rozi\u00e8re; Naman Goyal; Eric Hambro; Faisal Azhar; Aurelien Rodriguez; Armand Joulin; Louis Martin; Kevin Stone; Peter Al- Bert; Amjad Almahairi; Yasmine Babaei; Nikolay Bashlykov; Soumya Batra; Prajjwal Bhargava; Shruti Bhosale; Dan Bikel; Lukas Blecher; Cristian Canton Ferrer; Moya Chen; Guillem Cucurull; David Esiobu; Jude Fernandes; Jeremy Fu; Wenyin Fu; Brian Fuller; Cynthia Gao; Vedanuj Goswami; An- Thony Hartshorn; Saghar Hosseini; Rui Hou; Hakan Inan; Marcin Kardas; Viktor Kerkez; Madian Khabsa; Isabel Kloumann; Artem Korenev; Singh Koura; Jenya Lee; Di- Ana Liskovich; Yinghai Lu; Yuning Mao; Xavier Mar- Tinet; Todor Mihaylov; Pushkar Mishra; Igor Moly- Bog; Yixin Nie; Andrew Poulton; Jeremy Reizen- Stein; Rashi Rungta; Kalyan Saladi; Alan Schelten; Ruan Silva; Eric Michael Smith; Ranjan Subrama- Nian; Ellen Tan; Binh Tang; Ross Tay- Lor; Adina Williams; Jian Xiang Kuan; Puxin Xu; Zheng Yan; Iliyan Zarov; Yuchen Zhang; Angela Fan; Melanie Kambadur; Sharan Narang; Aurelien Ro- Driguez; Robert Stojnic; Sergey Edunov",
+    "pub_date": "",
+    "abstract": "To precisely evaluate a language model's capability for logical reading comprehension, we present a dataset for testing the understanding of the rationale behind critical reasoning. For questions taken from an existing multiplechoice logical reading comprehension dataset, we crowdsource rationale texts that explain why we should select or eliminate answer options, resulting in 3,003 multiple-choice subquestions that are associated with 943 main questions. Experiments on our dataset show that recent large language models (e.g., InstructGPT) struggle to answer the subquestions even if they are able to answer the main questions correctly. We find that the models perform particularly poorly in answering subquestions written for the incorrect options of the main questions, implying that the models have a limited capability for explaining why incorrect alternatives should be eliminated. These results suggest that our dataset encourages further investigation into the critical reasoning ability of language models while focusing on the elimination process of relevant alternatives. Mana Ashida and Saku Sugawara. 2022. Possible stories: Evaluating situated commonsense reasoning under multiple possible scenarios. In",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Critical reasoning, a type of logical reasoning not tied to formal logic, is a core ability of humans that is required for thoughtful reading of text. It involves not only understanding what a passage explicitly says but also comprehending its underlying assumptions, argument structure, and supported conclusions. Developing systems capable of critical reasoning as reliably as humans is one of the ultimate goals of natural language processing. Recent studies have proposed datasets that evaluate logical reasoning including critical reasoning ability (Yu et al., 2020;Liu et al., 2020) in reading comprehension. Owing to the recent development of large language models (LLMs; Brown et al., 2020;He et al., 2023), the performance of the stateof-the-art models is nearing that of humans (Jiao et al., 2022;Wang et al., 2022). "
+            ],
+            "publication_ref": [
+                "b13",
+                "b5"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Passage",
+            "text": [
+                "The argument proceeds by doing which one of the following?"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Main Question",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Sub Question (on the rationale of eliminating Option A)",
+            "text": [
+                "A. deriving implications of a generalization that it assumes to be true. B. showing how evidence that apparently contradicts supports the conclusion. C. enumerating problems for which it proposes a general solution. D. citing examples in support of its conclusion."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "\ud83e\udd16 \ud83e\uddd4",
+            "text": [
+                "Why is the method of drawing implications from an assumed true generalization not considered the way in which the argument proceeds?  (Yu et al., 2020) and its subquestion we create to test the understanding of implicit rationale. We find that even if the model can answer the original question correctly, it cannot answer subquestions that should be answerable.",
+                "However, current multiple-choice questions in existing logical reading comprehension datasets may not sufficiently test the ability of critical reasoning. The example illustrated in Figure 1 shows that even if a model can answer a question taken from the ReClor dataset (Yu et al., 2020) that has questions for graduate admission examinations, it cannot answer an auxiliary question that queries the implicit rationale for eliminating a relevant alternative. This behavior might be due to the model's limited generalizability that is exposed by input perturbation (Si et al., 2021;Lin et al., 2021;Shi et al., 2023) or characterized as shortcut reasoning (Niven and Kao, 2019;Geirhos et al., 2020). Because a single question cannot fully ask the rationale of why we select an option as the correct answer and eliminate the others as the incorrect ones, current datasets may not be sufficient to comprehensively evaluate the process of critical reasoning.",
+                "Recent studies propose methods for probing the reasoning process using auxiliary generation tasks such as in the form of simple commonsense facts (Aggarwal et al., 2021), logical graphs (Huang et al., 2022), and arithmetic equations (Ribeiro et al., 2023). However, this line of approach may not be suitable to capture the implicit rationale of critical reasoning. In particular, it cannot explicitly consider the selection and elimination process of relevant alternatives in logical reasoning. In addition, the format of such auxiliary tasks is usually not the same as that of the main task, which may fail to evaluate the target abilities consistently.",
+                "As a first step to address these limitations, we construct a benchmark that comprehensively evaluates language models' ability of critical reasoning in logical reading comprehension. Our dataset, rationale understanding for logical reasoning evaluation (RULE), consists of main questions taken from ReClor and auxiliary subquestions that we newly create for this study. The process of constructing our dataset is illustrated in Figure 2. Our core idea is that for each answer option in a main question, we crowdsource a free-form human-written rationale that explains why that option should be selected or eliminated, and use those rationales to create a set of subquestions that are associated with the main question. After manual filtering to ensure human answerability, in addition to 943 main questions, we obtain 3,003 subquestions for the testonly purpose. The common multiple-choice format of the main questions and subquestions enables us to evaluate the models' capability of critical reasoning concisely and consistently.",
+                "In our experiments using strong baseline models including LLMs, e.g., Flan-UL2, (Tay et al., 2023), LLaMA 2 (Touvron et al., 2023b), and Instruct-GPT (Ouyang et al., 2022), we observe that the models cannot answer the main questions and subquestions consistently, showing a larger than 30% gap against humans in our strict consistency metric. In particular, we find that the models struggle to answer eliminative subquestions, which are pertinent to the rationale of eliminating incorrect options, showing a large gap (\u2248 20% accuracy) between humans and the best-performing LLM. Conversely, the models tend to correctly answer selective subquestions, which are pertinent to the rationale of selecting the correct option. This clear contrast suggests that these models provide the correct answer without fully understanding why the other options are incorrect. Our analysis using a follow-up task and manual annotations supports this observation. We also compare our human-written rationales with model-generated ones using an LLM, finding that our rationales are likely to be more detailed and supportive than the model-generated ones.",
+                "Our contributions are as follows: (i) Based on an existing logical reading comprehension dataset, we create a dataset including over 3,000 auxiliary questions designed to test a model's consistent ability for critical reasoning. (ii) We evaluate cuttingedge models, including LLMs, across finetuned, few-shot, and zero-shot settings, showing that even the best model falls short of human performance, particularly lagging in understanding eliminative rationales for incorrect answer options. (iii) Our annotation analysis also highlights the model's deficiency in understanding eliminative rationales and shows that our human-written rationales are of higher quality than model-generated ones. 1"
+            ],
+            "publication_ref": [
+                "b13",
+                "b13",
+                "b1",
+                "b0",
+                "b7"
+            ],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Works",
+            "text": [
+                "Critical and Logical Reasoning Critical reasoning is one of the core abilities of logical reasoning that humans perform, along with analytical reasoning (Zhong et al., 2022) and abductive reasoning (Bhagavatula et al., 2020). This reasoning is related to understanding the structure of practical arguments that is generally composed of ground (premise), warrant (rationale), and claim (conclusion). As formulated by Toulmin (2003), given facts or data as the ground, we provide the warrant that acts as a bridge between the ground and the claim we are making. Recent research includes developing ways to model this behavior in tasks such as argument mining and question answering (QA) (e.g., ReClor). For example, Habernal et al. (2018) propose a task of identifying implicit rationale (i.e., warrant) in arguments. However, Niven and Kao (2019) find that successful systems on the argument reasoning task exploit superficial input features. Similarly, QA systems have been shown to exhibit shallow understanding by input perturbation (Si et al., 2021;Lin et al., 2021;Shi et al., 2023). For example, Lin et al. (2021) demonstrate that QA performance significantly decreases when incorrect options are replaced with irrelevant texts in an adversarial manner. This means that successful models on those datasets do not nec- "
+            ],
+            "publication_ref": [
+                "b4"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Option D",
+            "text": [
+                "deriving implications of a generalization that it assumes to be true Option A"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "RationaleD",
+            "text": [
+                "Figure 2: Our dataset construction process. We first ask crowdworkers to write the rationale for each answer option. After validating the collected rationale by aligning them to the source options, we use a large language model to generate subquestion texts. We finally ensure the human answerability of the generated subquestions.",
+                "essarily exhibit generalizable capabilities in other datasets. These findings necessitate the explainability of the (informal) logical reasoning process for better evaluation of intended reasoning abilities (e.g., the critical reasoning in this study).",
+                "Reasoning Explanation Although some studies explain the rationale behind commonsense and logical reasoning using graphs (Saha et al., 2021;Ribeiro et al., 2023), others explain it as a decomposition (Khot et al., 2020;Dalvi et al., 2021;Geva et al., 2021), a combination of supporting textual spans in the input (Yang et al., 2018;Inoue et al., 2020), commonsense rules (Saha et al., 2022), or underlying facts (Aggarwal et al., 2021). The work most similar to ours is MetaLogic (Huang et al., 2022), which focuses on generating graphs explaining the logical relations between sentences in Re-Clor examples, aiming to model the valid reasoning process. In contrast, we employ free-text rationales that explain the process of critical reasoning, enabling us to construct multiple-choice questions about the understanding of rationales. We also aim to faithfully test the models' performance on the main questions as well as auxiliary subquestions in the multiple-choice discrimination task, instead of the generation of the reasoning process in a different format from the original task."
+            ],
+            "publication_ref": [
+                "b2",
+                "b12",
+                "b0",
+                "b7"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "RULE Data Collection",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Design Choices",
+            "text": [
+                "We construct a new dataset, RULE (rationale understanding for logical reasoning evaluation), to evaluate the consistent rationale understanding in logical reading comprehension. The dataset comprises main questions and their auxiliary questions (subquestions). The subquestions are designed to test the understanding of the rationale necessary for answering the main questions correctly. In constructing our dataset, we make three decisions in its design choices.",
+                "Source Dataset Among existing datasets for testing logical reading comprehension, we use ReClor for the following reasons: (1) It covers various types of logical reasoning required in the multiplechoice format, (2) its context passages are of sufficient length to compose a meaningful rationale (e.g., the contexts in LogiQA (Liu et al., 2020) are shorter), and (3) it contains a sufficient number of examples to create an auxiliary benchmarking dataset. We cannot find other candidate datasets, but our approach is applicable to similar ones."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Rationale Collection",
+            "text": [
+                "The task of writing implicit rationales from scratch for logical reasoning questions is not straightforward because the reasoning process can involve multiple steps with differing granularity. Therefore, to facilitate rationale writing, we use answer options in the multiplechoice questions. To answer a question with four options, the reasoning process should involve the rationale of both identifying the correct option and eliminating the three incorrect options. By focusing on the correctness of each option, we can decompose the complex task of rationale writing into smaller intuitive tasks. In addition, we collect human-written free-form rationales to expect benefits over model-generated rationales (Sun et al., 2022), in particular for covering the implicit process of critical reasoning.",
+                "Task Format We also aim to design auxiliary questions so that we can easily evaluate models on both main questions and subquestions in the same task format. To this end, we use four rationales collected for a main question as the four answer options of its subquestion. A single main question has at most four subquestions that share the same set of answer options, which can be seen as questionwise contrastive evaluation (Gardner et al., 2020;Ashida and Sugawara, 2022)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Collecting Rationales",
+            "text": [
+                "We use crowdsourcing to collect rationales for creating our subquestions. Appendix A shows our crowdsourcing instructions and examples.",
+                "Qualification We conduct a two-stage qualification test to recruit crowdworkers for our tasks. The first stage is a QA task to identify workers who carefully answer logical reading comprehension questions. The task consists of ten questions taken from ReClor, and workers achieving \u2265 80% accuracy advance to the next test. In the second stage, workers are presented with a single ReClor question that is randomly sampled from a pool of ten questions. The task is to write four implicit rationales (one sentence each) behind each option's (in)correctness. To guide them, we provide detailed instructions with eight writing examples.",
+                "Through preliminary pilot studies, we define two essential criteria for writing rationales: specificity and necessity. Specificity requires rationales to be well informed and support the corresponding options exclusively. This requirement is crucial because non-specific rationales could support multiple options, rendering them unsuitable for options in subquestions. Necessity emphasizes the importance of ensuring that the rationale is essential for validating the option's correctness. Even if a detailed rationale is provided, it must be aligned with the main question's point to preserve its validity.",
+                "Following these criteria, the authors manually assess the rationales provided by the workers. We identify 57 workers through this qualification process. These workers are invited to both the rationale writing and subsequent validation tasks."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Rationale Writing",
+            "text": [
+                "We take 1,200 questions from the training set of ReClor. As with the second phase of the qualification task, we present workers with a context, question, and four options marked as either correct or incorrect, and then ask workers to write rationale sentences for each option. Of these qualified individuals, 50 were actively engaged in this task. We collect 4,800 rationales in total and send them to the rationale validation step."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Rationale Validation",
+            "text": [
+                "To validate the collected rationales, we first focus on their specificity, which is critical for creating a set of reasonable subquestions about a given main question. Because assessing the necessity of rationales may not be straightforward, we analyze the reasoning types involved in understanding rationales in Section 5.",
+                "For the validation, we conduct an alignment test between a set of rationales and answer options. In this test, workers are presented with one main question, its four options, and one rationale. They are then asked to identify which one of the options is supported by the given rationale. If a rationale is insufficiently detailed and could potentially support other options, it would be difficult for workers to correctly match the rationale to its corresponding option. We ensure that the worker who validates a rationale is different from the one who wrote it.",
+                "This test enables us to refine our initial pool of 4,800 rationales down to 3,828, ensuring that each rationale is sufficiently specific to support its corresponding option."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Subquestion Construction",
+            "text": [
+                "Question Generation We then generate question texts to construct subquestions using a language model. Given one main question and one of its options, the model is instructed to generate a subquestion that asks about the reason for the correctness of the option. For example, when we input the prompt \"What mistake does the argument make in its reasoning?\" and the incorrect answer option \"It confuses probability and certainty,\" the model generates the question \"What evidence is there that the argument does not make the mistake of confusing probability and certainty?\" We use different prompts for the correct and incorrect options to avoid the problem of the model omitting negatives (e.g., \"not\") when generating eliminative subquestions. For the generation, we use Instruct-GPT (text-davinci-003), which is one of the strong large language models. Appendix B shows an example of our prompt.",
+                "Subquestion Construction Coupling the validated rationales with generated question texts, we construct at most four subquestions for a single main question. Each subquestion corresponds to each of the four answer options in the main question. The four answer options of the subquestions are identical to the four rationales written for the main question. The correct answer option of a sub-question is the rationale written for the option that the subquestion is made from.",
+                "A subquestion must have four validated rationales to compose the multiple-choice format. However, when we look at a main question, all four rationales are not always valid, which could largely decrease the number of possible subquestions. To mitigate this issue, we create a subquestion even if three out of the four rationales are valid, by replacing the invalid rationale with the \"None of the above choices\" option. Through this process, we obtain 3,824 subquestions. We discard a main question if it has no valid subquestions."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Human Validation",
+            "text": [
+                "As the final step of our data collection, we validate the answerability of the subquestions by humans. Despite the ensured specificity of rationales, the complexity of the subquestion texts could potentially make the subquestions unanswerable. To address this issue, we ask three workers to answer each subquestion to evaluate its human answerability. A subquestion is considered answerable if at least two workers answer it correctly, or if all workers select \"None of the above choices.\" In the latter scenario, we replace the correct answer in the question with \"None of the above choices.\" This process results in 3,003 answerable subquestions with 943 main questions. We expect the number of questions in our dataset can demonstrate statistical power for meaningful model benchmarking and comparison (Card et al., 2020).",
+                "We then ask different workers to answer the questions, collecting three additional labels for each question to measure human accuracy."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Dataset Statistics",
+            "text": [
+                "Table 1 shows the dataset statistics. Compared to the main questions (ReClor), our subquestions have longer questions and answer options. The subquestions that have \"None of the above choices\" as the correct answer comprise 7.4% (222/3,003) of the dataset, which is comparable to a similar multiplechoice reading comprehension dataset (6.7% in CosmosQA; Huang et al., 2019). We also report the crowdsourcing details in Appendix C."
+            ],
+            "publication_ref": [
+                "b6"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Baseline Performance on RULE",
+            "text": [
+                "We measure the baseline performance of recent state-of-the-art models on our dataset. Because the main purpose of our dataset is to perform an exten- sive evaluation of the models tested on ReClor, we use all of our main questions and subquestions as a test set. Our hypothesis is that if the models can effectively generalize to understand the rationale behind the correct answer, they should exhibit a similar degree of performance on both the main questions and subquestions.",
+                "Evaluation Metrics In addition to the simple accuracy over the main questions (MainQ Accuracy) and subquestions (SubQ Accuracy), we calculate the accuracy across the subquestions written for the correct and incorrect original options (Selective and Eliminative SubQ Accuracy), respectively. We also calculate the Consistency score to see how often a model answers both the main question and all of its subquestions correctly and thereby shows the comprehensive capability of critical reasoning.",
+                "Because the SubQ accuracy is a micro average, we also report a macro average for reference (MainQwise SubQ Accuracy). To compute these scores for humans, we take a majority vote of the three labels for each main question and subquestion."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Models and Settings",
+            "text": [
+                "The models we evaluate are either in the fullyfinetuned setting on the training set of ReClor (excluding our main questions), few-shot of ReClor, and zero-shot that uses only the task instruction.",
+                "Fully-Finetuned Models We use DeBERTa-v3 (large; He et al., 2023) and UnifiedQA-v2 (base, large, and 3B;Khashabi et al., 2020Khashabi et al., , 2022)). Both models are reported to exhibit strong generalization performance on QA datasets.  (text-davinci-003;Ouyang et al., 2022). In the few-shot setting, the input prompt has five Re-Clor exemplars. Because some models only accept a limited length of input, we only report one-shot results of those models. For reference, we report few-shot results using RULE examples. The zeroshot prompt only has the task instruction. We also include Chain-of-Thoughts (CoT; Wei et al., 2022) and zero-shot CoT (Kojima et al., 2022) of Instruct-GPT, providing the models with explanatory examples to potentially enhance their performance. In CoT, the prompt includes ReClor exemplars each of which is followed by the rationale of the correct answer option that is collected in this study."
+            ],
+            "publication_ref": [
+                "b5"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Few-and",
+            "text": [
+                "Appendix D shows examples of our CoT prompt.",
+                "In the few-and zero-shot settings, we follow the test split approach used by Ravichander et al. ( 2022) and split our dataset into five disjoint sets to measure the variability of models' performance. Appendix E describes the details."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results",
+            "text": [
+                "Table 2 presents our main results. In the fullyfinetuned setting, we observe that the SubQ accuracy does not significantly exceed the chance rate (25.0%), which is far below the zero-shot performance of UnifiedQA-v2 as well as the human performance. This degradation may be due to overfitting to ReClor examples, by which the models rely heavily on superficial features of answer options that are not useful in answering the subquestions. In our dataset, a group of subquestions shares the same set of four rationales, which requires that the models closely examine the question texts.",
+                "In the few-and zero-shot settings, we observe that the highest accuracy is 80.3% on the main questions by LLaMA 2 70B with five-shot exemplars of ReClor and 65.7% on the subquestions by Flan-UL2 in the zero-shot setting. Both the MainQ and the SubQ accuracies are lower than the human accuracy by large margins (\u2206 = 11.2%, 16.9%), highlighting a severe limitation in the models' rationale understanding; in most cases, the models may only understand part of the necessary rationales for the comprehension process.",
+                "Although it is not our intended task setting, when we use a part of the subquestions for in-context learning, the highest SubQ accuracy is 70.1% by InstructGPT in the five-shot setting. This result is still below the human accuracy by a noticeable margin. Interestingly, the in-context learning on subquestions is not helpful for smaller models such as Vicuna 7B and 13B.",
+                "Looking at the best Selective and Eliminative SubQ Accuracies, we find that although the former accuracy (five-shot LLaMA 2 70B, 90.0%) is close to the human performance, the latter accuracy (zero-shot Flan-UL2, 59.1%) is significantly below the human performance (78.9%). This contrast shows that answering the eliminative subquestions is difficult for the models, highlighting the limited capacity of LLMs: Even if the models can choose the correct answer option, they may not understand why incorrect answer options should be refuted.",
+                "Consistency and MainQ-wise SubQ Accuracy also conform to this trend. Although the consistency by humans is not high (52.9%), probably owing to the difficulty of the subquestions, a large margin still exists between the human consistency and the best consistency by InstructGPT (18.2%). MainQ-wise SubQ Accuracy provides a bit more intuitive observation: The best model answers only 64.3% of the subquestions per one main question, although humans get them wrong less often (81.5%). We report the detailed number of MainQ-wise SubQ Accuracy in Appendix F.",
+                "Contrary to our expectations, CoT does not improve the performance of InstructGPT. Rather, it leads to a decline in the MainQ and SubQ accuracies. This result is consistent with findings on the unreliable nature of CoT (Wang et al., 2023;Turpin et al., 2023), which may be exposed by the complexity of critical reasoning.",
+                "Does the Model Answer \"None of the above choices\" Questions Correctly? Some of our subquestions contain \"None of the above choices,\" which might make the questions challenging. In particular, the model performance on this type of question might be strongly affected by the incontext learning of exemplars. To investigate this hypothesis, we calculate the accuracy of the subquestions that include the \"None\" option. In the five-shot InstructGPT using RULE examples, we find that although the model achieves 62.7% ac- curacy for the subquestions that have the \"None\" option, it shows 32.0% when \"None\" is the correct answer. This low accuracy is decomposed into 40.9% accuracy if the prompt includes the \"None\" option as the correct answer and 13.7% accuracy otherwise. These results demonstrate that using exemplars helps to answer those questions to some extent but not significantly. Table 3 reports the accuracy of five-shot InstructGPT across the five batches.",
+                "We report the complementary results of the main experiment in Appendix G, in which the one-shot setting does not improve the model performance consistently. Appendix H shows the SubQ accuracy only for the main questions the models answer correctly. Appendix I shows the performance plot across the question and option length."
+            ],
+            "publication_ref": [
+                "b9",
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3",
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "Analysis",
+            "text": [
+                "To qualitatively investigate the models' behavior observed in Section 4, we aim to answer the following research questions.",
+                "Why Are the Eliminative Subquestions Difficult? As discussed in the previous section, we find a performance discrepancy between the selective and eliminative subquestions. We attribute this discrepancy to two potential reasons. First, the eliminative subquestions are inherently complex because of the negation included in their question text, which the models may find difficult to handle (Ravichander et al., 2022). Second, the model may lack the ability to comprehend why certain options are incorrect, which is partially supported by studies that highlight the susceptibility for distractors in the multiple-choice QA (Si et al., 2021).",
+                "To distinguish between the difficulty of comprehending complex questions and that of refuting relevant alternatives in the eliminative subquestions, we develop a follow-up task, rationale alignment. In this task, given a context, the main question, one of the main options, and four rationales, the model selects one out of the four rationales that validates the correctness of the given option. We use Instruct-GPT in the five-shot setting and report the average results from five different prompts. Appendix J provides the input prompt.",
+                "Because the subquestion text is not used in this task, we expect that the results are not affected by the complexity of subquestion texts. The result is 89.7% and 31.5% accuracy for the correct and incorrect answer options, respectively, showing a distinct difference between them. This discrepancy suggests the model's serious deficiency in comprehending eliminative rationales.",
+                "Is the Model Better at Writing Rationales than Humans? Given that CoT does not improve the model performance, we are interested in the quality and potential usefulness of model-generated rationales compared to our human-written rationales. We use a similar prompt to that used in our CoT setting, instructing InstructGPT to generate rationales for 50 options. We then randomly shuffle the order of human-written and model-generated rationales, and manually annotate which rationale is better in terms of necessity and specificity. The result is 35 wins by humans and 15 wins by the model among the 50 comparisons, showing that the human-written rationales are likely to be more detailed and supportive than the model-generated ones. In particular, we find that the model rationales struggle to capture the implicit rationale necessary for certifying the validity of the target option. When the rationale is explicit and described well in the context, the model rationale looks convincing and close to the human rationale. Among the 15 examples where humans lose, we find five examples unsatisfactory to validate the target option, implying that approximately 10% of unreasonable rationales are potentially included in our dataset.",
+                "What Types of Reasoning are Required in the Rationale Understanding? To qualitatively analyze the collected rationales, we first sample 100 subquestions to annotate reasoning types. We define two dichotomies: direct/indirect and contextual/external. Direct reasoning occurs if a rationale involves an explicit description for the certification of a target option's (in)validity, whereas indirect reasoning only provides relevant facts for the validity. Context reasoning includes facts (or their interpretation and summarization) described in the context, while external reasoning is pertinent to commonsense and norms that are not described in the context. For comparative error analysis, we also sample 100 subquestions among those that InstructGPT answers incorrectly. We report our annotation results in Table 4. The number of the direct and contextual rationales is the largest among the other types, which further increases when we look at the error cases of In-structGPT. We find that our dataset covers a sufficient number of indirect and external reasoning, i.e., various modes of rationale understanding. Error examples for the four reasoning types are reported in Appendix K. Although we also examine the reasoning types originally labeled in the ReClor dataset, we do not observe any remarkable trends in the subquestion accuracy (Appendix L).",
+                "Do the Rationales Help the Model to Answer the Main Questions? Because the collected rationales are expected to support the decision of selecting and eliminating answer options, we investigate whether adding the rationales to the main questions improves the performance in the five-shot Instruct- GPT. We append the rationale to the context, main question, and four options with the Rationale: label. The results are shown in Table 5. We observe an improvement when the selective rationale is added; however, degradation occurs when we add the eliminative rationale, even if it is provided with the selective rationale. This result adds insight to the observation by Sun et al. (2022), showing that the model cannot use eliminative rationales for answering main questions and becomes confused by those rationales. We also investigate the context-ablated setting in Appendix M."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_5",
+                "tab_6"
+            ]
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "We construct a dataset to evaluate the models' ability of critical reasoning in logical reading comprehension. We crowdsource free-form rationale for main questions taken from an existing dataset and use an LLM to generate subquestion texts. Resulting questions ask about the underlying rationales for why a certain answer option should be selected and the others should be eliminated. We find that LLMs are particularly bad at answering eliminative subquestions, highlighting that those models do not necessarily have the comprehensive ability of critical reasoning. For future work, we will develop a more efficient pipeline for data collection and facilitate better rationale generation by LLMs."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethical Consideration",
+            "text": [
+                "We use crowdsourcing in our data collection. We make sure to be responsible to the crowdworkers and to make fair compensation for their work. We do not collect any personal information other than worker IDs on the platform, which are removed in our data release. Before the workers accept our tasks, we inform them of our purpose for the data collection. This study is approved by the internal review board of the authors' institutes."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "We recognize the following limitations in this study.",
+                "Task Format In this study, we focus on the multiple-choice QA task. This task format allows us to flexibly ask about various linguistic phenomena and human reasoning by selecting and eliminating alternatives, and we consider solving such a discriminative task would be a minimal requirement for human-like linguistic behaviors. However, it has an inherent limitation in assessing the ability of natural language understanding. For example, we cannot evaluate the models' ability to produce an intended output.",
+                "Annotation Analysis We conduct the annotation analysis in Section 5, in which we define the reasoning types and manually review the sampled examples. Although we make our annotation data and guideline publicly available for ensuring the reproducibility of annotation results, the results of our annotation analysis inevitably involve our subjective judgments.",
+                "Source Dataset We create our auxiliary questions on top of an existing English logical reading comprehension dataset, ReClor. Although our methodology of the data collection (i.e., writing the rationale for selecting and eliminating alternatives) is widely applicable to other datasets and languages, using the single dataset in the single language would limit the generalizability of our findings. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Question Generation Prompt",
+            "text": [
+                "Figure 14 shows an example of our prompt used for generating subquestions in Section 3.3."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_3"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "C Crowdsourcing Details",
+            "text": [
+                "To access a pool of crowdworkers, we used Amazon Mechanical Turk. The crowdworkers who took the qualification test are based in the United States, United Kingdom, or Canada, have an approval rate of at least 98%, and have at least 1,000 approved tasks. We ensure that the average payments exceed $12.00 USD per hour for each task. The rationale writing task costs $2.00 per main question (estimating that it takes seven to ten minutes to write the rationales), the rationale validation task costs $0.30 per rationale (one minute), and the human validation task $1.50 per five questions (five minutes). The rationale writing tasks, rationale validation tasks, QA validation tasks, and human performance tasks are taken by 48, 39, 52, and 24 workers, respectively. We use the crowdsourcing tool used in Nangia et al. ( 2021)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "D Chain-of-Thought Prompt",
+            "text": [
+                "Figure 15 shows an example of the prompt used in our chain-of-thought experiment. We insert the rationale between the Answer: label and the correct option label, with an expectation that it would help the model (InstructGPT) select the correct option."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "E Test Split Setting",
+            "text": [
+                "The in-context learning performance of LLMs may vary depending on the exemplars of the prompt, but it incurs a high computational cost (or financial cost for proprietary models) if we repeatedly evaluate the models on the entire dataset using various sets of different exemplars to take the average performance. Because of this cost limitation, we follow the test split approach used by Ravichander et al. ( 2022), splitting our dataset into five disjoint sets and testing the models on each set with different exemplars to measure the performance variance across the disjoint sets. Note that we do not split the set of the main questions, because it has only 943 examples; hence, in the few-shot setting, we take the average across five runs on all main questions. In the few-shot setting using ReClor, we sample questions disjointly from its training set, whereas  in using RULE, the exemplars are sampled from the corresponding disjoint set."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "F MainQ-wise SubQ Results of InstructGPT",
+            "text": [
+                "Because a single main question has multiple subquestions in our dataset, we report the detailed numbers of correctly-answered SubQ by Instruct-GPT in Figure 3. Table 6: Complementary results of the model performance on our dataset including the models in the one-shot setting and omitting those in the five-shot and zero-shot settings."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "G Complementary Few-Shot and Zero-Shot Results",
+            "text": [
+                "In Table 6, we report the complementary results of few-shot settings, including the models on the one-129    shot setting. We also report the results of LLaMA (7B to 65B; Touvron et al., 2023a) for reference."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "H Main Results of the Subquestions for the Correctly-Answered Main Questions",
+            "text": [
+                "Table 8 shows the main results of the model performance on the subquestions for the main questions that are correctly answered by the model. Overall, we observe similar trends to the main results with the standard SubQ accuracy. Interestingly, the models' SubQ accuracies do not significantly improve even when we focus only on the correctly-answered main questions."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_10"
+            ]
+        },
+        {
+            "heading": "I Relationship between Question and Option Length and Model Performance",
+            "text": [
+                "In Figures 4 to 10, we plot the distribution of the questions and options length and the model performance according to those lengths."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "J Rationale Alignment Task",
+            "text": [
+                "In the rationale alignment task, we test Instruct-GPT in the five-shot setting. Similar to the main experiment, we report the average results from five prompts. Each prompt is composed of five exemplars, with two exemplars presenting the correct option and three exemplars presenting the incorrect option. Figure 12 shows an example of our prompt.",
+                "The results with and without the task instruction are shown in Table 7. The performance gap between the correct and incorrect options implies that such advanced models may simply infer the correct answer without properly discriminating against incorrect options. Such a situation raises two issues: (1) the inability to reason logically like a human, and (2) the limitations of ability measurement using distractors. The first issue suggests that the model may not be able to make a clear distinction between what is correct and what is incorrect. The second issue is that the alternatives in the multiple-choice QA task are generally expected to distinguish between test takers with and without sufficient knowledge (Gierl et al., 2017), but such an expectation may not be met in our dataset."
+            ],
+            "publication_ref": [
+                "b3"
+            ],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": [
+                "tab_9"
+            ]
+        },
+        {
+            "heading": "K Reasoning Type Annotation",
+            "text": [
+                "Table 10 shows examples of reasoning types we define in the annotation analysis. See Table 11 for a full example that has the main question and two subquestions."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1",
+                "tab_13"
+            ]
+        },
+        {
+            "heading": "L ReClor Reasoning Types and Subquestion Accuracy",
+            "text": [
+                "Figure 13 shows the relation between the subquestion accuracy and the reasoning types defined in the original ReClor dataset. Although we do not observe significant performance differences, we see higher accuracy in Match Structures, Evaluation, Strengthen, and Weaken reasoning, and lower accuracy in Sufficient Assumptions, Technique, and Role reasoning."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "M Context-Ablation Analysis",
+            "text": [
+                "We try to answer the question \"Does the context help in answering subquestions?\" in the contextablation setting. By removing the context, we analyze the model performance on the subquestions (and the main questions for reference) to see the dependency between question texts and answer options. The results in Table 9 show the performance reduction by approximately 4 points in the zeroshot setting and no reduction in the five-shot setting. This result implies question texts depend on answer options to some extent, which potentially makes the subquestions difficult for the models, given the first analysis in this section."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_11"
+            ]
+        },
+        {
+            "heading": "N Similarity of Rationale with MainQ Option",
+            "text": [
+                "In our process to validate specificity, even if a rationale has the same meaning as the MainQ's option, we can not exclude it. This implies that some rationales might have the similar meaning as the option and not serve as a valid rationale. To examine this potential issue, we sample 50 random questions from both the selective SubQ and the eliminative SubQ. We then count how many of these rationales are semantically similar to the MainQ's option. We found three such instances in the selective SubQ and one in the eliminative SubQ, which are shown in Table 12. 132",
+                "In a given context, you'll be given a question, an answer, and four rationales. Your task is to identify the rationale that explains the correctness of the provided option the best. If the option is wrong, choose the rationale that explains why it is wrong. Conversely, if the option is correct, choose the rationale that explains why it is correct.",
+                "Context: Teachers should not do anything to cause their students to lose respect for them. And students can sense when someone is trying to hide his or her ignorance. Therefore, a teacher who does not know the answer to a question a student has asked should not pretend to know the answer. Question: The conclusion is properly drawn if which one of the following is assumed? Question: The conclusion is properly drawn if which one of the following is assumed?",
+                "Option: Students' respect for a teacher is independent of the amount of knowledge they attribute to that teacher. Rationale0: The ranking of students' respect for honesty is not relevant to the conclusion of a teacher shouldn't pretend to know an answer to question they don't know the answer to."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_14"
+            ]
+        },
+        {
+            "heading": "Rationale1:",
+            "text": [
+                "The assumption is that students' respect for the teacher is based on how much knowledge the teacher has. Rationale2: The conclusion is that teachers shouldn't pretend to know the answer to a question that they don't know, so the assumption is that student's respect for a teacher is interlinked to the student's perceived knowledge of the teacher. Rationale3: The conclusion does not have anything to do with a teacher being effective.",
+                "Answer: The answer is Rationale2",
+                "Context: Miguel has four family members who plan to come to his graduation on Sunday afternoon, but it is likely that only three of them will be allowed to attend.",
+                "Normally graduation is held in the football stadium, where there is no limit on the number of family members who can attend. However, the ceremony is relocated to the gymnasium if it rains, and each graduate receives just three admission tickets for use by family members."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Question:",
+            "text": [
+                "The conclusion of the argument is most strongly supported if which one of the following is assumed?",
+                "Option: The weather service has indicated that there is a very high likelihood of rain on Sunday afternoon."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Rationale0:",
+            "text": [
+                "No mention is made of whether un-needed spaces can be transferred between students, and so this cannot be assumed to impact the number of spaces available to Miguel's family. Rationale1: Abnormally large class size may not preclude Miguel from having more than three family members attend, as the football stadium is a possible venue and has no limitation on the number who may attend. Rationale2: A family member who cannot attend the graduation has no relevance to how many may be allowed to attend. Rationale3: Rain would preclude the use of the stadium which has no limit of the number of family members attending and force the use of the gymnasium, which limits the number attending to three.",
+                "Answer: The answer is Rationale3",
+                "[\u2026]",
+                "Exemplars with Task Instruction"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Test Instance",
+            "text": [
+                "Context: Because it permits a slower and more natural rhythm of life, living in the country is supposed to be more healthy and relaxed than living in the city. But surveys show that people living in the country become ill as often and as seriously as people living in the city, and that they experience an equal amount of stress."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Question:",
+            "text": [
+                "The statements above, if true, provide the most support for which one of the following?",
+                "Rationale0: This passage kind of disputes this line of thinking, living in the country should have a slower rhythm yet they experience the same amount of stress as a city dweller. Rationale1: This passage is not saying this specifically, just that a natural rhythm might not have as many benefits as people want to believe."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Rationale2:",
+            "text": [
+                "The passage kind of focuses on both the thoughts that living in the country should be healthier but surveys show that it is not the case.  "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Direct External",
+            "text": [
+                "A just government never restricts the right of its citizens to act upon their desires except when their acting upon their desires is a direct threat to the health or property of other of its citizens.",
+                "Which one of the following judgments most closely conforms to the principle cited above?",
+                "A just government would not censor writings of Shakespeare, but it could censor magazines and movies that criticize the government.",
+                "FALSE A just government would not censor magazines and movies that criticize the government because these things do not threaten the health or property of its citizens."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Indirect Contextual",
+            "text": [
+                "Doctor: The practice of using this therapy to treat the illness cannot be adequately supported by the claim that any therapy for treating the illness is more effective than no therapy at all. What must also be taken into account is that this therapy is expensive and complicated.",
+                "Which one of the following most accurately expresses the main point of the doctor's argument?",
+                "The therapy's possible effectiveness in treating the illness is not sufficient justification for using it. TRUE Therapy's other costs must be considered before enlisting the treatment as it is not cheap and not simple."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Indirect External",
+            "text": [
+                "On average, corporations that encourage frequent social events in the workplace show higher profits than those that rarely do. This suggests that the EZ Corporation could boost its profits by having more staff parties during business hours.",
+                "Which one of the following, if true, most weakens the argument above?",
+                "Frequent social events in a corporate workplace leave employees with less time to perform their assigned duties than they would otherwise have. FALSE Frequent social events in a corporate workplace can reenergize employees, like a lunch break does.",
+                "Table 10: Examples of the reasoning types with a passage, a question, an option, the correctness of the option, and its human-written rationale.",
+                "Combine Question and Option and generate a new sentence that asks the reason as follows.",
+                "Question: Which one of the following is an assumption required by the department store manager's argument? Option: Either few customers would want free gift wrapping or most customers would want it. Answer: Which of the following reasoning justifies that the department store manager's argument requires the assumption that either few customers would want free gift wrapping or most customers would want it? Question: The main point made in Kim's argument is that Option: replacing gasoline-powered cars with battery-powered electric cars will require building more generating facilities. Answer: Why is it valid to conclude that Kim's argument focuses on the claim that replacing gasoline-powered cars with battery-powered electric cars will require building more generating facilities? Question: The argument's conclusion follows logically if which one of the following is assumed? Option: A work of science fiction cannot achieve greatness unless it contains compelling characters. Answer: Why does the argument's conclusion follow logically if it is assumed that a work of science fiction cannot achieve greatness unless it contains compelling characters? Paragraph: Trisha: Today' s family is declining in its ability to carry out its functions of child-rearing and providing stability for adult life. There must be a return to the traditional values of commitment and responsibility. Jerod: We ought to leave what is good enough alone. Contemporary families may be less stable than traditionally, but most people do not find that to be bad. Contemporary criticisms of the family are overblown and destructive."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "MainQ",
+            "text": [
+                "Question: Trisha and Jerod disagree over whether the institution of the family is Options: 1) valued by most people. 2) changing over time.",
+                "3) adequate as it is. 4) no longer traditional."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Selective SubQ",
+            "text": [
+                "Question: What is the source of the disagreement between Trisha and Jerod regarding whether the institution of the family is adequate as it is? Options:",
+                "1) The argument does not mention value to the people. 2) Trisha is arguing that things were better with traditional families and Jerod is arguing that they are good now, the argument is about the quality of the relationship now.",
+                "3) Both Trisha and Jerod agree that families are no longer traditional, this is not what the argument is about. 4) None of the above choices."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Eliminative SubQ",
+            "text": [
+                "Question: What evidence is there to suggest that Trisha and Jerod's disagreement over whether the institution of the family is no longer traditional is not valid? Options: 1) Both Trisha and Jerod agree that families are no longer traditional, this is not what the argument is about. 2) Trisha is arguing that things were better with traditional families and Jerod is arguing that they are good now, the argument is about the quality of the relationship now.",
+                "3) The argument does not mention value to the people. 4) None of the above choices. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Question Type Option Rationale",
+            "text": [
+                "Selective Delays in the communication of discoveries will have a chilling effect on scientific research. Delays in communicating discoveries would limit the time other scientists have to investigate and contribute. Kimmy is a highly compensated and extremely popular television and movie actress.",
+                "All the information in the passage indicates that Kimmy is affluent and renowned. Before new therapeutic agents reach the marketplace, they do not benefit patients.",
+                "The passage states that new therapies aid patients only after they are introduced to the marketplace."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Eliminative",
+            "text": [
+                "The speed of eye orientation correlates with intelligence, not overall health.",
+                "The speed at which one can orient one's eye to a stimulus has been closely associated with overall health. Context: Teachers should not do anything to cause their students to lose respect for them. And students can sense when someone is trying to hide his or her ignorance. Therefore, a teacher who does not know the answer to a question a student has asked should not pretend to know the answer. Question: The conclusion is properly drawn if which one of the following is assumed? Option0: Students respect honesty above all else. Option1: Students lose respect for teachers whenever they sense that the teachers are trying to hide their ignorance. Option2: Students' respect for a teacher is independent of the amount of knowledge they attribute to that teacher. Option3: A teacher cannot be effective unless he or she retains the respect of students."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Answer:",
+            "text": [
+                "The assumption is that students' respect for the teacher is based on how much knowledge the teacher has. Therefore the answer is Option1",
+                "Context: Miguel has four family members who plan to come to his graduation on Sunday afternoon, but it is likely that only three of them will be allowed to attend. Normally graduation is held in the football stadium, where there is no limit on the number of family members who can attend. However, the ceremony is relocated to the gymnasium if it rains, and each graduate receives just three admission tickets for use by family members. Question: The conclusion of the argument is most strongly supported if which one of the following is assumed? Option0: Miguel has several friends who have fewer than three family members coming to graduation. Option1: Miguel's graduating class is much larger than usual. Option2: Miguel has a fifth family member who is unable to come to his graduation. Option3: The weather service has indicated that there is a very high likelihood of rain on Sunday afternoon.",
+                "Answer: Rain would preclude the use of the stadium which has no limit of the number of family members attending and force the use of the gymnasium, which limits the number attending to three. Therefore the answer is Option3 [\u2026] Exemplars with CoT"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Test Instance",
+            "text": [
+                "Context: Because it permits a slower and more natural rhythm of life, living in the country is supposed to be more healthy and relaxed than living in the city. But surveys show that people living in the country become ill as often and as seriously as people living in the city, and that they experience an equal amount of stress. Question: The statements above, if true, provide the most support for which one of the following? Option0: Living in the country is neither healthier nor more relaxing than living in the city. Option1: The amount of stress a person experiences depends on that person's rhythm of life. Option2: People whose rhythm of life is slow and natural recover quickly from illness.       "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Solve reading comprehension questions!",
+            "text": [
+                "This is a HIT of answering multiple choice reading comprehension questions. Spend up to five minutes for answering five questions (no rejection happens). You can take up to 30 HITs for this batch.",
+                "Passage 1 / 3 1. uses as evidence a source that there is reason to believe is unreliable 2. fails to consider that several different effects may be produced by a single cause 3. treats one main factor considered in the selection of plays to perform as though it were a condition that must be met in order for a play to be selected 4. takes a condition necessary for a playwright's being critically acclaimed to be a condition sufficient for a playwright's being critically acclaimed 5.",
+                "Clark: Our local community theater often produces plays by critically acclaimed playwrights. In fact, the production director says that critical acclaim is one of the main factors considered in the selection of plays to perform. So, since my neighbor Michaela' s new play will be performed by the theater this season, she must be a critically acclaimed playwright."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Question",
+            "text": [
+                "The reasoning in Clark's argument is most vulnerable to criticism on the grounds that the argument Options Invalid or unanswerable question Go to the next passage "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgments",
+            "text": [
+                "We would like to thank the anonymous reviewers for their helpful comments. This work was supported by JST PRESTO Grant Number JP-MJPR20C4 and JSPS KAKENHI Grant Number 22K17954."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluate explanation for reading comprehension Instructions",
+            "text": [
+                "In this task, you are given a passage, question about it, and four answer options where one option is the correct answer and the others are incorrect (the check and cross marks indicate it). In addition, you are given a rationale, which corresponds to one of the options and its correctness. You are asked to answer which option the given rationale corresponds to by checking the radio button. You can accept up to 160 HITs for this batch.",
+                "Passage 1 / 1 Match the Rationale \u2192 Completed A university study reported that between 1975 and 1983 the length of the average workweek in a certain country increased significantly. A governmental study, on the other hand, shows a significant decline in the length of the average workweek for the same period. Examination of the studies shows, however, that they used different methods of investigation; thus there is no need to look further for an explanation of the difference in the studies' results."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Question",
+            "text": [
+                "The argument's reasoning is flawed because the argument fails to Options \u274c recognize that varying economic conditions result in the average workweek changing in length \u2705 recognize that two different methods of investigation can yield identical results \u274c distinguish between a study produced for the purposes of the operation of government and a study produced as part of university research \u274c distinguish between a method of investigation and the purpose of an investigation Rationale It does not fail to distinguish the different studies, it blatantly says that one study was a university and one was by the government.",
+                "Answer which option corresponds to the ratinale! Submit your answer "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Explanations for Common-senseQA: New Dataset and Models",
+            "journal": "Long Papers",
+            "year": "2021",
+            "authors": "Shourya Aggarwal; Divyanshu Mandowara; Vishwajeet Agrawal; Dinesh Khandelwal; Parag Singla; Dinesh Garg"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Shortcut learning in deep neural networks",
+            "journal": "Nature Machine Intelligence",
+            "year": "2020",
+            "authors": "Robert Geirhos; J\u00f6rn-Henrik Jacobsen; Claudio Michaelis; Richard Zemel; Wieland Brendel; Matthias Bethge; Felix A Wichmann"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Did aristotle use a laptop? a question answering benchmark with implicit reasoning strategies",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Mor Geva; Daniel Khashabi; Elad Segal; Tushar Khot; Dan Roth; Jonathan Berant"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Developing, analyzing, and using distractors for multiple-choice tests in education: A comprehensive review",
+            "journal": "Review of Educational Research",
+            "year": "2017",
+            "authors": "Mark Gierl; Okan Bulut; Qi Guo; Xinxin Zhang"
+        },
+        {
+            "ref_id": "b4",
+            "title": "The argument reasoning comprehension task: Identification and reconstruction of implicit warrants",
+            "journal": "Long Papers",
+            "year": "2018",
+            "authors": "Ivan Habernal; Henning Wachsmuth; Iryna Gurevych; Benno Stein"
+        },
+        {
+            "ref_id": "b5",
+            "title": "DeBERTav3: Improving deBERTa using ELECTRAstyle pre-training with gradient-disentangled embedding sharing",
+            "journal": "",
+            "year": "2023",
+            "authors": "Pengcheng He; Jianfeng Gao; Weizhu Chen"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Cosmos QA: Machine reading comprehension with contextual commonsense reasoning",
+            "journal": "",
+            "year": "2019",
+            "authors": "Lifu Huang; Le Ronan; Chandra Bras; Yejin Bhagavatula;  Choi"
+        },
+        {
+            "ref_id": "b7",
+            "title": "MetaLogic: Logical reasoning explanations with finegrained structure",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yinya Huang; Hongming Zhang; Ruixin Hong; Xiaodan Liang; Changshui Zhang; Dong Yu"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Language models don't always say what they think: Unfaithful explanations in chain-of-thought prompting",
+            "journal": "",
+            "year": "2023",
+            "authors": "Miles Turpin; Julian Michael; Ethan Perez; Samuel R Bowman"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Towards understanding chain-of-thought prompting: An empirical study of what matters",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Boshi Wang; Sewon Min; Xiang Deng; Jiaming Shen; You Wu; Luke Zettlemoyer; Huan Sun"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Logic-driven context extension and data augmentation for logical reasoning of text",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Siyuan Wang; Wanjun Zhong; Duyu Tang; Zhongyu Wei; Zhihao Fan; Daxin Jiang; Ming Zhou; Nan Duan"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Chain-of-thought prompting elicits reasoning in large language models",
+            "journal": "Curran Associates, Inc",
+            "year": "2022",
+            "authors": "Jason Wei; Xuezhi Wang; Dale Schuurmans; Maarten Bosma; Fei Xia; Ed Chi; V Quoc; Denny Le;  Zhou"
+        },
+        {
+            "ref_id": "b12",
+            "title": "HotpotQA: A dataset for diverse, explainable multi-hop question answering",
+            "journal": "",
+            "year": "2018",
+            "authors": "Zhilin Yang; Peng Qi; Saizheng Zhang; Yoshua Bengio; William Cohen; Ruslan Salakhutdinov; Christopher D Manning"
+        },
+        {
+            "ref_id": "b13",
+            "title": "ReClor: A reading comprehension dataset requiring logical reasoning",
+            "journal": "",
+            "year": "2020",
+            "authors": "Weihao Yu; Zihang Jiang; Yanfei Dong; Jiashi Feng"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Analytical reasoning of text",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Wanjun Zhong; Siyuan Wang; Duyu Tang; Zenan Xu; Daya Guo; Yining Chen; Jiahai Wang; Jian Yin; Ming Zhou; Nan Duan"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Statistical records of crime rates probably often reflect as much about the motives and methods of those who compile or cite them [...]. The police may underreport crime [...] or overreport crime [...]. Politicians may magnify crime rates to [...]. Newspapers often sensationalize [...].",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 1 :1Figure 1: Example of ReClor(Yu et al., 2020) and its subquestion we create to test the understanding of implicit rationale. We find that even if the model can answer the original question correctly, it cannot answer subquestions that should be answerable.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :3Figure 3: Distribution of correctly answered subquestions (C) out of the total number of subquestions (N ), for both InstructGPT (top) and humans (bottom).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 4 :4Figure 4: Distribution of the question length (#tokens) of the main questions.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "57",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 5 :Figure 7 :57Figure 5: Comparison between the model and human accuracy and question length for the main questions.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 9 :9Figure 8: Distribution of the option length (#tokens) of the main questions.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 10 :10Figure 10: Comparison between the model and human accuracy and option length for the subquestions.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "Figure 11 :11Figure 11: Distribution of the option length (#tokens) of the subquestions.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1213",
+            "figure_type": "figure",
+            "figure_id": "fig_8",
+            "figure_caption": "Figure 12 :Figure 13 :1213Figure 12: Example of the prompt used for rationale alignment task.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_9",
+            "figure_caption": "Figure 14: Example of the prompt used to generate subquestions.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_10",
+            "figure_caption": "Figure 15: Example of the prompt using the chain-of-thought approach.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "16",
+            "figure_type": "figure",
+            "figure_id": "fig_11",
+            "figure_caption": "Figure 16 :16Figure 16: Instructions for the rationale writing task (1/4).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_12",
+            "figure_caption": "136",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "17",
+            "figure_type": "figure",
+            "figure_id": "fig_13",
+            "figure_caption": "Figure 17 :17Figure 17: Instructions for the rationale writing task (2/4).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "20",
+            "figure_type": "figure",
+            "figure_id": "fig_14",
+            "figure_caption": "Figure 20 :20Figure 20: Rationale writing task interface. The workers are given a context, question, and four options along with their correctness, and are asked to provide a rationale for each choice.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_15",
+            "figure_caption": "140",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "21",
+            "figure_type": "figure",
+            "figure_id": "fig_16",
+            "figure_caption": "Figure 21 :21Figure 21: Instructions for the rationale validation task.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "23",
+            "figure_type": "figure",
+            "figure_id": "fig_17",
+            "figure_caption": "Figure 23 :23Figure 23: Human validation task interface. The workers asked to answer subquestions.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Dataset statistics of our RULE dataset. S/E indicates the numbers of two types of subquestions written about the correct (selective) or incorrect (eliminative) options of their main questions, respectively. The question and option lengths of the main questions are separately reported in parentheses for comparison. \"None\" denotes \"None of the above choices.\"",
+            "figure_data": "# Main / Sub Questions943 / 3,003# SubQ / MainQ3.18# Selective / Eliminative (S/E)785 / 2,218Avg. context length73.8Avg. question length31.4 (15.5)Avg. option length23.5 (17.7)Avg. correct option length24.0 (18.6)# Question vocabulary8,843 (1,085)# Option vocabulary9,849 (9,652)# SubQ w/ \"None\" (# answer)1,102 (222)"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Zero-Shot Models We include recent LLMs such as Chung et al.,   ",
+            "figure_data": "2022), Flan-UL2 (20B; Tay et al., 2023), Vi-cuna (7B and 13B; Chiang et al., 2023), LLaMA2 (7B to 70B; Touvron et al., 2023b), Mis-tral (7B; Jiang et al., 2023) and InstructGPT"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "",
+            "figure_data": "Model# ParamMainQ Acc.SubQ Acc.Selective SubQ Acc.Eliminative SubQ Acc.Consist.MainQ-wise SubQ Acc.DEBERTA-V3-LARGE UNIFIEDQA-V2-BASE UNIFIEDQA-V2-LARGE UNIFIEDQA-V2-3B VICUNA 13B FLAN-UL2 INSTRUCTGPT INSTRUCTGPT + COT LLAMA2 13B LLAMA2 70B MISTRAL 7B VICUNA 13B FLAN-UL2 INSTRUCTGPT LLAMA2 13B LLAMA2 70B MISTRAL 7B UNIFIEDQA-V2-3B UNIFIEDQA-V2-11B FLAN-T5-XXL VICUNA 13B FLAN-UL2 INSTRUCTGPT INSTRUCTGPT+ COT LLAMA2 13B LLAMA2 70B MISTRAL 7B304M 220M 770M 3B 13B 20B N/A N/A 13B 70B 7B 13B 20B N/A 13B 70B 7B 3B 11B 11B 13B 20B N/A N/A 13B 70B 7BFully Finetuned on ReClor 33.1 56.1 25.8 21.3 25.0 19.9 25.3 21.8 Five-Shot on ReClor 46.2\u00b10.7 66.0 40.5 57.7 66.8 50.0\u00b14.4 78.2\u00b13.0 58.5\u00b10.3 65.5\u00b15.1 88.0\u00b14.0 71.8\u00b11.0 65.3\u00b11.8 88.4\u00b12.5 67.8\u00b10.5 63.2\u00b12.1 88.5\u00b12.5 48.5\u00b12.5 44.6\u00b13.2 75.3\u00b13.4 80.3\u00b10.4 60.0\u00b12.6 90.0\u00b11.1 59.9\u00b10.9 55.3\u00b13.4 83.6\u00b13.4 Five-Shot on RULE (for reference) 43.9\u00b11.3 44.2\u00b12.7 72.6\u00b12.6 57.9\u00b10.2 66.0\u00b14.9 87.7\u00b14.6 70.2\u00b10.4 70.1\u00b12.3 90.0\u00b13.5 47.7\u00b13.0 46.3\u00b14.0 80.0\u00b12.1 78.9\u00b10.6 64.0\u00b14.8 90.6\u00b12.5 58.2\u00b11.6 57.5\u00b15.4 88.1\u00b13.0 Zero-Shot 45.5 47.9\u00b12.1 71.6\u00b12.9 55.2 57.3\u00b12.7 74.8\u00b15.2 60.0 64.3\u00b14.0 86.2\u00b15.4 44.2 49.5\u00b12.7 77.1\u00b11.7 56.2 65.7\u00b15.2 84.5\u00b14.4 64.1 62.8\u00b12.2 89.9\u00b12.0 63.8 62.3\u00b11.0 89.6\u00b11.5 43.8 44.4\u00b13.0 75.3\u00b13.1 70.8 58.0\u00b13.7 88.1\u00b13.4 54.0 55.9\u00b13.2 85.9\u00b12.025.0 27.4 26.8 26.6 40.1\u00b14.6 57.6\u00b15.4 57.1\u00b11.5 54.2\u00b12.8 33.8\u00b14.0 49.4\u00b12.9 45.4\u00b13.6 34.2\u00b12.6 58.4\u00b15.0 63.0\u00b12.0 34.4\u00b14.7 54.6\u00b15.5 46.7\u00b17.3 39.4\u00b12.2 51.1\u00b12.7 56.5\u00b13.3 39.7\u00b12.7 59.1\u00b15.1 53.2\u00b12.1 52.6\u00b11.5 33.5\u00b12.5 47.3\u00b14.0 45.3\u00b13.62.4 0.7 1.4 1.4 5.6 16.9 18.2 17.2 5.3 17.7 9.0 4.1 17.8 23.1 5.1 21.1 9.4 5.7 9.7 14.7 6.2 14.7 15.5 14.2 4.7 14.1 8.632.8 26.0 24.7 25.2 49.4 64.3 64.0 61.8 44.7 59.3 54.4 44.0 64.9 69.2 47.1 63.5 57.2 47.8 56.5 63.4 49.4 64.2 61.8 61.2 44.5 57.3 55.0HUMAN-91.582.693.078.952.981.5#170.1010.3#269.7025.9#372.900.0#471.3143.8#566.0140.6Avg.70.10.432.0"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Accuracy of the subquestions that have \"None of the above choices\" as the correct answer (None Acc), compared to that of all subquestions (Acc). None in shot indicates how many \"None\" examples are included in the few-shot prompt for each test split.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Annotation results of rationale types on 100 examples randomly sampled from all subquestions (left) and from the error examples by InstructGPT (right).",
+            "figure_data": "Direct Indirect TotalContextual 37 / 47 28 / 22 65 / 69External22 / 20 13 / 11 35 / 31Total59 / 67 41 / 33100"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "MainQ accuracy of InstructGPT that uses the selective or eliminative rationales in the input.",
+            "figure_data": "InputAccuracyContext72.2+ Selective Rationale91.4+ Eliminative Rationale66.0+ Both89.6"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "Result of the rationale alignment task with and without the task instruction.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "Main results of the model performance on our dataset focusing on the subquestions for the main questions that are correctly answered by the model.",
+            "figure_data": "Model# ParamMainQ Acc.SubQ Acc.Selective SubQ Acc.Eliminative SubQ Acc.Consist.MainQ-wise SubQ Acc.DEBERTA-V3-LARGE UNIFIEDQA-V2-BASE UNIFIEDQA-V2-LARGE UNIFIEDQA-V2-3B FLAN-UL2 LLAMA 7B LLAMA 13B LLAMA 33B LLAMA 65B VICUNA 7B VICUNA 13B INSTRUCTGPT INSTRUCTGPT + COT LLAMA2 13B LLAMA2 70B MISTRAL 7B FLAN-UL2 LLAMA 7B LLAMA 13B LLAMA 33B LLAMA 65B VICUNA 7B VICUNA 13B INSTRUCTGPT INSTRUCTGPT + COT LLAMA2 13B LLAMA2 70B MISTRAL 7B UNIFIEDQA-V2-BASE UNIFIEDQA-V2-LARGE UNIFIEDQA-V2-3B UNIFIEDQA-V2-11B FLAN-T5-XXL FLAN-UL2 LLAMA 7B LLAMA 13B LLAMA 33B LLAMA 65B VICUNA 7B VICUNA 13B INSTRUCTGPT INSTRUCTGPT + COT LLAMA2 13B LLAMA2 70B MISTRAL 7B304M 220M 770M 3B 20B 7B 13B 33B 65B 7B 13B N/A N/A 13B 70B 7B 20B 7B 13B 33B 65B 7B 13B N/A N/A 13B 70B 7B 220M 770M 3B 11B 11B 20B 7B 13B 33B 65B 7B 13B N/A N/A 13B 70B 7BFully Finetuned on ReClor 33.1 60.4 25.8 19.7 25.0 17.3 25.3 19.9 Five-Shot on ReClor 58.5\u00b10.3 66.0 40.5 57.7 66.8 66.3\u00b16.3 89.6\u00b14.6 25.8\u00b11.6 28.5\u00b17.5 34.3\u00b112.2 38.7\u00b12.7 37.0\u00b14.0 65.0\u00b16.7 58.5\u00b11.2 47.7\u00b14.2 77.5\u00b16.3 69.1\u00b10.9 54.4\u00b11.7 85.5\u00b12.8 33.4\u00b12.6 40.0\u00b15.1 62.7\u00b16.9 46.2\u00b10.7 48.5\u00b16.1 76.0\u00b18.8 71.8\u00b11.0 64.1\u00b13.5 89.2\u00b13.8 67.8\u00b10.5 62.9\u00b13.1 89.5\u00b14.2 48.5\u00b12.5 45.8\u00b14.2 79.1\u00b14.0 80.3\u00b10.4 59.9\u00b12.5 90.7\u00b11.9 59.9\u00b10.9 54.7\u00b14.4 84.5\u00b12.8 Five-Shot on RULE (for reference) 57.9\u00b10.2 67.2\u00b16.2 89.4\u00b14.4 29.1\u00b12.3 34.6\u00b13.2 66.2\u00b18.0 36.8\u00b13.5 35.1\u00b13.2 67.4\u00b15.3 53.6\u00b10.4 48.5\u00b16.0 78.5\u00b15.9 66.2\u00b10.7 57.2\u00b15.1 86.4\u00b13.1 35.0\u00b11.1 40.3\u00b13.1 61.4\u00b18.8 43.9\u00b11.3 43.9\u00b12.6 73.0\u00b13.1 70.2\u00b10.4 70.2\u00b13.5 91.0\u00b14.6 67.8\u00b10.5 62.9\u00b13.1 89.5\u00b14.2 47.7\u00b13.0 46.9\u00b14.7 79.4\u00b16.3 78.9\u00b10.6 63.7\u00b14.2 90.8\u00b12.5 58.2\u00b11.6 56.2\u00b15.1 88.0\u00b13.6 Zero-Shot 30.4 43.0\u00b12.9 51.0\u00b17.5 41.4 43.9\u00b14.1 59.9\u00b17.6 45.5 49.3\u00b12.4 75.4\u00b14.1 55.2 56.8\u00b12.9 77.6\u00b17.1 60.0 63.2\u00b13.4 87.3\u00b14.8 56.2 65.3\u00b15.9 86.0\u00b14.8 27.7 27.0\u00b14.5 37.5\u00b12.8 31.7 35.5\u00b13.0 55.9\u00b14.0 54.5 50.2\u00b14.6 81.8\u00b14.3 52.1 47.5\u00b12.2 80.1\u00b12.5 36.7 40.8\u00b12.8 77.5\u00b12.8 44.2 48.9\u00b14.8 76.9\u00b13.4 64.1 61.9\u00b12.9 89.8\u00b12.9 63.8 60.9\u00b11.4 89.1\u00b12.4 43.8 45.5\u00b13.7 77.6\u00b15.3 70.8 57.2\u00b14.0 88.2\u00b13.2 54.0 54.7\u00b13.4 85.1\u00b15.522.5 26.7 27.7 25.7 57.2\u00b15.1 24.2\u00b15.7 25.9\u00b13.8 38.3\u00b15.8 46.9\u00b15.6 30.0\u00b13.0 42.2\u00b15.4 60.7\u00b16.1 55.8\u00b13.6 33.1\u00b15.2 50.5\u00b17.2 46.8\u00b12.8 57.1\u00b13.6 23.7\u00b11.3 24.4\u00b12.6 36.8\u00b15.4 53.7\u00b110.3 32.4\u00b14.8 34.2\u00b13.7 64.3\u00b12.4 55.8\u00b13.6 33.6\u00b14.6 55.2\u00b19.2 49.4\u00b17.9 39.8\u00b11.7 39.0\u00b12.7 38.9\u00b13.1 53.0\u00b13.8 59.2\u00b14.6 60.5\u00b14.7 23.6\u00b13.9 27.5\u00b13.8 41.4\u00b15.5 38.0\u00b15.4 29.4\u00b12.8 40.4\u00b11.8 55.8\u00b13.6 55.9\u00b13.2 33.3\u00b13.0 49.9\u00b15.4 47.1\u00b14.33.7 1.8 2.4 2.1 28.8 3.4 7.4 10.6 16.0 8.5 12.1 25.1 24.9 11.1 21.8 15.0 30.9 5.4 6.6 10.6 18.3 9.5 9.4 32.7 24.9 11.0 26.5 16.3 8.7 7.9 12.6 17.5 24.6 26.2 3.1 4.3 12.5 10.4 6.6 13.9 24.2 22.3 10.7 19.9 15.932.2 25.0 24.6 24.1 65.1 27.2 37.2 47.3 54.1 39.7 48.1 62.8 61.5 45.8 59.4 53.7 66.2 34.9 35.0 47.6 56.0 40.8 43.4 69.3 61.5 47.0 63.0 55.6 43.4 42.5 49.5 55.9 62.7 63.7 26.9 35.9 50.2 46.6 40.3 48.2 60.8 59.7 45.4 56.3 53.3HUMAN-91.582.992.879.357.881.6SettingMainQSubQSelective SubQEliminat. SubQ0-shot 5-shot41.0\u221223.0 58.8\u22124.2 86.4\u22123.7 42.5\u221229.7 70.5+0.0 86.9\u22123.153.4\u22124.3 64.7+1.7"
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "table",
+            "figure_id": "tab_11",
+            "figure_caption": "Context-ablated accuracy. The subscript values indicate the accuracy gap against the full-input setting.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "table",
+            "figure_id": "tab_13",
+            "figure_caption": "Examples of the main questions and subquestions in our dataset. The options in bold indicate the correct answer.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "12",
+            "figure_type": "table",
+            "figure_id": "tab_14",
+            "figure_caption": "Rationales that are semantically similar to the MainQ's option in Selective and Eliminative SubQs.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [],
+    "doi": "10.18653/v1/2021.acl-long.238"
+}

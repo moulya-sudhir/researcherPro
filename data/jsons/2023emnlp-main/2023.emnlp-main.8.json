@@ -1,0 +1,622 @@
+{
+    "title": "Primacy Effect of ChatGPT",
+    "authors": "Yiwei Wang; Yujun Cai; Muhao Chen; Yuxuan Liang; Bryan Hooi; Angeles \u2021 Meta",
+    "pub_date": "",
+    "abstract": "Instruction-tuned large language models (LLMs), such as ChatGPT, have led to promising zero-shot performance in discriminative natural language understanding (NLU) tasks. This involves querying the LLM using a prompt containing the question, and the candidate labels to choose from. The question-answering capabilities of ChatGPT arise from its pre-training on large amounts of human-written text, as well as its subsequent fine-tuning on human preferences, which motivates us to ask: Does ChatGPT also inherit humans' cognitive biases? In this paper, we study the primacy effect of ChatGPT: the tendency of selecting the labels at earlier positions as the answer. We have two main findings: i) ChatGPT's decision is sensitive to the order of labels in the prompt; ii) ChatGPT has a clearly higher chance to select the labels at earlier positions as the answer. We hope that our experiments and analyses provide additional insights into building more reliable ChatGPT-based solutions. We release the source code at https: //github.com/wangywUST/PrimacyEffectGPT.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Humans tend to recall information presented at the start of a list better than information at the middle or end. This phenomenon is known as the primacy effect (Asch, 1946), which is a cognitive bias that relates to humans' attention spans (Crano, 1977), rehearsal (Tan and Ward, 2000), and memory systems (Li, 2010). Similarly, in advertisement systems and search engines, humans tend to interact with items in higher positions regardless of the items' actual relevance (Chen et al., 2023). Primacy effect influences humans' behaviors to make unfair decisions. Similarly, if it exists in machine learning models, it may lead to worse performance. * Equal contribution. Recently, instruction-tuned large language models (LLMs), represented by ChatGPT (OpenAI, 2022), have received wide attention on their capabilities of imitating humans in question-answering and problem-solving. However, this underlying behavioral similarity between ChatGPT and humans naturally leads to an intriguing question: Is Chat-GPT also affected by the primacy effect?",
+                "ChatGPT provides a convenient way to achieve the discriminative natural language understanding (NLU) (Li et al., 2023;Wei et al., 2023;Yuan et al., 2023). People only need to list the labels in the prompt and asking ChatGPT to select the label(s) that match the input text. In this work, to analyze the primacy effect of ChatGPT, we start by testing with random label shuffling, i.e., shuffling labels listed in the prompt before every prediction. We compare the predictions on the same instance with two different label orders. Then, we count the predicted label indices on many instances with label shuffling. The motivation is that: a fair NLU model should give the same prediction on an input instance regardless of how the labels are ordered; consequently, it should produce uniformly distributed label indices under label shuffling for any instance.",
+                "Through extensive experiments with a series of NLU datasets, we find that \u2022 ChatGPT's prediction is sensitive to the order of labels in the prompt. Specifically, Chat-GPT's prediction changes after a label shuffling on 87.9% of the instances in TACRED.",
+                "\u2022 ChatGPT is affected by the primacy effect: ChatGPT tends to select labels in earlier positions in the prompt (see Fig. 1), which present clear bias with respect to the label order.",
+                "On the whole, our work contributes to a better understanding of ChatGPT's behaviors and building more faithful ChatGPT-based NLU solutions."
+            ],
+            "publication_ref": [
+                "b2",
+                "b9",
+                "b33",
+                "b20",
+                "b42"
+            ],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Primacy Effect of ChatGPT",
+            "text": [
+                "In this section, we first introduce the general prompt design of ChatGPT in discriminative natural language understanding (NLU). Then, we analyze the primacy effect of ChatGPT using label shuffling in prompts."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompts for ChatGPT",
+            "text": [
+                "Prompts are a key component to the effective use of ChatGPT on discriminative NLU tasks (Wei et al., 2023;Yuan et al., 2023). Generally, prompts for such tasks involve two key components: (i) label definitions, and (ii) a task description and input text (see an example in Fig. 2).",
+                "ChatGPT's capability of understanding instructions in the prompt benefits from its training with human feedback (OpenAI, 2022), but this also creates the risk of inheriting humans' cognitive biases. In this paper, we discuss a cognitive bias in Chat-GPT: the primacy effect, which indicates the tendency of selecting labels in earlier positions in the prompt."
+            ],
+            "publication_ref": [
+                "b42"
+            ],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Analysis with Label Shuffling",
+            "text": [
+                "Analyzing the primacy effect requires us to distill the effects of label orders in the prompts. However, this is non-trivial because there are many factors influencing ChatGPT's decisions, such as the input text and label definitions. In our work, to distinguish the primacy effect of ChatGPT from other factors, we conduct random shuffling for labels listed in the prompts. Specifically, before every prediction, we shuffle the labels as visualized in Fig. 3. Label shuffling erases the discriminative semantics of the specific label orders in the prompts.  Ideally, a fair model should return the same prediction when labels are shuffled, and consequently, the predicted label index should follow a uniform distribution under random shuffling.",
+                "Next, we introduce our two ways of using random label shuffling to analyze ChatGPT."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_3"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Prediction Comparison on an Instance",
+            "text": [
+                "A reliable and consistent classifier is expected to consistently choose the same label for the same instance irrespective of the label order. To evaluate such consistency of ChatGPT, we perform the random shuffling for the same instance twice to produce two prompts. We feed these two prompts to Chat-GPT and compare the corresponding two predictions with each other. We apply the above process to all the test instances and compute the fraction of the instances where the prediction changed after label shuffling. The higher the fraction is, the more sensitive ChatGPT is to the label order."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Statistics of Predicted Indices",
+            "text": [
+                "Taking a further step, we perform statistical analysis on the predicted indices for instances where the prediction changed after label shuffling. If ChatGPT does not have any preference on the label orders, its predicted label indices should be uniformly distributed. By comparing the predicted label index distribution of ChatGPT to the uniform distribution, we can assess its fairness and preferences regarding label orders."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": [
+                "We analyze the primacy effect based on the aforementioned strategies using three relation extraction datasets and an intent detection dataset. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiment Setup",
+            "text": [
+                "We mainly chose relation extraction and intent detection tasks in our experiments since these tasks naturally come with adequately sized decision spaces to illustrate the underlying primacy effect of labels. For relation extraction, we experiment on three benchmark datasets including TACRED (Zhang et al., 2017), TACREV (Alt et al., 2020), and Re-TACRED (Stoica et al., 2021). For intent detection, we conducted experiments on Banking77 (Casanueva et al., 2020a) and MASSIVE (FitzGerald et al., 2022). MASSIVE (FitzGerald et al., 2022) is a parallel dataset of massive utterances with annotations for the Natural Language Understanding tasks of intent prediction. Utterances span 60 intents.",
+                "We additionally conducted experiments on the NLP datasets: GoEmotions (Demszky et al., 2020) and 20 Newsgroups (Albishre et al., 2015) for a more comprehensive evaluation. GoEmotions (Demszky et al., 2020) is a dataset for fine-grained emotion classification. It is a corpus of 58k carefully curated comments extracted from Reddit, with human annotations for 27 emotion categories and a neutral one. The 20 Newsgroups (Albishre et al., 2015) dataset is a collection of approximately 20,000 newsgroup documents, partitioned across 20 different newsgroups.",
+                "We follow the existing work (Wei et al., 2023;Li et al., 2023) to apply ChatGPT to these tasks via the OpenAI API gpt-3.5-turbo. Specifically, we set the temperature as 0.0 to minimize the randomness of ChatGPT's outputs. For comparison, we adopt the existing work (Casanueva et al., 2020b;Zhou and Chen, 2022) to fine-tune the BERT model with an MLP classification head."
+            ],
+            "publication_ref": [
+                "b44",
+                "b1",
+                "b30",
+                "b4",
+                "b13",
+                "b10",
+                "b0",
+                "b10",
+                "b0",
+                "b5"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Consistency under Label Shuffling",
+            "text": [
+                "First, we observe the low consistency of ChatGPT confronted under label shuffling. As shown in Table 1, ChatGPT changes its label prediction after label shuffling in over 85% of the test instances on the TACRED, TACREV, and Re-TACRED datasets, and in 35.7% of instances on Banking77. Also, ChatGPT changes its label prediction after label shuffling in over 69% of the test instances on the datasets of GoEmotions and in more than 30% of instances on MASSIVE and 20 Newsgroups. In contrast, the fine-tuned BERT classifier maintains consistent predictions after label shuffling. This discrepancy challenges the widely-held belief that ChatGPT can comprehend human instructions and provide consistent responses. One possible explanation is that ChatGPT's understanding of the prompt is obtained by training on human-labeled data, which inherits humans' cognitive bias of treating labels at different positions unfairly.",
+                "It is worth noting that the ratio of instances with changed predictions is consistently high across the relation extraction datasets but lower on intent detection. This discrepancy can be attributed to the fact that information extraction tasks are shown to be challenging for ChatGPT and other LLMs (Wang et al., 2023;Li et al., 2023). In more difficult tasks, ChatGPT lacks sufficient discriminative semantic understanding from the input text and may be more affected by the label order."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Primacy Effect of ChatGPT",
+            "text": [
+                "The empirical results in Section 3.2 indicate that ChatGPT's predictions are affected by label order. To deeper delve into the effects of label orders on ChatGPT, we analyze the distribution of predicted label indices (e.g., if the prediction is the first label, the label index is 1), as introduced in Section 2.2. We visualize the distributions in Fig. 4   the distribution of ChatGPT's predictions consistently deviates from the uniform distribution, displaying a consistent bias towards smaller indices across different datasets. In contrast, BERT exhibits no preference for label orders and consistently demonstrates a uniform distribution in its predicted label indices. We term this tendency of ChatGPT as the primacy effect, where the model tends to favor the labels presented earlier in the prompt. The magnitude of these primacy effects varies across tasks, as illustrated in Fig. 4. Notably, the influence of primacy effects is higher in more challenging tasks. This observation aligns with the results discussed in Sec. 3.3, wherein the impact of primacy effects is greater when ChatGPT tackles more difficult tasks. In the next section, we will quantitatively analyze the primacy effects of ChatGPT."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4",
+                "fig_4"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation on Fairness",
+            "text": [
+                "The fairness of a trained model can be assessed by examining the imbalance or skewness in its predictions (Sweeney and Najafian, 2019). Following prior studies (Xiang et al., 2020;Sweeney and Najafian, 2019;Qian et al., 2021;Wang et al., 2022), we employ the JS divergence (Fuglede and Topsoe, 2004) as the metric to evaluate how imbalanced/skewed/unfair a prediction P is. The measurement is symmetric (i.e., JS(P \u2225U ) = JS(U \u2225P )) and strictly scoped.",
+                "To evaluate the label order bias of ChatGPT, we compute the average relative label order imbalance (LOI): LOI is defined as the JS divergence between the predicted label index distribution P and the uniform distribution U :",
+                "LOI = JS(P (x|x \u2208 D), U ),(1)",
+                "where x represents an input instance, D is the test set, P (x) is the predicted label index, and U is the uniform distribution. LOI captures the disparity between the predicted indices and a uniform distribution.",
+                "We conduct the fairness evaluation following the experimental settings described in Section 3.3, and the results are presented in Table 2. The findings demonstrate that ChatGPT exhibits unfair treatment of label indices when making relation label predictions for input texts. Furthermore, the degree of unfairness increases with the task's difficulty, which aligns with the empirical results discussed in Sections 3.2 and 3.3. In contrast, BERT demonstrates significantly better fairness, as its predictions are not influenced by label orders.",
+                "We additionally test the performance of Chat-GPT with CoT (Chain-of-thoughts) (Wei et al., 2022). With CoT, ChatGPT still exhibits the primacy effect. The above results show that with or without CoT, ChatGPT consistently exhibits the primacy effect. A reason for this phenomenon could be that the CoT encourages the LLMs for \"slow thinking\" about the question but does not neces-sarily mitigate the cognitive bias in the reasoning steps of CoT."
+            ],
+            "publication_ref": [
+                "b32",
+                "b41",
+                "b32",
+                "b26",
+                "b14",
+                "b39"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Related Work",
+            "text": [
+                "Large Language Models (LLMs) (Brown et al., 2020;Rae et al., 2021;Thoppilan et al., 2022;Smith et al., 2022), such as GPT-3 (Brown et al., 2020), LaMDA (Thoppilan et al., 2022) and PaLM (Chowdhery et al., 2022), refer to large scale pretrained models that contain more than a hundred billion parameters. Based on the highly parallelizable Transformer architecture (Vaswani et al., 2017), these Large Language models have shown powerful capability to produce reasonable results with very few samples or task descriptions as input.",
+                "A key milestone in the development process of LLMs is ChatGPT, which is developed by Ope-nAI based on InstructGPT (Ouyang et al., 2022). ChatGPT is able to interact with humans through multiple turns of dialogue, understand user intent, accomplish instructions, and return human-like responses. This attracts huge attention from research field, motivating numerous recent work (Zhang et al., 2022;Ma et al., 2023;Wan et al., 2023;Zhong et al., 2023;Susnjak, 2023) to utilize Chat-GPT to different tasks.",
+                "As ChatGPT is a proprietary model, and OpenAI does not disclose its training specifics, researchers are actively investigating its associated implications and capabilities. There has been some work analyzing the performance, robustness, faithfulness, and explain-ability of ChatGPT (Gao et al., 2023;Han et al., 2023;Li et al., 2023). For example, (Malinka et al., 2023) investigates the educational integrity of ChatGPT and evaluates the ChatGPT's abilities to solve assignments of various levels in computer security specialization. (Haque et al., 2022) and (Kr\u00fcgel et al., 2023) investigate the ethical risks of ChatGPT.",
+                "Before ChatGPT, LLMs' inference has been accompanied by in-context learning (ICL) which adds a few demonstrations in the prompt (Dong et al., 2022;Fei et al., 2023). Accordingly, some work investigates the effects of demonstration orders for the LLMs before ChatGPT (Lu et al., 2021). (Zhao et al., 2021) finds the majority label, recency, and common token biases of LLMs' ICL.",
+                "Different from the above work, we focus on a new phenomenon of ChatGPT: the primacy effect, which is the tendency of selecting the first labels as the answer. The primary effect seriously influences ChatGPT's fairness. Collectively, our findings provide a new understanding of how ChatGPT works given the instructional prompts."
+            ],
+            "publication_ref": [
+                "b3",
+                "b28",
+                "b34",
+                "b29",
+                "b3",
+                "b34",
+                "b8",
+                "b35",
+                "b25",
+                "b25",
+                "b22",
+                "b46",
+                "b31",
+                "b15",
+                "b16",
+                "b23",
+                "b18",
+                "b37",
+                "b21",
+                "b45"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "While previous work often takes ChatGPT as a universal method applicable to all text-related tasks, we argue that its flexibility comes with the risk of inheriting human's cognitive biases. These biases lead to unfair judgments which can affect the performance of the machine learning model. This work studies a cognitive bias of ChatGPT: primacy effects. We propose a simple yet effective label shuffling method to analyze the influence of label orders on ChatGPT. We discover the primacy effect of ChatGPT and finds that it highly influences the fairness of ChatGPT in NLU. Our work contributes to a better understanding of the behaviors of ChatGPT and building more faithful solutions with ChatGPT in NLU applications."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitation",
+            "text": [
+                "Our work has a few potential limitations. Firstly, we primarily evaluate the primacy effect of Chat-GPT, which is one of the most widely-used instruction-legacy models for each task. It would be beneficial to assess this effect on other LLMs models (such as Google Bard, vicuna (Chiang et al., 2023)) and explore additional tasks to examine this primacy effect. Secondly, this work focused on analyzing the primacy effect of ChatGPT through experiments. We encourage further studies to propose effective solutions that can mitigate the negative impacts associated with the primacy effect."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgement",
+            "text": [
+                "The authors would like to thank the anonymous reviewers for their discussion and feedback. Yiwei Wang and Bryan Hooi are supported by NUS ODPRT Grant A-0008067-00-00, NUS ODPRT Grant R252-000-A81-133, and Singapore Ministry of Education Academic Research Fund Tier 3 under MOEs official grant number MOE2017-T3-1-007. Muhao   "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Effective 20 newsgroups dataset cleaning",
+            "journal": "IEEE",
+            "year": "2015",
+            "authors": "Khaled Albishre; Mubarak Albathan; Yuefeng Li"
+        },
+        {
+            "ref_id": "b1",
+            "title": "TACRED revisited: A thorough evaluation of the TACRED relation extraction task",
+            "journal": "",
+            "year": "2020",
+            "authors": "Christoph Alt; Aleksandra Gabryszak; Leonhard Hennig"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Forming impressions of personality",
+            "journal": "The Journal of Abnormal and Social Psychology",
+            "year": "1946",
+            "authors": "E Solomon;  Asch"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Language models are few-shot learners",
+            "journal": "",
+            "year": "2020",
+            "authors": "Tom Brown; Benjamin Mann; Nick Ryder; Melanie Subbiah; Jared D Kaplan; Prafulla Dhariwal; Arvind Neelakantan; Pranav Shyam; Girish Sastry; Amanda Askell"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Efficient intent detection with dual sentence encoders",
+            "journal": "",
+            "year": "2020",
+            "authors": "I\u00f1igo Casanueva; Tadas Temcinas; Daniela Gerz; Matthew Henderson; Ivan Vulic"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Efficient intent detection with dual sentence encoders",
+            "journal": "",
+            "year": "2020",
+            "authors": "I\u00f1igo Casanueva; Tadas Tem\u010dinas; Daniela Gerz; Matthew Henderson; Ivan Vuli\u0107"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Bias and debias in recommender system: A survey and future directions",
+            "journal": "ACM Transactions on Information Systems",
+            "year": "2023",
+            "authors": "Jiawei Chen; Hande Dong; Xiang Wang; Fuli Feng; Meng Wang; Xiangnan He"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Ion Stoica, and Eric P. Xing. 2023. Vicuna: An opensource chatbot impressing gpt-4 with 90%* chatgpt quality",
+            "journal": "",
+            "year": "",
+            "authors": "Wei-Lin Chiang; Zhuohan Li; Zi Lin; Ying Sheng; Zhanghao Wu; Hao Zhang; Lianmin Zheng; Siyuan Zhuang; Yonghao Zhuang; Joseph E Gonzalez"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Palm: Scaling language modeling with pathways",
+            "journal": "",
+            "year": "2022",
+            "authors": "Aakanksha Chowdhery; Sharan Narang; Jacob Devlin; Maarten Bosma; Gaurav Mishra; Adam Roberts; Paul Barham;  Hyung Won; Charles Chung; Sebastian Sutton;  Gehrmann"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Primacy versus recency in retention of information and opinion change",
+            "journal": "The Journal of Social Psychology",
+            "year": "1977",
+            "authors": "D William;  Crano"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Goemotions: A dataset of fine-grained emotions",
+            "journal": "",
+            "year": "2020",
+            "authors": "Dorottya Demszky; Dana Movshovitz-Attias; Jeongwoo Ko; Alan Cowen; Gaurav Nemade; Sujith Ravi"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Xu Sun, Jingjing Xu, and Zhifang Sui. 2022. A survey for in-context learning",
+            "journal": "",
+            "year": "",
+            "authors": "Qingxiu Dong; Lei Li; Damai Dai; Ce Zheng; Zhiyong Wu; Baobao Chang"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Mitigating label biases for in-context learning",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yu Fei; Yifan Hou; Zeming Chen; Antoine Bosselut"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Massive: A 1m-example multilingual natural language understanding dataset with 51 typologically-diverse languages",
+            "journal": "",
+            "year": "2022",
+            "authors": "Jack Fitzgerald; Christopher Hench; Charith Peris; Scott Mackie; Kay Rottmann; Ana Sanchez; Aaron Nash; Liam Urbach; Vishesh Kakarala; Richa Singh"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Jensenshannon divergence and hilbert space embedding",
+            "journal": "IEEE",
+            "year": "2004",
+            "authors": "Bent Fuglede; Flemming Topsoe"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Is chatgpt a good causal reasoner? a comprehensive evaluation",
+            "journal": "",
+            "year": "2023",
+            "authors": "Jinglong Gao; Xiao Ding; Bing Qin; Ting Liu"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Is information extraction solved by chatgpt? an analysis of performance, evaluation criteria, robustness and errors",
+            "journal": "",
+            "year": "2023",
+            "authors": "Ridong Han; Tao Peng; Chaohao Yang; Benyou Wang; Lu Liu; Xiang Wan"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Zarrin Tasnim Sworna, Roshan Namal Rajapakse, and Hussain Ahmad. 2022. \" i think this is the most disruptive technology",
+            "journal": "",
+            "year": "",
+            "authors": "Isuru Mubin Ul Haque;  Dharmadasa"
+        },
+        {
+            "ref_id": "b18",
+            "title": "The moral authority of chatgpt",
+            "journal": "",
+            "year": "2023",
+            "authors": "Sebastian Kr\u00fcgel; Andreas Ostermaier; Matthias Uhl"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Evaluating chatgpt's information extraction capabilities: An assessment of performance, explainability, calibration, and faithfulness",
+            "journal": "",
+            "year": "2023",
+            "authors": "Bo Li; Gexiang Fang; Yang Yang; Quansen Wang; Wei Ye; Wen Zhao; Shikun Zhang"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Primacy effect or recency effect? a long-term memory test of super bowl commercials",
+            "journal": "Journal of Consumer Behaviour: An International Research Review",
+            "year": "2010",
+            "authors": "Cong Li"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Fantastically ordered prompts and where to find them: Overcoming few-shot prompt order sensitivity",
+            "journal": "",
+            "year": "2021",
+            "authors": "Yao Lu; Max Bartolo; Alastair Moore; Sebastian Riedel; Pontus Stenetorp"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Large language model is not a good few-shot information extractor",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yubo Ma; Yixin Cao"
+        },
+        {
+            "ref_id": "b23",
+            "title": "On the educational impact of chatgpt: Is artificial intelligence ready to obtain a university degree",
+            "journal": "",
+            "year": "2023",
+            "authors": "Kamil Malinka; Martin Peres\u00edni; Anton Firc; Ondrej Hujnak; Filip Janus"
+        },
+        {
+            "ref_id": "b24",
+            "title": "",
+            "journal": "OpenAI. 2022. Introducing chatgpt",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b25",
+            "title": "Training language models to follow instructions with human feedback",
+            "journal": "Advances in Neural Information Processing Systems",
+            "year": "2022",
+            "authors": "Long Ouyang; Jeffrey Wu; Xu Jiang; Diogo Almeida; Carroll Wainwright; Pamela Mishkin; Chong Zhang; Sandhini Agarwal; Katarina Slama; Alex Ray"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Counterfactual inference for text classification debiasing",
+            "journal": "",
+            "year": "2021",
+            "authors": "Chen Qian; Fuli Feng; Lijie Wen; Chunping Ma; Pengjun Xie"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Language Processing",
+            "journal": "Long Papers",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b28",
+            "title": "Scaling language models: Methods, analysis & insights from training gopher",
+            "journal": "",
+            "year": "2021",
+            "authors": "Sebastian Jack W Rae; Trevor Borgeaud; Katie Cai; Jordan Millican; Francis Hoffmann; John Song; Sarah Aslanides; Roman Henderson; Susannah Ring;  Young"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Using deepspeed and megatron to train megatron-turing nlg 530b, a large-scale generative language model",
+            "journal": "",
+            "year": "2022",
+            "authors": "Shaden Smith; Mostofa Patwary; Brandon Norick; Patrick Legresley; Samyam Rajbhandari; Jared Casper; Zhun Liu; Shrimai Prabhumoye; George Zerveas; Vijay Korthikanti"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Re-tacred: Addressing shortcomings of the tacred dataset",
+            "journal": "",
+            "year": "2021",
+            "authors": "George Stoica"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Applying bert and chatgpt for sentiment analysis of lyme disease in scientific literature",
+            "journal": "",
+            "year": "2023",
+            "authors": "Teo Susnjak"
+        },
+        {
+            "ref_id": "b32",
+            "title": "A transparent framework for evaluating unintended demographic bias in word embeddings",
+            "journal": "",
+            "year": "2019",
+            "authors": "Chris Sweeney; Maryam Najafian"
+        },
+        {
+            "ref_id": "b33",
+            "title": "A recency-based account of the primacy effect in free recall",
+            "journal": "Journal of Experimental Psychology: Learning, Memory, and Cognition",
+            "year": "2000",
+            "authors": "Lydia Tan; Geoff Ward"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Lamda: Language models for dialog applications",
+            "journal": "",
+            "year": "2022",
+            "authors": "Romal Thoppilan; Daniel De Freitas; Jamie Hall; Noam Shazeer; Apoorv Kulshreshtha;  Heng-Tze; Alicia Cheng; Taylor Jin; Leslie Bos; Yu Baker;  Du"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Attention is all you need",
+            "journal": "",
+            "year": "2017",
+            "authors": "Ashish Vaswani; Noam Shazeer; Niki Parmar; Jakob Uszkoreit; Llion Jones; Aidan N Gomez; \u0141ukasz Kaiser; Illia Polosukhin"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Gpt-re: In-context learning for relation extraction using large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zhen Wan; Fei Cheng; Zhuoyuan Mao; Qianying Liu; Haiyue Song; Jiwei Li; Sadao Kurohashi"
+        },
+        {
+            "ref_id": "b37",
+            "title": "A causal view of entity bias in (large) language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Fei Wang; Wenjie Mo; Yiwei Wang; Wenxuan Zhou; Muhao Chen"
+        },
+        {
+            "ref_id": "b38",
+            "title": "Should we rely on entity mentions for relation extraction? debiasing relation extraction with counterfactual analysis",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yiwei Wang; Muhao Chen; Wenxuan Zhou; Yujun Cai; Yuxuan Liang; Dayiheng Liu; Baosong Yang; Juncheng Liu; Bryan Hooi"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Chain-of-thought prompting elicits reasoning in large language models",
+            "journal": "Advances in Neural Information Processing Systems",
+            "year": "2022",
+            "authors": "Jason Wei; Xuezhi Wang; Dale Schuurmans; Maarten Bosma; Fei Xia; Ed Chi; V Quoc; Denny Le;  Zhou"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Zeroshot information extraction via chatting with chatgpt",
+            "journal": "",
+            "year": "2023",
+            "authors": "Xiang Wei; Xingyu Cui; Ning Cheng; Xiaobin Wang; Xin Zhang; Shen Huang; Pengjun Xie; Jinan Xu; Yufeng Chen; Meishan Zhang"
+        },
+        {
+            "ref_id": "b41",
+            "title": "Learning from multiple experts: Self-paced knowledge distillation for long-tailed classification",
+            "journal": "Springer",
+            "year": "2020",
+            "authors": "Liuyu Xiang; Guiguang Ding; Jungong Han"
+        },
+        {
+            "ref_id": "b42",
+            "title": "Zero-shot temporal relation extraction with chatgpt",
+            "journal": "",
+            "year": "2023",
+            "authors": "Chenhan Yuan; Qianqian Xie; Sophia Ananiadou"
+        },
+        {
+            "ref_id": "b43",
+            "title": "Daijun Ding, and Liwen Jing. 2022. How would stance detection techniques evolve after the launch of chatgpt? arXiv preprint",
+            "journal": "",
+            "year": "",
+            "authors": "Bowen Zhang"
+        },
+        {
+            "ref_id": "b44",
+            "title": "Position-aware attention and supervised data improve slot filling",
+            "journal": "",
+            "year": "2017",
+            "authors": "Yuhao Zhang; Victor Zhong; Danqi Chen; Gabor Angeli; Christopher D Manning"
+        },
+        {
+            "ref_id": "b45",
+            "title": "Calibrate before use: Improving few-shot performance of language models",
+            "journal": "PMLR",
+            "year": "2021",
+            "authors": "Zihao Zhao; Eric Wallace; Shi Feng; Dan Klein; Sameer Singh"
+        },
+        {
+            "ref_id": "b46",
+            "title": "Can chatgpt understand too? a comparative study on chatgpt and fine-tuned bert",
+            "journal": "",
+            "year": "2023",
+            "authors": "Qihuang Zhong; Liang Ding; Juhua Liu; Bo Du; Dacheng Tao"
+        },
+        {
+            "ref_id": "b47",
+            "title": "An improved baseline for sentence-level relation extraction",
+            "journal": "",
+            "year": "2022",
+            "authors": "Wenxuan Zhou; Muhao Chen"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Primacy Effect of ChatGPT: ChatGPT tends to return labels in earlier positions as the answer. This plot shows the distribution of ChatGPT's predicted label indices in TACRED (42 classes), where we randomly shuffle labels before every prediction (see Sec. 2.2).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "I need a new PIN. Which Label matches the intent expressed in the Target Text?",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 2 :2Figure 2: A prompt example for ChatGPT.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 3 :3Figure 3: We analyze the primacy effects of ChatGPT by randomly shuffling the labels in the prompts.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 4 :4Figure 4: The distribution of predicted indices of the test instances with label shuffling before every prediction.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": ". Notably, Fraction of the instances that have their predicted label changed after a label shuffling.",
+            "figure_data": "MethodTACRED TACREV Re-TACRED Banking77 GoEmotions MASSIVE 20 NewsgroupsChatGPT w/ Prompt BERT w/ MLP87.9 0.085.9 0.088.6 0.035.7 0.069.3 0.032.8 0.034.1 0.0"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "",
+            "figure_data": "MethodTACRED TACREV Re-TACRED Banking77ChatGPT w/ Prompts ChatGPT w/ CoT BERT w/ MLP57.9 57.6 1.857.8 57.9 1.958.1 58.3 2.318.8 18.6 2.1"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "LOI = JS(P (x|x \u2208 D), U ),(1)",
+            "formula_coordinates": [
+                4.0,
+                352.77,
+                426.61,
+                172.38,
+                20.55
+            ]
+        }
+    ],
+    "doi": ""
+}

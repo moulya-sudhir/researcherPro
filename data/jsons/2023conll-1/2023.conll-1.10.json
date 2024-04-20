@@ -1,0 +1,749 @@
+{
+    "title": "A Minimal Approach for Natural Language Action Space in Text-based Games",
+    "authors": "Kelvin Dongwon;  Ryu; Meng Fang; Gholamreza Haffari; Shirui Pan; Ehsan Shareghi",
+    "pub_date": "",
+    "abstract": "Text-based games (TGs) are language-based interactive environments for reinforcement learning. While language models (LMs) and knowledge graphs (KGs) are commonly used for handling large action space in TGs, it is unclear whether these techniques are necessary or overused. In this paper, we revisit the challenge of exploring the action space in TGs and propose \u03f5-admissible exploration, a minimal approach of utilizing admissible actions, for training phase. Additionally, we present a textbased actor-critic (TAC) agent that produces textual commands for game, solely from game observations, without requiring any KG or LM. Our method, on average across 10 games from Jericho, outperforms strong baselines and stateof-the-art agents that use LM and KG. Our approach highlights that a much lighter model design, with a fresh perspective on utilizing the information within the environments, suffices for an effective exploration of exponentially large action spaces. 1  ",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "An intelligent agent that communicates in natural language space has been a long goal of artificial intelligence (Fang et al., 2017). Text-based games (TGs) best suit this goal, since they allow the agent to read the textual description of the world and write the textual command to the world (Hausknecht et al., 2020;C\u00f4t\u00e9 et al., 2018). In TGs, the agent should perform natural language understanding (NLU), sequential reasoning and natural language generation (NLG) to generate a series of actions to accomplish the goal of the game, i.e. adventure or puzzle (Hausknecht et al., 2020). The language perspective of TGs foists environments partially observable and action space combinatorially large, making the task challenging. Since TGs alert the player how much the game has proceeded with the game score, reinforcement learning (RL) naturally lends itself as a suitable framework.",
+                "Due to its language action space, an RL agent in TGs typically deals with a combinatorially large action space, motiving various design choices to account for it. As two seminal works in this space, Yao et al. (2020) trained a language model (LM) to produce admissible actions 2 for the given textual observation and then used, under the predicted action list, Deep Reinforcement Relevance Network to estimate the Q value. As an alternative, Ammanabrolu and Hausknecht (2020) constructs a knowledge graph (KG) to prune down action space while learning the policy distribution through actorcritic (AC) method and supervision signal from the admissible actions. Both paradigms leverage admissible actions at different stages at the cost of imposing additional modules and increasing model complexity.",
+                "In this paper, we take a fresh perspective on leveraging the information available in the TG environment to explore the action space without relying on LMs or KGs. We propose a minimal form of utilizing admissibility of actions to constrain the action space during training while allowing the agent to act independently to access the admissible actions during testing. More concretely, our proposed training strategy, \u03f5-admissible exploration, leverages the admissible actions via random sampling during training to acquire diverse and useful data from the environment. Then, our developed textbased actor-critic (TAC) agent learns the policy distribution without any action space constraints. It is noteworthy that our much lighter proposal is under the same condition as other aforementioned methods since all the prior works use admissible actions in training the LM or the agent.",
+                "Our empirical findings, in Jericho, illustrate that TAC with \u03f5-admissible exploration has better or on-par performance in comparison with the stateof-the-art agents that use an LM or KG. Through experiments, we observed that while previous methods have their action selections largely dependent on the quality of the LM or KG, sampling admissible actions helps with the action selection and results in acquiring diverse experiences during exploration. While showing a significant success on TGs, we hope our approach encourages alternative perspectives on leveraging action admissibility in other domains of applications where the action space is discrete and combinatorially large."
+            ],
+            "publication_ref": [
+                "b7",
+                "b6",
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Basic Definitions",
+            "text": [
+                "Text-based Games. TGs are game simulation environments that take natural language commands and return textual description of the world. They have received significant attention in both NLP and RL communities in recent years. C\u00f4t\u00e9 et al. (2018) introduced TextWorld, a TG framework that automatically generates textual observation through knowledge base in a game engine. It has several hyper-parameters to control the variety and difficulty of the game. Hausknecht et al. (2020) released Jericho, an open-sourced interface for human-made TGs, which has become the de-facto testbed for developments in TG. Admissible Action. A list of natural language actions that are guaranteed to be understood by the game engine and change the environment in TGs are called Admissible Actions. The term was introduced in TextWorld while a similar concept also exists in Jericho under a different name, valid actions. Hausknecht et al. (2020) proposed an algorithm that detects a set of admissible actions provided by Jericho suite by constructing a set of natural language actions from every template with detectable objects for a given observation and running them through the game engine to return those actions that changed the world object tree.",
+                "Template-based Action Space. Natural language actions are built with template (T) and object (O) from template-based action space. Each template takes at most two objects. For instance, a templateobject pair (take OBJ from OBJ, egg, fridge) produces a natural language action take egg from fridge while (west,-,-) produces west. The agent ought to find the optimal policy that maximizes the expected discounted sum of rewards, or the return, R t = \u221e k=0 \u03b3 k r t+k+1 . Traditional Reinforcement Learning. There are three traditional algorithms in RL, Q-learning (QL), policy gradient (PG) and actor-critic (AC). QL estimates the return for a given state-action pair, or Q",
+                "value, Q(s t , a t ) = E[ \u221e k=0 \u03b3 k r t+k+1 |s t , a t ],",
+                "then selects the action of the highest Q value. However, this requires the action space to be countably finite. To remedy this, PG directly learns the policy distribution from the environment such that it maximizes the total return through Monte-Carlo (MC) sampling. AC combines QL and PG, where it removes MC in PG and updates the parameters per each step with estimated Q value using QL. This eliminates the high variance of MC as an exchange of a relatively small bias from QL."
+            ],
+            "publication_ref": [
+                "b6"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work on TG Agents in RL",
+            "text": [
+                "We provide a brief overview of widely known TG agents relevant to the work presented in this paper. We empirically compare these in the Section 5.1. Contextual Action LM (CALM)-DRRN (Yao et al., 2020) uses an LM (CALM) to produce a set of actions for a given textual observation from the TGs. It is trained to map a set of textual observations to the admissible actions through causal language modeling. Then, Deep Reinforcement Relevance Network (DRRN) agent was trained on the action candidates from CALM. DRRN follows QL, estimating the Q value per observation-action pair. As a result, CALM removes the need for the ground truth while training DRRN. 3  Knowledge Graph Advantage Actor Critic (KG-A2C) (Ammanabrolu and Hausknecht, 2020) uses the AC method to sequentially sample templates and objects, and KGs for long-term memory and action pruning. Throughout the gameplay, KG-A2C organizes knowledge triples from textual observation using Stanford OpenIE (Angeli et al., 2015) to construct a KG. Then, the KG is used to build state representation along with encoded game observations and constrain object space with only the entities that the agent can reach within KG, i.e. immediate neighbours. They used admissible actions in the cross entropy supervised loss. KG-A2C Inspired Agents. Xu et al. (2020) proposed SHA-KG that uses stacked hierarchical attention on KG. Graph attention network (GAT) was applied to sample sub-graphs of KG to enrich the state representation on top of KG-A2C. Ammanabrolu et al. (2020) used techniques inspired by Question Answering (QA) with LM to construct the KG. They introduced Q*BERT which uses AL-BERT (Lan et al., 2020) fine-tuned on a dataset specific to TGs to perform QA and extract information from textual observations of the game, i.e. \"Where is my current location?\". This improved the quality of KG, and therefore, constituted better state representation. Ryu et al. (2022) proposed an exploration technique that injects commonsense directly into action selection. They used log-likelihood score from commonsense transformer (Bosselut et al., 2019) to re-rank actions. Peng et al. (2021) investigated explainable generative agent (HEX-RL) and applied hierarchical graph attention to symbolic KG-based state representations. This was to leverage the graph representation based on its significance in action selection. They also employed intrinsic reward signal towards the expansion of KG to motivate the agent for exploration (HEX-RL-IM) (Peng et al., 2021).",
+                "All the aforementioned methods utilize admissible actions in training the LM or agent. Our proposed method, introduced shortly ( \u00a74), uses admissible actions as action constraints during training without relying on KG or LM.",
+                "4 Text-based Actor Critic (TAC)",
+                "Our agent, Text-based Actor Critic (TAC), follows the Actor-Critic method with template-object decoder. We provide an overview of the system in Figure 1 and a detailed description in below. We follow the notation introduced earlier in Section 2. Encoder. Our design consists of text and state encoders. Text encoder is a single shared bidirectional GRU with different initial hidden state for different input text, (o game , o look , o inv , a N ). The state representation only takes encoded textual observations while the natural language action a N is encoded to be used by the critic (introduced shortly). State encoder embeds game scores into a high dimensional vector and adds it to the encoded observation. This is then, passed through a feed-forward neural network, mapping an instance of observation to state representation without the history of the past information.",
+                "Actor. The Actor-Critic design is used for our RL component. We describe our generative actor first. Our actor network maps from state representation to action representation. Then, the action representation is decoded by GRU-based template and object decoders (Ammanabrolu and Hausknecht, 2020). Template decoder takes action representation and produces the template distribution and the context vector. Object decoder takes action representation, semi-completed natural language action and the context from template decoder to produce object distribution sequentially. Critic. Similar to (Haarnoja et al., 2018), we employed two types of critics for practical purpose, state critic for state value function and state-action critic for state-action value function. Both critics take the state representation as input, but stateaction critic takes encoded natural language action as an additional input. The textual command produced by the decoder is encoded with text encoder and is passed through state-action critic to predict state-action value, or Q value, for a given command. A more detailed diagram for Actor and Critic is in Appendix D. To smooth the training, we introduced target state critic as an exponentially moving average of state critic (Mnih et al., 2015). Also, the two state-action critics are independently updated to mitigate positive bias in the policy improvement (Fujimoto et al., 2018). We used the minimum of the two enhanced critic networks outputs as our estimated state-action value function.",
+                "Objective Function. Our objective functions are largely divided into two, RL and SL. RL objectives are for reward maximization L R , state value prediction L V , and state-action value prediction L Q .",
+                "We overload the notation of \u03b8: for instance, V \u03b8 (o) signifies parameters from the encoder to the critic, and \u03c0 \u03b8 (a|o) from the encoder to the actor. Reward maximization is done as follows,",
+                "L R = \u2212E [A(o, a)\u2207 \u03b8 ln \u03c0 \u03b8 (a|o)] , (1) A(o, a) = Q \u03b8 (o, a) \u2212 V \u03b8 (o),",
+                "(2) where A(o, a) is the normalized advantage function with no gradient flow.",
+                "LV = E \u2207 \u03b8 V \u03b8 (o) \u2212 r + \u03b3V\u03b8(o \u2032 ) ,(3)",
+                "LQ = E \u2207 \u03b8 Q \u03b8 (o, a) \u2212 r + \u03b3V\u03b8(o \u2032 ) ,(4)",
+                "where o \u2032 is observation in the next time step and \u03b8 signifies the parameters containing the target state critic, updated as moving average with \u03c4 , \u03b8v = \u03c4 \u03b8 v + (1 \u2212 \u03c4 ) \u03b8v .",
+                "(5)",
+                "Our SL updates the networks to produce valid templates and valid objects,",
+                "L T = 1 |T| a T \u2208T (y a T ln (\u03c0 \u03b8 (a T |o)) + (1 \u2212 y a T ) (1 \u2212 ln (\u03c0 \u03b8 (a T |o)))),(6)",
+                "L O = 1 |O| a O \u2208O (y a O ln (\u03c0 \u03b8 (a O |o, \u00e2)) + (1 \u2212 y a O ) (1 \u2212 ln (\u03c0 \u03b8 (a O |o, \u00e2)))),(7)",
+                "y a T = 1 a T \u2208 T a 0 otherwise y a O = 1 a O \u2208 O a 0 otherwise",
+                "where L T and L O are the cross entropy losses over the templates (T) and objects (O). Template and object are defined as a T and a O , while \u00e2 is the action constructed by previously sampled template and object. Positive samples, y a T and y a O , are only if the corresponding template or object are in the admissible template (T a ) or admissible object (O a ). 4  The final loss function is constructed with \u03bb coefficients to control for trade-offs,",
+                "L = \u03bb R L R +\u03bb V L V +\u03bb Q L Q +\u03bb T L T +\u03bb O L O. (8",
+                ")",
+                "Our algorithm is akin to vanilla A2C proposed by Ammanabrolu and Hausknecht (2020) with some changes under our observations. A detailed comparison and qualitative analysis are in Appendix E and F. \u03f5-admissible Exploration. We use a simple exploration technique during training, which samples the next action from admissible actions with \u03f5 probability threshold. For a given state s, define A a (s) \u2286 A N as an admissible action subset of all natural language actions set. We sample an action directly from admissible action set under uniform distribution, a N \u223c U(A a (s)). Formally, we uniformly sample p \u2208 [0, 1] per every step,",
+                "\u03b2(a|s) = U(A a (s)) p < \u03f5 \u03c0(a|s) p \u2265 \u03f5 (9)",
+                "This collects diverse experiences from altering the world with admissible actions. We also tried a variant where the \u03f5 is selected adaptively given the game score the agent has achieved. However, this variant under-performed the static \u03f5. See Appendix I for more details on this and the results.   "
+            ],
+            "publication_ref": [
+                "b25",
+                "b3",
+                "b24",
+                "b14",
+                "b5",
+                "b17",
+                "b17",
+                "b9",
+                "b16",
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": [
+                "In this section, we provide a description of our experimental details and discuss the results. We selected a wide variety of agents (introduced in Section 3) utilizing the LM or the KG: CALM-DRRN (Yao et al., 2020) and KG-A2C (Ammanabrolu and Hausknecht, 2020) as baselines, and SHA-KG (Xu et al., 2020), Q*BERT (Ammanabrolu et al., 2020), HEX-RL and HEX-RL-IM (Peng et al., 2021) as state-of-the-art (SotA). Experimental Setup. Similar to KG-A2C, we train our agent on 32 parallel environments with 5 random seeds. We trained TAC on games of Jericho suite with 100k steps and evaluated with 10 episodes per every 500 training step. During the training, TAC uses uniformly sampled admissible action for a probability of \u03f5 and during the testing, it follows its policy distribution generated from the game observations. We used prioritized experience replay (PER) as our replay buffer (Schaul et al., 2016). We first fine-tune TAC on ZORK1, then apply the same hyper-parameters for all the games. The details of our hyper-parameters can be found in Appendix A. Our final score is computed as the average of 30 episodic testing game scores. Additionally, our model has a parameter size of less than 2M, allowing us to run the majority of our experiments on CPU (Intel Xeon Gold 6150 2.70 GHz).",
+                "The full parameter size in ZORK1 and the training time comparison can be found in Appendices B and C.  CALM-DRRN and KG-A2C fails to achieve any game score (approximately 0), but TAC achieves the score of +3.4, +25.4 and +2.81 For detailed game scores and the full learning curves on 29 games, please refer to Appendix G. There are a few games that TAC under-performs. We speculate three reasons for this: over-fitting, exploration, and catastrophic forgetting. For instance, as illustrated by the learning curves of TAC in Figure 2, LUDICORP appears to acquire more reward signals during training, but fails to achieve them during testing. We believe this is because the agent is over-fitted to spurious features in specific observations (Song et al., 2020), producing inadmissible actions for a given state that are admissible in other states. On the other hand, TAC in OMNIQUEST cannot achieve a game score more than 5 in both training and testing. This is due to the lack of exploration, where the agent is stuck at certain states because the game score is too far to reach. This, in fact, occurs in ZORK3 and ZTUU for some random seeds, where few seeds in ZORK3 do not achieve any game score while ZTUU achieves 10 or 13 only, resulting in high variance. Finally, catastrophic forgetting (Kirkpatrick et al., 2016) is a common phenomenon in TGs (Hausknecht et al., 2020;Ammanabrolu and Hausknecht, 2020), and this is also observed in JEWEL with TAC. Training Score vs. Testing Score. Figure 2 shows that the game scores during training and testing in many games are different. There are three inter-pretations for this: (i) the \u03f5-admissible exploration triggers negative rewards since it is uniformly sampling admissible actions. It is often the case that negative reward signal triggers termination of the game, i.e. \u221210 score in ZORK1, so this results in episodic score during training below testing. (ii) the \u03f5-admissible exploration sends the agent to the rarely or never visited state, which is commonly seen in ZTUU. This induces the agent taking useless actions that would not result in rewards since it does not know what to do. (iii) Over-fitting where testing score is lower than training score. This occurs in LUDICORP, where the agent cannot escape certain states with its policy during testing. \u03f5-admissible exploration lets the agent escape from these state during training, and therefore, achieves higher game score."
+            ],
+            "publication_ref": [
+                "b25",
+                "b24",
+                "b17",
+                "b19",
+                "b20",
+                "b13"
+            ],
+            "figure_ref": [
+                "fig_1",
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Main Results",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ablation",
+            "text": [
+                "\u03f5-Admissible Exploration. To understand how \u03f5 influences the agent, ablations with two \u03f5 values, 0.0 and 1.0, on five selective games were conducted. As shown in Figure 3, in the case of \u03f5 = 0.0, the agent simply cannot acquire reward signals. TAC achieves 0 game score in RE-VERB, ZORK1 and ZORK3 while it struggles to learn in DETECTIVE and PENTARI. This indicates that the absence of \u03f5-admissible exploration results in meaningless explorations until admissible actions are reasonably learned through supervised signals. With \u03f5 = 1.0, learning becomes unstable since this is equivalent to no exploitation during training, not capable of observing reward signals that are far from the initial state. Hence, tuned \u03f5 is important to allow the agent to cover wider range of states (exploration) while acting from its experiences (exploitation).",
+                "Supervised Signals. According to the Figure 3, removing SL negatively affects the game score. This is consistent with the earlier observations (Ammanabrolu and Hausknecht, 2020) reporting that KG-A2C without SL achieves no game score in ZORK1. However, as we can observe, TAC manages to retain some game score, which could be reflective of the positive role of \u03f5-admissible exploration, inducing similar behaviour to SL.",
+                "From the observation that the absence of SL degrades the performance, we hypothesize that SL induces a regularization effect. We ran experiments with various strengths of supervised signals by increasing \u03bb T and \u03bb O in LUDICORP and TEMPLE, in which TAC attains higher scores at training compared with testing. As seen in Figure 4 (left two plots), higher \u03bb T and \u03bb O relaxes over-fitting, reaching the score from 7.7 to 15.8 in LUDICORP and from 5.8 to 8.0 in TEMPLE. Since SL is not directly related to rewards, this supports that SL acts as regularization. Further experimental results on ZORK1 is in Appendix H.",
+                "To further examine the role of admissible actions in SL, we hypothesize that SL is responsible for guiding the agent in the case that the reward signal is not collected. To verify this, we excluded \u03f5-admissible exploration and ran TAC with different \u03bb T and \u03bb O in REVERB and ZORK1, in which TAC fails to achieve any score. According to Figure 4 (right two plots), TAC with stronger SL and \u03f5 = 0.0 achieves game scores from 0 to 8.3 in REVERB, and from 0 to 18.3 in ZORK1, which suggests that SL acts as guidance. However, in the absence of \u03f5-admissible exploration, despite the stronger supervised signals, TAC cannot match the scores using \u03f5-admissible exploration.",
+                "Admissible Action Space During Training. To examine if constraining the action space to admissible actions during training leads to better utilization, we ran an ablation by masking template and object with admissible actions at training time. This leads to only generating admissible actions. Our plots in Figure 3 show that there is a reduction in the game score in PENTARI, REVERB and ZORK1 while DETECTIVE and ZORK3 observe slight to  substantial increases, respectively. We speculate that the performance decay is due to the exposure bias (Bengio et al., 2015) introduced from fully constraining the action space to admissible actions during training. This means the agent does not learn how to act when it receives observations from inadmissible actions at test phase. However, for games like ZORK3, where the agent must navigate through the game to acquire sparse rewards, this technique seems to help."
+            ],
+            "publication_ref": [
+                "b4"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Qualitative Analysis",
+            "text": [
+                "In this section, we show how CALM and KG-A2C restrict their action space. Table 2 shows a snippet of the gameplay in ZORK1. Top three rows are the textual observations and the bottom three rows are the actions generated by CALM, the objects extracted from KG in KG-A2C, and the admissible actions from the environment. CALM produces 30 different actions, but still misses 10 actions out of 17 admissible actions. Since DRRN learns to estimate Q value over generated 30 actions, those missing admissible actions can never be selected, resulting in a lack of exploration. On the other hand, KG-generated objects do not include 'sack' and 'painting', which means that the KG-A2C masks these two objects out from their object space. Then, the agent neglects any action that includes these two object, which also results in a lack of exploration."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "Discussion",
+            "text": [
+                "Supervised Learning Loss. Intuitively, RL is to teach the agent how to complete the game while SL is to teach how to play the game. If the agent never acquired any reward signal, learning is only guided by SL. This is equivalent to applying imitation learning to the agent to follow more probable actions, a.k.a. admissible actions in TGs. However, in the case where the agent has reward signals to learn from, SL turns into regularization ( \u00a75.2), inducing a more uniformly distributed policies. In this sense, SL could be considered as the means to introduce the effects similar to entropy regularization in Ammanabrolu and Hausknecht (2020).",
+                "Exploration as Data Collection. In RL, the algorithm naturally collects and learns from data. Admissible action prediction from LM is yet to be accurate enough to replace the true admissible actions (Ammanabrolu and Riedl, 2021;Yao et al., 2020). This results in poor exploration and the agent may potentially never reach a particular state. On the other hand, KG-based methods (Ammanabrolu and Hausknecht, 2020;Peng et al., 2021;Xu et al., 2020Xu et al., , 2021Xu et al., , 2022;;Ryu et al., 2022) must learn admissible actions before exploring the environment meaningfully. This will waste many samples since the agent will attempt inadmissible actions, collecting experiences of the unchanged states. Additionally, its action selection is largely dependent on the quality of KG. The missing objects from KG may provoke the same effects as LM, potentially obstructing navigating to a particular state. In this regards, \u03f5-admissible exploration can overcome the issue by promoting behaviour that the agent would take after learning admissible actions fully. Under such conditions that a compact list of actions is either provided the environment or extracted by algorithm (Hausknecht et al., 2020), our approach can be employed. Intuitively, this is similar to playing the game with a game manual but not a ground truth to complete the game, which leads to collecting more meaningful data. It also collects more diverse data due to the stochasticity of exploration. Hence, TAC with \u03f5-admissible exploration can learn how to complete the game with minimal knowledge of how to play the game.",
+                "Bias in Exploration. Our empirical results from adaptive \u03f5 experiments in Appendix I suggest that reasonable \u03f5 is required for both under-explored states and well-explored states. This could indicate that diverse data collection is necessary regardless of how much the agent knows about the game while \u03f5 value should not be too high such that the agent can exploit. Finally, from our ablation, fully constraining action space to admissible actions degrades performance. This could be a sign of exposure bias, which is a typical issue in NLG tasks (He et al., 2019;Mandya et al., 2020) and occurs between the training-testing discrepancy due to the teacher-forcing done at training (He et al., 2019). In our setting, this phenomena could potentially occur if the agent only learns from admissible actions at training time. Since \u03f5-admissible exploration allows a collection of experiences of any actions (i.e., potentially inadmissible actions) with probability of 1 \u2212 \u03f5, TAC with reasonable \u03f5 learns from high quality and unbiased data. Our observations indicate that both the algorithm that learns from data, and the exploration to acquire data are equally important."
+            ],
+            "publication_ref": [
+                "b25",
+                "b17",
+                "b24",
+                "b22",
+                "b23",
+                "b11",
+                "b15",
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "Text-based Games (TGs) offer a unique framework for developing RL agents for goal-driven and contextually-aware natural language generation tasks. In this paper we took a fresh approach in utilizing the information from the TG environment, and in particular the admissibility of actions during the exploration phase of RL agent. We introduced a language-based actor critic method (TAC) with a simple \u03f5-admissible exploration. The core of our algorithm is the utilization of admissible actions in training phase to guide the agent exploration towards collecting more informed experiences. Compared to state-of-the-art approaches with more complex design, our light TAC design achieves substantially higher game scores across 10-29 games.",
+                "We provided insights into the role of action admissibility and supervision signals during training and the implications at test phase for an RL agent. Our analysis showed that supervised signals towards admissible actions act as guideline in the absence of reward signal, while serving a regularization role in the presence of such signal. We demonstrated that reasonable \u03f5 probability threshold is required for high quality unbiased experience collection during the exploration phase."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Appendices",
+            "text": [
+                "In this section, we provide the details of TAC, training, and full experimental results. We also provide Limitations and Ethical Considerations."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Hyperparameters",
+            "text": [
+                "Table 3 shows the hyper-parameters used for our experiments. For 905, ADVENT, ANCHOR, AWAKEN, DEEPHOME, INHUMANE and MOONLIT, gradients exploding has been observed with the hyperparameters in Table 3, so we reduced learning rate to 10 \u22125 for these games.  "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7",
+                "tab_7"
+            ]
+        },
+        {
+            "heading": "B Parameter Size for ZORK1",
+            "text": [
+                "The total parameter size of TAC in ZORK1 is 1,783,849 with 49,665 target state critic, which slightly varies by the size of template and object space per game. This is much lower than KG-A2C (4,812,741), but little higher than DRRN (1,486,081). 5"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Training Time",
+            "text": [
+                "We used Intel Xeon Gold 6150 2.70 GHz for CPU and Tesla V100-PCIE-16GB for GPU, 8 CPUs with 25GB memory, to train KG-A2C and TAC on ZORK1. The results are demonstrated in Table 5. 6 Our TAC has approximately three times lesser parameters than KG-A2C in ZORK1, which 5 The code for KG-A2C is in https://github.com/ rajammanabrolu/KG-A2C, and DRRN is in https:// github.com/microsoft/tdqn. 6 The code for KG-A2C is in https://github.com/ rajammanabrolu/KG-A2C. would be consistent across different games. On the other hand, for step per second, TAC is twice faster in GPU and thrice faster in CPU than KG-A2C. Approximated days for training TAC on CPU and GPU are 1.2 and 0.8 days while KG-A2C is 4.1 and 1.6 days. TAC still benefits from GPU, but not as much as KG-A2C as its training time is more dependent to the game engine than backpropagation.",
+                "Step/second (CPU)",
+                "Step/second (GPU) Parameter Size KG-A2C 0.28 0.71 4.8M TAC 0.99 1.43 1.8M  "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "D Details of Actor and Critic Components",
+            "text": [
+                "Consider an action example (take OBJ from OBJ, egg, fridge) as (template, first object, second object). Template a T = (take OBJ from OBJ) is sampled from template decoder and encoded to h T with text encoder. Object decoder takes action representation a and encoded semi-completed action h T and produces the first object a O1 = (egg). The template a T = (take OBJ from OBJ) and the first object a O1 = (egg) are combined to a T,O1 = (take egg from OBJ), a T \u2297 a O1 = a T,O1 . a T,O1 is then, encoded to hidden state h T,O1 with text encoder. Similarly, the object decoder takes a and h T,O1 and produces the second object a O2 = (fridge). a T,O1 and a O2 are combined to be natural language action, a T,O1 \u2297 a O2 = a N Finally, a N is encoded to h a with text encoder and inputted to state-action critic to predict Q value.",
+                "E Comparison with Vanilla A2C in Ammanabrolu and Hausknecht (2020) Architecture. Vanilla A2C from Ammanabrolu and Hausknecht (2020) uses separate gated recurrent units (GRUs) to encode textual observations and previous action, (o game , o look , o inv , a t\u22121 ), and transforms the game score, n score , into binary encoding. Then, they are concatenated and passed through state network to form state representation. Their state network is GRU-based to account historical information. The actor-critic network consists of actor and state value critic, so the state representation is used to estimate state value and produce the policy distribution.",
+                "Our TAC uses a single shared GRU to encode textual observations and previous action with different initial state to signify that the text encoder con-structs the general representation of text while the game score is embedded to learnable high dimentional vector. However, when constructing state representation, we only used (o game , o look , o inv ) under our observation that o game carries semantic information about a t\u22121 . Additionally, we also observed that the learned game score representation acts as conditional vector in Appendix F, so the state representation is constructed as an instance of observation without historical information. Finally, we included additional modules, state-action value critic (Haarnoja et al., 2018), target state critic (Mnih et al., 2015) and two state-action critics (Fujimoto et al., 2018;Haarnoja et al., 2018) for practical purpose.",
+                "Objective Function. Three objectives are employed in Ammanabrolu and Hausknecht (2020), reinforcement learning (RL), supervised learning (SL) and entropy regularization. Both RL and SL are also used in our objectives with minor changes in value function update in RL. That is, two stateaction value critics are updated independently to predict Q value per state-action pair and target state critic is updated as moving average of state critic Notable difference is that we excluded entropy regularization from Ammanabrolu and Hausknecht (2020). This is because under our ablation in Section 5.2, we observed that SL acts as regularization.",
+                "Replay Buffer Unlike on-policy vanilla A2C (Ammanabrolu and Hausknecht, 2020), since TAC utilizes \u03f5-admissible exploration, it naturally sits as off-policy algorithm. We used prioritized experience replay (PER) as our replay buffer (Schaul et al., 2016). Standard PER assigns a newly acquired experience with the maximum priority. This enforces the agent to prioritize not-yet-sampled ex-Case 1.1",
+                "Step: 4 Game: Kitchen You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west and a dark staircase can be seen leading upward. A dark chimney leads down and to the east is a small window which is open. On the table is an elongated brown sack, smelling of hot peppers. A bottle is sitting on the table. The glass bottle contains: A quantity of water Look: Kitchen You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west and a dark staircase can be seen leading upward. A dark chimney leads down and to the east is a small window which is open. On the   periences over others. As we are using 32 parallel environments and 64 batch size for update, half of the updates will be directed by newly acquired experiences, which not all of them may be useful. Thus, instead, we assign newly acquired experience with TD errors when they are added to the buffer. This risks the agent not using some experiences, but it is more efficient since we sample useful batch of experiences."
+            ],
+            "publication_ref": [
+                "b9",
+                "b16",
+                "b8",
+                "b9",
+                "b19"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "F Qualitative Analysis",
+            "text": [
+                "It has been repetitively reported that including game score when constructing state helps in TGs (Ammanabrolu and Hausknecht, 2020;Jang et al., 2021). Here, we provide some insights in what the agent learns from the observations using fully trained TAC. To illustrate this, we highlight the role of game score on the action preference of the TAC for the same observation in ZORK1. Observations for different cases can be found in Table 6 and Ta-ble 8 while the policy and Q value are in Table 7 and Table 9.",
+                "Case 1 in Table 6 and   "
+            ],
+            "publication_ref": [
+                "b12"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_11",
+                "tab_12",
+                "tab_15",
+                "tab_11"
+            ]
+        },
+        {
+            "heading": "G Full Experimental Results",
+            "text": [
+                "The full learning curve of TAC and game score comparison are presented in Figure 6 and Table 10."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4"
+            ],
+            "table_ref": [
+                "tab_17"
+            ]
+        },
+        {
+            "heading": "H Stronger Supervised Signals for ZORK1",
+            "text": [
+                "We also explored how stronger supervised signals can induce better regularization in ZORK1. Similar to other sets of experiments, we selected variety of    \u03bb T -\u03bb O pair. However, our results show that TAC starts under-fitting in ZORK1 when larger \u03bb T and \u03bb O are applied."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "I Adaptive Score-based \u03f5",
+            "text": [
+                "We also designed the epsilon scheduler that dynamically assigns \u03f5 based on the game score that the agent has achieved; \u03f5 \u221d e a\u03f5 n tst nscore , where a \u03f5 is the hyper-parameters and n tst is the average testing game score. During training, higher n score exponentially increases \u03f5 while a \u03f5 controls the slope of the exponential function. Higher a \u03f5 makes the slope more steep. Intuitively, as the agent exploits the well-known states, \u03f5 is small, encouraging the agent to follow its own policy, and as the agent reaches the under-explored states (i.e., similar to test condition), \u03f5 increases to encourage more diversely. The \u03f5 is normalized and scaled. The example plot is shown in FIgure 10.",
+                "We conducted a set of ablations with dynamic \u03f5 value in DETECTIVE, PENTARI, REVERB, ZORK1 and ZORK3. We used \u03f5 min = {0.0, 0.3}, a \u03f5 = {3, 9} and \u03f5 max = {0.7, 1.0}, so total 8 different hyper-parameters. Figure 8 shows fixed \u03f5 min = 0.0 with varying a \u03f5 and \u03f5 max and Figure 8 shows fixed \u03f5 min = 0.3. Other than ZORK3, TAC with dynamic \u03f5 matches or underperforms TAC with fixed \u03f5 = 0.3. There are two interesting phenomenons. (i) Too high \u03f5 max results in more unstable learning and lower performance. This becomes very obvious in PENTARI, REVERB and ZORK1, where regardless of \u03f5 min and a \u03f5 , if \u03f5 max = 1.0, the learning curve is relatively low. In DETECTIVE of Figure 8, the learning becomes much more unstable with \u03f5 max = 1.0. This indicates that even underexplored states, exploitation may still be required.",
+                "(ii) Too low \u03f5 min results in more unstable learning and lower performance. Although PENTARI benefits from \u03f5 min = 0.0, the learning curves in Figure 8 is generally lower and unstable than Figure 9. This appears to be that despite how much the agent learned the environment, it still needs to act stochastically to collect diverse experiences."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "J Limitations",
+            "text": [
+                "Similar to CALM-DRRN (Yao et al., 2020), KG-A2C (Ammanabrolu and Hausknecht, 2020) and KG-A2C variants (Ammanabrolu et al., 2020;Xu et al., 2020;Peng et al., 2021) that use admissible actions, our method still utilizes admissible actions. This makes our TAC not suitable for environments that do not provide admissible action set. In the absence of admissible actions, our TAC requires some prior knowledge of a compact set of more probable actions from LMs or other sources. This applies to other problems, for instance, applying our proposed method to language-grounded robots requires action candidates appropriate per state that they must be able to sample during training. The algorithm proposed by Hausknecht et al. (2020) extracts admissible actions by simulating thousands of actions per every step in TGs. This can be used to extract a compact set of actions in other problems, but it would not be feasible to apply if running a simulation is computationally expensive or risky (incorrect action in real-world robot may result in catastrophic outcomes, such as breakdown)."
+            ],
+            "publication_ref": [
+                "b25",
+                "b24",
+                "b17"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "K Ethical Considerations",
+            "text": [
+                "Our proposal may impact other language-based autonomous agents, such as dialogue systems or language-grounded robots. In a broader aspect, it contributes to the automated decision making, which can be used in corporation and government. When designing such system, it is important to bring morals and remove bias to be used as intended."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Graph constrained reinforcement learning for natural language action spaces",
+            "journal": "",
+            "year": "2020-04-26",
+            "authors": "Prithviraj Ammanabrolu; Matthew J Hausknecht"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Modeling worlds in text",
+            "journal": "",
+            "year": "2021",
+            "authors": "Prithviraj Ammanabrolu; Mark Riedl"
+        },
+        {
+            "ref_id": "b2",
+            "title": "How to avoid being eaten by a grue: Exploration strategies for text-adventure agents",
+            "journal": "",
+            "year": "2002",
+            "authors": "Prithviraj Ammanabrolu; Ethan Tien; Zhaochen Luo; Mark O Riedl"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Leveraging linguistic structure for open domain information extraction",
+            "journal": "Long Papers",
+            "year": "2015",
+            "authors": "Gabor Angeli; Melvin Jose Johnson Premkumar; Christopher D Manning"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Scheduled sampling for sequence prediction with recurrent neural networks",
+            "journal": "MIT Press",
+            "year": "2015",
+            "authors": "Samy Bengio; Oriol Vinyals; Navdeep Jaitly; Noam Shazeer"
+        },
+        {
+            "ref_id": "b5",
+            "title": "COMET: commonsense transformers for automatic knowledge graph construction",
+            "journal": "Long Papers",
+            "year": "2019-07-28",
+            "authors": "Antoine Bosselut; Hannah Rashkin; Maarten Sap; Chaitanya Malaviya; Asli Celikyilmaz; Yejin Choi"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Textworld: A learning environment for textbased games",
+            "journal": "",
+            "year": "2018",
+            "authors": "\u00c1kos Marc-Alexandre C\u00f4t\u00e9;  K\u00e1d\u00e1r; ( Xingdi; ) Eric; Ben Yuan; Tavian Kybartas; Emery Barnes; James Fine; Matthew Moore; Layla El Hausknecht; Mahmoud Asri; Wendy Adada; Adam Tay;  Trischler"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Learning how to active learn: A deep reinforcement learning approach",
+            "journal": "Association for Computational Linguistics",
+            "year": "2017",
+            "authors": "Meng Fang; Yuan Li; Trevor Cohn"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Addressing function approximation error in actor-critic methods",
+            "journal": "PMLR",
+            "year": "2018",
+            "authors": "Scott Fujimoto; David Herke Van Hoof;  Meger"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor",
+            "journal": "PMLR",
+            "year": "2018-07-10",
+            "authors": "Tuomas Haarnoja; Aurick Zhou; Pieter Abbeel; Sergey Levine"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Interactive fiction games: A colossal adventure",
+            "journal": "AAAI Press",
+            "year": "2020-02-07",
+            "authors": "Matthew J Hausknecht; Prithviraj Ammanabrolu; Marc-Alexandre C\u00f4t\u00e9; Xingdi Yuan"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Quantifying exposure bias for neural language generation. CoRR, abs",
+            "journal": "",
+            "year": "1905",
+            "authors": "Tianxing He; Jingzhao Zhang; Zhiming Zhou; James R Glass"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Monte-carlo planning and learning with language action value estimates",
+            "journal": "",
+            "year": "2021",
+            "authors": "Youngsoo Jang; Seokin Seo; Jongmin Lee; Kee-Eung Kim"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Agnieszka Grabska-Barwinska, Demis Hassabis, Claudia Clopath, Dharshan Kumaran, and Raia Hadsell",
+            "journal": "CoRR",
+            "year": "2016",
+            "authors": "James Kirkpatrick; Razvan Pascanu; Neil C Rabinowitz; Joel Veness; Guillaume Desjardins; Andrei A Rusu; Kieran Milan; John Quan; Tiago Ramalho"
+        },
+        {
+            "ref_id": "b14",
+            "title": "ALBERT: A lite BERT for self-supervised learning of language representations",
+            "journal": "",
+            "year": "2020-04-26",
+            "authors": "Zhenzhong Lan; Mingda Chen; Sebastian Goodman; Kevin Gimpel; Piyush Sharma; Radu Soricut"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Do not let the history haunt you: Mitigating compounding errors in conversational question answering",
+            "journal": "",
+            "year": "2020",
+            "authors": "Angrosh Mandya; O' James; Danushka Neill; Frans Bollegala;  Coenen"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Dharshan Kumaran, Daan Wierstra, Shane Legg, and Demis Hassabis",
+            "journal": "Charles Beattie",
+            "year": "2015",
+            "authors": "Volodymyr Mnih; Koray Kavukcuoglu; David Silver; Andrei A Rusu; Joel Veness; Marc G Bellemare; Alex Graves; Martin A Riedmiller; Andreas Fidjeland; Georg Ostrovski; Stig Petersen"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Inherently explainable reinforcement learning in natural language",
+            "journal": "",
+            "year": "2021",
+            "authors": "Xiangyu Peng; Mark O Riedl; Prithviraj Ammanabrolu"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Shirui Pan, and Reza Haf. 2022. Fire burns, sword cuts: Commonsense inductive bias for exploration in text-based games",
+            "journal": "Association for Computational Linguistics",
+            "year": "",
+            "authors": "Dongwon Ryu; Ehsan Shareghi; Meng Fang; Yunqiu Xu"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Prioritized experience replay",
+            "journal": "",
+            "year": "2016",
+            "authors": "Tom Schaul; John Quan; Ioannis Antonoglou; David Silver"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Observational overfitting in reinforcement learning",
+            "journal": "",
+            "year": "2020",
+            "authors": "Xingyou Song; Yiding Jiang; Stephen Tu; Yilun Du; Behnam Neyshabur"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Multi-stage episodic control for strategic exploration in text games",
+            "journal": "",
+            "year": "2022",
+            "authors": "Jens Tuyls; Shunyu Yao; M Sham;  Kakade;  Karthik R Narasimhan"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Generalization in text-based games via hierarchical reinforcement learning",
+            "journal": "",
+            "year": "2021",
+            "authors": "Yunqiu Xu; Meng Fang; Ling Chen; Yali Du; Chengqi Zhang"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Perceiving the world: Question-guided reinforcement learning for text-based games",
+            "journal": "Long Papers",
+            "year": "2022",
+            "authors": "Yunqiu Xu; Meng Fang; Ling Chen; Yali Du; Joey Zhou; Chengqi Zhang"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Deep reinforcement learning with stacked hierarchical attention for text-based games",
+            "journal": "",
+            "year": "2020-12-06",
+            "authors": "Yunqiu Xu; Meng Fang; Ling Chen; Yali Du; Joey Tianyi Zhou; Chengqi Zhang"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Keep CALM and explore: Language models for action generation in textbased games",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Shunyu Yao; Rohan Rao; Matthew Hausknecht; Karthik Narasimhan"
+        },
+        {
+            "ref_id": "b26",
+            "title": "In one corner of the house there is a small window which is slightly ajar. Look: Behind House You are behind the white house. A path leads into the forest to the east. In one corner of the house there is a small window which is slightly ajar. Inv: You are empty handed. Score: 0 Action: open window Case 2.2 Step: 3 Game: With great effort, you open the window far enough to allow entry. Look: Behind House You are behind the white house. A path leads into the forest to the east",
+            "journal": "north",
+            "year": "",
+            "authors": ""
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure 2: The full learning curve of TAC on five games in Jericho suite. Blue and red plots are training and testing game score while cyan and yellow star marker line signify CALM-DRRN and KG-A2C.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "34",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :Figure 4 :34Figure 3: Ablation study on five popular games in Jericho suite. Four different ablation are conducted with SL, \u03f5 = 0.0, \u03f5 = 1.0, and with full admissible constraints during training (Admissible Action space). Similar to the previous figure, CALM-DRRN and KG-A2C are added for comparison.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 5 :5Figure 5: The details of actor and critic of text-based actor-critic; State representation is the input to actor-critic while a red circle is the output from actor, a N representing natural language action. Red and green boxes indicate actor and critic, respectively.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 6 :6Figure 6: The full learning curve for TAC, compared with TDQN and KG-A2C",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 7 :7Figure 7: The learning curve of TAC for regularization ablation in ZORK1. Stronger supervised signals are used with \u03f5 = 0.3, where 5-3 signifies \u03b3 T = 5 and \u03b3 O = 3.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8910",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 8 :Figure 9 :Figure 10 :8910Figure 8: The learning curve of TAC with dynamic epsilon on five popular games. All the experiments were done with fixed \u03f5 min = 0.0, a \u03f5 = {3, 9} and \u03f5 max = {0.7, 1.0}.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "A, P, O, P o , R, \u03b3), where S and A are a set of state and action, and P is the state transition probability that maps state-action pair to the next state, Pr(s t+1 |s t , a t ). O is a set of observation that depends on the current state via an emission probability, P o \u2261 Pr(o t |s t ). R is an immediate reward signal held between the state and the next state, r(s t , s t+1 ), and \u03b3 is the discount factor. The action selection rule is referred to as the policy \u03c0(a|o), in which the optimal policy acquires the maximum rewards in the shortest move. TG Environment as POMDP.Three textual observations are acquired from the engine, game feedback o game , room description o look , and inventory description o inv . The game feedback is dependent on the previous action, Pr(o game,t |s",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "3.2 Game score comparison over 10 popular game environments in Jericho, with best results highlighted by boldface. We only included algorithms that reported the end performance. \u2020 HEX-RL and HEX-RL-IM did not report the performance in ZORK3 and are not open-sourced, so the mean average did not account ZORK3.",
+            "figure_data": "DETECTIVE289.7207.9246.1274.0276.7276.9272.3 \u00b1 23.3LIBRARY9.014.310.018.015.913.818.0 \u00b1 1.2LUDICORP10.117.817.618.014.017.67.7 \u00b1 2.5PENTARI0.050.748.250.034.644.753.2 \u00b1 2.9TEMPLE0.07.67.98.08.08.05.8 \u00b1 2.3ZORK130.434.033.635.029.830.246.3 \u00b1 5.0ZORK30.50.10.70.1\u2212\u22121.6 \u00b1 1.2ZTUU3.75.05.05.05.05.133.2 \u00b1 26.3NORMALIZED MEAN0.15490.24750.24900.27880.2722  \u20200.2834  \u20200.3307"
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "50% higher score than both CALM-DRRN and KG-A2C with normalized mean score. Per game, in SORCERER, SPIRIT, ZORK3 and ZTUU, TAC achieves at least \u223c 200% and at most \u223c 400% higher score.. In ACORNCOURT, DEEPHOME and DRAGON, both",
+            "figure_data": "PENTARI,"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "GameKitchen. On the table is an elongated brown sack, smelling of hot peppers. A bottle is sitting on thetable. The glass bottle contains: A quantity of water. Inventory You are carrying: A painting, A brass lantern (providing light) Room Kitchen. You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west and a dark staircase can be seen leading upward. A dark chimney leads down and to the east is a small window which is open. On the table is an elongated brown sack, smelling of hot peppers. A bottle is sitting on the table. 'all', 'antique', 'board', 'bottle', 'brass', 'chimney', 'dark', 'door', 'down', 'east', 'exit', 'front', 'grue', 'house', 'is', 'kitchen', 'lantern', 'large', 'light', 'narrow', 'north', 'of', 'passage', 'path', 'quantity', 'rug', 'south', 'staircase', 'table', 'to', 'trap', 'trophy', 'up', 'west', 'white', 'window', 'with' Admiss. Actions 'close window', 'east', 'jump', 'open bottle', 'open sack', 'put down all', 'put down light', 'put down painting', 'put light on table', 'put out light', 'put painting on table', 'take all', 'take bottle', 'take sack', 'throw light at window', 'up', 'west'",
+            "figure_data": "The glass bottlecontains: A quantity of waterLM'close bottle', 'close door', 'down', 'drink water', 'drop bottle',Actions'drop painting', 'east', 'empty bottle', 'get all', 'get bottle', 'geton table', 'get painting', 'get sack', 'north', 'open bottle', 'out','pour water on sack', 'put candle in sack', 'put painting in sack','put painting on sack', 'put water in sack', 'south', 'take all','take bottle', 'take painting', 'take sack', 'throw painting', 'up','wait', 'west'KG'a',Objects"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Action space for a game observation (top panel) for CALM (LM), KG-A2C (KG), and the Admissible Action sets. Red and blue colored actions are the actions missed by either CALM or KG-A2C. Brown are the actions missed by both, and blacks are actions covered by both.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "Hyper-parameters for main experiments.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "Parameter size for ZORK1.",
+            "figure_data": "NameSizetext_encoder_network.embedding.weight[8000,100]text_encoder_network.embedding_sa.weight[4,128]text_encoder_network.encoder.weight_ih_l0[384,100]text_encoder_network.encoder.weight_hh_l0[384,128]text_encoder_network.encoder.bias_ih_l0[384]text_encoder_network.encoder.bias_hh_l0[384]state_network.embedding_score.weight[1024,128]state_network.tf.weight[128,384]state_network.tf.bias[128]state_network.fc1.weight[128,128]state_network.fc1.bias[128]state_network.fc2.weight[128,128]state_network.fc2.bias[128]state_network.fc3.weight[128,128]state_network.fc3.bias[128]state_network.s.weight[128,128]state_network.s.bias[128]state_critic.fc1.weight[128,128]state_critic.fc1.bias[128]state_critic.fc2.weight[128,128]state_critic.fc2.bias[128]state_critic.fc3.weight[128,128]state_critic.fc3.bias[128]state_critic.v.weight[1,128]state_critic.v.bias[1]actor_network.fc1.weight[128,128]actor_network.fc1.bias[128]actor_network.fc2.weight[128,128]actor_network.fc2.bias[128]actor_network.fc3.weight[128,128]actor_network.fc3.bias[128]actor_network.a.weight[128,128]actor_network.a.bias[128]state_action_critic_1.fc1.weight[128,256]state_action_critic_1.fc1.bias[128]state_action_critic_1.fc2.weight[128,128]state_action_critic_1.fc2.bias[128]state_action_critic_1.fc3.weight[128,128]state_action_critic_1.fc3.bias[128]state_action_critic_1.q.weight[1,128]state_action_critic_1.q.bias[1]state_action_critic_2.fc1.weight[128,256]state_action_critic_2.fc1.bias[128]state_action_critic_2.fc2.weight[128,128]state_action_critic_2.fc2.bias[128]state_action_critic_2.fc3.weight[128,128]state_action_critic_2.fc3.bias[128]state_action_critic_2.q.weight[1,128]state_action_critic_2.q.bias[1]target_state_critic.fc1.weight[128,128]target_state_critic.fc1.bias[128]target_state_critic.fc2.weight[128,128]target_state_critic.fc2.bias[128]target_state_critic.fc3.weight[128,128]target_state_critic.fc3.bias[128]target_state_critic.v.weight[1,128]target_state_critic.v.bias[1]template_decoder_network.tmpl_gru.weight_ih_l0[384,128]template_decoder_network.tmpl_gru.weight_hh_l0[384,128]template_decoder_network.tmpl_gru.bias_ih_l0[384]template_decoder_network.tmpl_gru.bias_hh_l0[384]template_decoder_network.fc2.weight[128,128]template_decoder_network.fc2.bias[128]template_decoder_network.tmpl.weight[235,128]template_decoder_network.tmpl.bias[235]object_decoder_network.obj_gru.weight_ih_l0[384,256]object_decoder_network.obj_gru.weight_hh_l0[384,128]object_decoder_network.obj_gru.bias_ih_l0[384]object_decoder_network.obj_gru.bias_hh_l0[384]object_decoder_network.fc2.weight[128,128]object_decoder_network.fc2.bias[128]object_decoder_network.obj.weight[699,128]object_decoder_network.obj.bias[699]"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "Training time as step per second in CPU and GPU and total parameter size for ZORK1.",
+            "figure_data": "Actor NetworkTemplate DecoderText EncoderState CriticObject DecoderText EncoderState-Action CriticObject DecoderText Encoder53241"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "table is an elongated brown sack, smelling of hot peppers. A bottle is sitting on the table. The glass bottle contains: A quantity of water Inv: You are empty handed. Kitchen On the table is an elongated brown sack, smelling of hot peppers. A bottle is sitting on the table. The glass bottle contains: A quantity of water Look: Kitchen You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west and a dark staircase can be seen leading upward. A dark chimney leads down and to the east is a small window which is open. On the table is an elongated brown sack, smelling of hot peppers. A bottle is sitting on the table. The glass bottle contains: A quantity of water Inv: You are carrying: A painting A brass lantern (providing light) Kitchen On the table is an elongated brown sack, smelling of hot peppers. A bottle is sitting on the table. The glass bottle contains: A quantity of water Look: Kitchen You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west and a dark staircase can be seen leading upward. A dark chimney leads down and to the east is a small window which is open. On the table is an elongated brown sack, smelling of hot peppers. A bottle is sitting on the table. The glass bottle contains: A quantity of water Inv: You are empty handed.",
+            "figure_data": "Score: 10Action: westCase 1.2Step: 15Game: Score: 39Action: westCase 1.3Step: 20Game: Score: 45Action: east"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_11",
+            "figure_caption": "Case 1; Game observation and the selected action snippets from ZORK1.",
+            "figure_data": "Case 1.1nscore = 10nscore = 39nscore = 45\u03c0(a T |o)Q(o, a)\u03c0(a T |o)Q(o, a)\u03c0(a T |o)Q(o, a)west0.999823.74600.0004.14340.0005.0134east0.00018.43850.56745.16400.99966.0319Case 1.2nscore = 10nscore = 39nscore = 45\u03c0(a T |o)Q(o, a)\u03c0(a T |o)Q(o, a)\u03c0(a T |o)Q(o, a)west0.997527.60050.98198.37940.89678.0586east0.00023.60150.00026.52840.0006.4848Case 1.3nscore = 10nscore = 39nscore = 45\u03c0(a T |o)Q(o, a)\u03c0(a T |o)Q(o, a)\u03c0(a T |o)Q(o, a)west0.787222.24190.00014.96640.0005.0169east0.005519.17510.78215.72990.99996.2653"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_12",
+            "figure_caption": "Case 1; The changes in policy and Q value based on the score embedding from ZORK1.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_13",
+            "figure_caption": "For three different cases, Case 1.1, Case 1.2, and Case 1.3, the agent is at Kitchen location, so many semantic meaning between textual observations are similar, i.e. o look or o inv . For each case, the agent is meant to go west with n score = 10, go west with n score = 39, and go east with n score = 45, respectively. In Case 1.1, despite the optimal choice of action is west, by replacing the score from n score = 10 to n score = 45, the agent chooses east, which is appropriate for Case 1.3. Another interesting observation is that replacing game score decreases Q value from 23.7460 to 5.0134 for west and from 18.4385 to 6.0319 for east in Case 1.1.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "table",
+            "figure_id": "tab_14",
+            "figure_caption": "Case 2; Game observation and the selected action snippets from ZORK1.",
+            "figure_data": "Case 2.1nscore = 0nscore = 45\u03c0(a T |o)Q(o, a)\u03c0(a T |o)Q(o, a)open window0.999929.02050.01115.9599west0.000028.68480.08936.1119north0.000026.79970.81746.2819Case 2.2nscore = 0nscore = 45\u03c0(a T |o)Q(o, a)\u03c0(a T |o)Q(o, a)open window0.000030.21540.00006.1354west0.999932.02980.00005.8312north0.000026.75090.99526.6669Case 2.3nscore = 0nscore = 45\u03c0(a T |o)Q(o, a)\u03c0(a T |o)Q(o, a)open window0.000030.21840.00016.0443west0.999932.03020.00005.6724north0.000026.74940.98676.5545"
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "table",
+            "figure_id": "tab_15",
+            "figure_caption": "Case 2; The changes in policy and Q value based on the score embedding from ZORK1.of n score carries some inductive bias, i.e. temporal, for the agent to infer the stage of the game. This is consistently manifested in Case 1.3, but in Case 1.2, the agent is robust to the game score because it carries painting that is directly related to reward signals, navigating to pursue that particular reward, which is put paining in case for reward signal of +6 in Living Room location.Case 2 in Table8 and Table 9In Case 2, the agent is at Behind House for three other sets of game instances, which has action and score pair as, open window for n score = 0, west for n score = 0, and north for n score = 45. The phenomenon between Case 1.1 and Case 1.3 occurs the same for Case 2.2 and Case 2.3. However, unlike Case 1, the score between Case 2.1 and Case 2.2 is the same. This means that the agent somehow chooses the optimal action for Case 2.2 over Case 2.1 in the case where n score = 0 is injected for Case 2.3. This appears to be that the agent can capture semantic correlation between \"In one corner of the house there is a small window which is open\" from textual observation in Case 2.3 and open window action. Because a small window is already opened, open window action is no longer required, so the agent tends to produce west, which is appropriate for Case 2.2.Thus, from our qualitative analysis, we speculate that the agent captures the semantics of the textual observations and infers the game stage from game score embedding to make optimal decision.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "table",
+            "figure_id": "tab_17",
+            "figure_caption": "Game score comparison over 29 game environments in Jericho, with best results highlighted by boldface. NAIL and DRRN are non-generative baselines while TDQN and KG-A2C are generative baselines. The last row is the mean game score over all the environments. The initial game score of ADVENT \u2020 is 36 and DEEPHOME \u2021 is 1.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "value, Q(s t , a t ) = E[ \u221e k=0 \u03b3 k r t+k+1 |s t , a t ],",
+            "formula_coordinates": [
+                2.0,
+                305.87,
+                522.16,
+                196.78,
+                15.24
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "L R = \u2212E [A(o, a)\u2207 \u03b8 ln \u03c0 \u03b8 (a|o)] , (1) A(o, a) = Q \u03b8 (o, a) \u2212 V \u03b8 (o),",
+            "formula_coordinates": [
+                4.0,
+                104.64,
+                457.22,
+                185.23,
+                27.31
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "LV = E \u2207 \u03b8 V \u03b8 (o) \u2212 r + \u03b3V\u03b8(o \u2032 ) ,(3)",
+            "formula_coordinates": [
+                4.0,
+                104.8,
+                514.15,
+                184.94,
+                10.63
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "LQ = E \u2207 \u03b8 Q \u03b8 (o, a) \u2212 r + \u03b3V\u03b8(o \u2032 ) ,(4)",
+            "formula_coordinates": [
+                4.0,
+                99.36,
+                528.9,
+                190.38,
+                10.63
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "L T = 1 |T| a T \u2208T (y a T ln (\u03c0 \u03b8 (a T |o)) + (1 \u2212 y a T ) (1 \u2212 ln (\u03c0 \u03b8 (a T |o)))),(6)",
+            "formula_coordinates": [
+                4.0,
+                86.52,
+                633.48,
+                203.34,
+                48.58
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "L O = 1 |O| a O \u2208O (y a O ln (\u03c0 \u03b8 (a O |o, \u00e2)) + (1 \u2212 y a O ) (1 \u2212 ln (\u03c0 \u03b8 (a O |o, \u00e2)))),(7)",
+            "formula_coordinates": [
+                4.0,
+                80.0,
+                685.18,
+                209.87,
+                49.57
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "y a T = 1 a T \u2208 T a 0 otherwise y a O = 1 a O \u2208 O a 0 otherwise",
+            "formula_coordinates": [
+                4.0,
+                75.17,
+                742.33,
+                208.46,
+                26.07
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "L = \u03bb R L R +\u03bb V L V +\u03bb Q L Q +\u03bb T L T +\u03bb O L O. (8",
+            "formula_coordinates": [
+                4.0,
+                311.6,
+                394.21,
+                209.3,
+                11.18
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": ")",
+            "formula_coordinates": [
+                4.0,
+                520.9,
+                394.55,
+                4.24,
+                9.46
+            ]
+        },
+        {
+            "formula_id": "formula_9",
+            "formula_text": "\u03b2(a|s) = U(A a (s)) p < \u03f5 \u03c0(a|s) p \u2265 \u03f5 (9)",
+            "formula_coordinates": [
+                4.0,
+                348.91,
+                626.18,
+                176.24,
+                25.83
+            ]
+        }
+    ],
+    "doi": "10.3115/v1/P15-1034"
+}

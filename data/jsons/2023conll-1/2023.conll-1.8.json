@@ -1,0 +1,745 @@
+{
+    "title": "A Comparative Study on Textual Saliency of Styles from Eye Tracking, Annotations, and Language Models",
+    "authors": "Karin De Langis; Dongyeop Kang",
+    "pub_date": "",
+    "abstract": "There is growing interest in incorporating eyetracking data and other implicit measures of human language processing into natural language processing (NLP) pipelines. The data from human language processing contain unique insight into human linguistic understanding that could be exploited by language models. However, many unanswered questions remain about the nature of this data and how it can best be utilized in downstream NLP tasks. In this paper, we present eyeStyliency, an eye-tracking dataset for human processing of stylistic text (e.g., politeness). We develop a variety of methods to derive style saliency scores over text using the collected eye dataset. We further investigate how this saliency data compares to both human annotation methods and model-based interpretability metrics. We find that while eyetracking data is unique, it also intersects with both human annotations and model-based importance scores, providing a possible bridge between human-and machine-based perspectives. We propose utilizing this type of data to evaluate the cognitive plausibility of models that interpret style. Our eye-tracking data and processing code are publicly available. 1  ",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Human perception and understanding of text is critical in NLP. Typically, this understanding is leveraged in the form of ground-truth human annotations in supervised learning pipelines, or in the form of human evaluations of generated text. However, human language understanding is complex; multiple cognitive processes work together to enable reading, many of which occur automatically and unconsciously (DeVito, 1970).",
+                "Because of the complexity, disciplines concerned with understanding and modeling how humans read -e.g., psycholinguistics and cognitive science -heavily utilize implicit measures of the Figure 1: Salient words for impoliteness from three different perspectives. We find that eye tracking data contains some overlap between machine and human-annotated salience.",
+                "human reading experience that capture signals from these automatic processes in real time. Examples of implicit measures include event-related potential, reaction times, and eye movements. In contrast, explicit measures include surveys and other methods that directly ask people to report their perceptions and experiences. We posit that traditional NLP pipelines, which have widely used explicit measures of human understanding, can also benefit from implicit measures. In this paper, we focus specifically on the use of eye movements as an implicit measure of textual saliency.",
+                "Recent research in NLP has demonstrated the feasibility of incorporating various types of eye movement data into NLP models in order to improve performance on a number of tasks (see Table 2 for an overview). However, this is still an underexplored area: best practices remain unclear, and it's not obvious whether there are tasks that are unsuitable for eye movement data, or how eye movement data should be balanced with traditional annotation data. In this work, we address two main research questions: RQ1: Does eye-tracking-based saliency meaningfully differ from simply gathering word-level human annotations, or from modelbased word importance measures? RQ2: How can we measure eye movements specific to a high-level textual feature like style, and which eye tracking metrics and data processing methods are best suited to capturing textual saliency?",
+                "To address these questions, we conduct an eye tracking case study in which participants read texts the HummingBird dataset (Hayati et al., 2021). We choose this dataset because it contains lexicallevel human annotations indicating which words contribute to the text's style and because its domain (textual styles) has not to our knowledge been widely explored for eye tracking applications -although prior work investigates eye tracking and sentiment analysis, it does not extend to other linguistic styles such as politeness.",
+                "We collect style-specific eye movements through a carefully designed experiment (see Section 3 for details), and we use these eye movements to derive saliency scores over the text. We compare this eye-based saliency to human annotations as well as two large language model (LLM)-derived importance scores: integrated gradient scores from a BERT model fine-tuned on style datasets (Hayati et al., 2021), and word-surprisal scores from GPT-2 (Radford et al., 2019) (see Figure 1 for an example). Our findings indicate that eye-trackingbased saliency highlights some unique areas of the text, but it also intersects with both saliency from model-based metrics and saliency from human annotations, making a bridge of sorts between the human-and machine-based perspectives. We discuss some implications of these findings for NLP research.",
+                "Specifically, our contributions are:",
+                "\u2022 An experimental paradigm for obtaining eye tracking-based signals for specific features of text (in our case, textual style). \u2022 A first-of-its-kind eye movement dataset on style saliency, collected from 20 participants and consisting of both control readings and style-focused readings for polite, impolite, positive, and negative textual styles. \u2022 An illustration of the distinction between this dataset's explicit human annotations and implicit human eye data through a unique comparison between salient text obtained via annotation and via eye tracking."
+            ],
+            "publication_ref": [
+                "b7",
+                "b11",
+                "b11",
+                "b27"
+            ],
+            "figure_ref": [
+                "fig_4",
+                "fig_4"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": [
+                "Eye tracking has been a staple of psycholinguistic investigations of reading for decades (Rayner, 1978;Just and Carpenter, 1980). Eye movement data is compelling because it provides realtime information about how people process language in a natural, ecologically valid setting (i.e., there is no Most prior research has focused on either (a) comparing and contrasting eye movements with various models' attention mechanisms, or (b) using eye movements for multi-task learning, where NLP task performance can be improved by a model that jointly learns to predict eye movements in addition to the relevant NLP task. To our knowledge, there have not been three-way comparisons between attention mechanisms from eye tracking, large language models, and manual human annotations.",
+                "explicit experimental task, such as question answering, for participants to complete) (Kaiser, 2013).",
+                "Eye data provides insight into cognitive processes through the eye-mind assumption, which posits that (1) our eyes fixate on whatever our brains are currently processing, and (2) as cognitive effort to process an item increases, the amount of time that the eyes fixate on that item also increases (Just and Carpenter, 1980). Analysis of eye data under this framework has led to important insights into many unconscious phenomena in human language comprehension, e.g. the mechanisms involved in ambiguity resolution during reading (Traxler and Frazier, 2008).",
+                "Eye Tracking in NLP. Due to the eye-mind assumption, eye-tracking data is particularly wellsuited to inferring patterns of reader attention, or saliency, over text. This saliency information has so far shown promising results when integrated into NLP models for question answering (e.g. Malkin et al. (2022); Sood et al. (2020a); Malmaud et al. (2020)). However, this is still a developing research area: there is limited available data, and there is little consensus regarding how to effectively collect data and incorporate it into NLP pipelines. To our knowledge there is no previous research that investigates saliency for style via eye tracking, nor any previous research that compares saliency from eye tracking to human annotations (Table 1 compares our work with the prior work).",
+                "Outside of textual saliency, eye-tracking data has been leveraged for a variety of NLP tasks. Mishra et al. (2013) quantify the difficulty of sentences in machine translation tasks using eye movement data; Mishra et al. (2016) determine whether a reader understands sarcasm in text, and S\u00f8gaard (2016) evaluate the quality of word embeddings and text generations, respectively. Other work uses existing datasets, sometimes augmenting the data with a learned gaze predictor model, and uses this eye movement data as an additional signal when training models for various NLP tasks, including named entity recognition (Hollenstein et al., 2019;Tokunaga et al., 2017), paraphrasing (Sood et al., 2020b), part-of-speech tagging (Barrett et al., 2018), and sentiment analysis (see also Mathias et al. (2020) for a review).",
+                "Saliency in Linguistic Styles. People apply styles to language in order to express attitudes, reflect interpersonal intentions or goals, or convey social standings of the speaker or listener. (Note that while many sociolinguistics theories distinguish between textual style and textual attributes, in this work, we follow the common convention in recent NLP papers of broadly using 'style' to encompass both of these ideas (Jin et al., 2022).) The meaning expressed by textual styles can be significant; in fact, there is strong evidence that effective communication requires an understanding of both style and literal semantic meaning (Hovy, 1987). Although BERT (Devlin et al., 2018) based fine-tuned models show strong performance on style classification, there are notable differences between how BERT perceives style at the lexical level and how humans perceive it, and that using data about these differences during training improves model performance (Hayati et al., 2023)."
+            ],
+            "publication_ref": [
+                "b28",
+                "b16",
+                "b17",
+                "b16",
+                "b37",
+                "b21",
+                "b33",
+                "b22",
+                "b24",
+                "b25",
+                "b32",
+                "b13",
+                "b36",
+                "b34",
+                "b1",
+                "b23",
+                "b15",
+                "b14",
+                "b8",
+                "b12"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "eyeStyliency: A Dataset of Eye Movement for Textual Saliency",
+            "text": [
+                "We describe the data collection procedure for eye-Styliency dataset from 20 participants and methods for computing saliency scores over text."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Data Setups",
+            "text": [
+                "Our dataset consists of items from the Hummingbird dataset (Hayati et al., 2021) in the following stylistic categories: polite, impolite, positive sentiment, and negative sentiment. 2 We chose this subset because of the small correlation between categories (other categories, e.g. anger, disgust, and negative sentiment are all highly correlated). In this study, we limit participants' total time commitment to one hour. To achieve this, the dataset size is 90 items across the four style categories. (The average word count per item in the dataset is 21.6 overall; for the impolite, polite, negative, and positive styles average word count is 21.3, 22.8, 21.4, and 20.8, respectively.) Most participants finished the experiment in 40-60 minutes, depending on both the individual's reading speed and the time needed to calibrate the individual to the eye tracker."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Eye-Tracking Measures",
+            "text": [
+                "Monocular eye movement data is collected with an EyeLink 1000 Plus 3 at a rate of 1000Hz. We look at the following eye-tracking metrics:",
+                "\u2022 First Fixation Duration (FFD): The duration of the first fixation in an interest area. \u2022 First Run Dwell Time (FRD): The time interval beginning with the first fixation in the interest area and ending when the eye exits an interest area (whether to the right or left). \u2022 Go Past Time (GP): The time interval beginning with the first fixation in an interest area and ending when the eye exits the interest area to the left (i.e., to reread). \u2022 Dwell Time (DT): The total fixation duration for all fixations in an interest area. Also known as gaze duration. \u2022 Reread Time (RR): The total fixation duration for all fixations in an interest area after the area has already been entered and exited once. \u2022 Pupil Size (PS): The average pupil size over all fixations in an interest area.",
+                "(Note that First Run Dwell Time + Reread Time = Dwell Time.) These measures can broadly be categorized into early measures (first fixation duration, pupil size) that reflect more low-level reading processes and",
+                "Applications N FFD FC FRD DT RR RC PL eyeStyliency (Ours) Textual Style 20 \u2713 \u2717 \u2713 \u2713 \u2713 \u2717 \u2713 Kuribayashi et al. (2021) Language model perplexity \u2717 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Malmaud et al. (2020) Question Answering 269 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Bolotova et al. (2020) Question Answering 20 \u2717 \u2713 \u2717 \u2713 \u2713 \u2717 \u2717 Sood et al. (2020b) Paraphrasing \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 \u2717 \u2717 Sood et al. (2020a) Question Answering 23 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Hollenstein et al. (2019) NER, Sentiment/Relation Classification \u2717 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 Barrett et al. (2018) PoS tagging \u2717 \u2713 \u2717 \u2717 \u2713 \u2713 \u2713 \u2717 Tokunaga et al. (2017) Named entity recognition (NER) \u2717 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Mishra et al. (2016) Sarcasm detection 7 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Klerke et al. (2015) NLG evaluation 24 \u2717 \u2713 \u2717 \u2713 \u2713 \u2713 \u2713 Green (2014) Phrase-structure parsing 40 \u2717 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717",
+                "Table 2: A comparison of prior works with respect to the eye tracking metrics studied, data processing techniques, and number of participants whose eye tracking data is collected. FFD = first fixation duration, FC = fixation count, RC = regression count, RR = reread time, PL = pupil size, N = number of participants if new eye data collected. late measures (go past time, dwell time, reread time) that reflect higher-level processing and meaning integration (Conklin et al., 2021). Previous eye tracking applications for NLP have commonly used dwell time, but a variety of measures have been examined (see Table 2). In this study, we aim to compare a wide variety of measures in order to estimate which may be best-suited to capturing textual saliency. Note that to avoid redundancy, we chose to omit fixation counts from our analysis after finding high correlations between this measure and dwell time (pearson's r = 0.93, p < 0.01).",
+                "We also chose to omit regression counts from our analysis after finding that regression counts were extremely sparse -specifically, 1.8% of the dataset had a non-zero regression count."
+            ],
+            "publication_ref": [
+                "b5"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental Procedure",
+            "text": [
+                "The experiment follows a between-subjects, blocked design. The key part of our experiment is the technique to isolate eye movements that are specifically relevant to the text's style. In order to do this, we inform participants at the beginning of each block that the block will contain only stimuli that share a style (polite, impolite, positive, or negative) and source (Twitter, IMdB, or Stack Exchange/Wikipedia forums) -but in fact, we will occasionally present an incongruent style in the block (e.g., present an impolite Tweet during the polite Tweet block). We expect that incongruency to cause readers to pay more attention to stylespecific aspects of the text, as they are unexpected. We are interested in comparing the eye movements of participants who read a stimulus in the congruent condition with those of participants who read that stimulus in the incongruent condition. Note that the experiment has a between-subjects design, i.e. the same participant does not see the same text in both conditions. The congruent reading of the text provides a control. Figure 2 shows a concrete example of these two conditions, while Figure 3 shows a visualization of these contrasted eye movements.",
+                "Figure 4 shows a procedure of our experiments. The experimental procedure is as follows (more details in Appendix A). Participants complete nine blocks. At the beginning of block, the participant is informed of the style and source, and asked to pay attention to the style of the following texts. Each block contains 10 items, eight of which are congruent with the target style. The remaining two items are incongruent with the target style. Incongruent items are counterbalanced across participants. Blocks are presented in a random order, and items within the blocks are pseudorandomized to ensure adequate spacing between congruent and incongruent trials (Egner, 2007) (there is also a context-free text as an added control). Participants are asked True/False comprehension questions pseudorandomly after 30% of the items in order to maintain motivation to read carefully. After the experiment concludes, participants complete the Perceived Awareness of Research Hypothesis Scale (PARH) (Rubin, 2016) to evaluate whether demand characterstics (Nichols and Maner, 2008) of the experiment may have influenced reading behavior. The study procedure was approved by the"
+            ],
+            "publication_ref": [
+                "b9",
+                "b29",
+                "b26"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Congruent Setup",
+            "text": [
+                "A densely constructed, highly referential film, and an audacious return to form that can comfortably sit among Jean-Luc Godard's finest work."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Incongruent Setup Context",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Stimuli",
+            "text": [
+                "Watching its rote plot points connect is about as exciting as gazing at an egg timer for 93 minutes. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Eye-based saliency",
+            "text": [
+                "The following movie reviews were written by critics who disliked the film.",
+                "The following movie reviews were written by critics who liked the film.",
+                "incongruent gaze congruent gaze (control) Figure 2: Illustrative example of congruent vs incongruent presentation of the same stimulus. We rely on expectation effects to induce participants to attend to the unexpected style (in this case, positive sentiment); in other words, we assume that the surprise regarding the style will result in longer gaze durations for words that contribute to the perception of that style -in this case, words relating to positive sentiment.",
+                "institutional review board (IRB).",
+                "Participants We collect data from 20 participants (12 male, 7 female, 1 non-binary; median age 23 years) recruited from the University community and word-of-mouth. An additional 6 participants were recruited but unable to complete the study due to problems with eye calibration. Participants were compensated with a $15 Amazon gift card.",
+                "Apparatus Monocular eye movement data is collected with an EyeLink 1000 Pro, using the desktop mount, at a rate of 1000Hz. Participants use a chinrest while reading in order to stabilize the head. We use the Experiment Builder software to present stimuli to participants in a 16pt serif font with 1.5 line spacing, on our display monitor with a 508mm display area and a 1680x1050 resolution. Participants are seated with their eyes 50-60cm away from the display monitor.",
+                "Study Design Rationale Based on the welldocumented phenomenon of expectancy effects in cognition (see Schwarz et al. (2016) for further discussion), we assume that the incongruent texts that subvert the stylistic expectation will lead to participants reacting with surprise and increased processing difficulty in response to parts of the text associated with the unexpected style.",
+                "Alternative designs that explicitly ask participants to classify an item's style were strongly considered, but were rejected for two reasons: first, we are interested in observing a relatively natural read- ing process and introducing a classification task runs counter to that goal; second, the style classification task could increase the saliency of not only the target style but also its opposing style, as both can be relevant to the decision (e.g., the presence of an impolite word is relevant to the decision of whether a statement is polite). We also considered designs in which congruency is established via explicit text labels rather than implicit expectations, but decided to instead choose an experimental paradigm that adheres as closely as possible to an ecologically valid reading task."
+            ],
+            "publication_ref": [
+                "b30"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Pre-processing Eye Tracking Data",
+            "text": [
+                "Eye data was delineated into fixations and saccades using the DataViewer software with EyeLink's standard algorithm and default velocity and acceleration thresholds. We further cleaned the data by removing trials with significant track loss (i.e. trials with track loss in over 50% of the text area); 1.5% of trials were removed due to track loss. An outlier analysis showed that 0.5% of fixations were outliers and were removed in our analysis."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Calculating Saliency Scores",
+            "text": [
+                "We divide the text into interest areas (IAs) and calculate saliency scores for each IA. We do not segment the IAs such that each IA contains a single word, because in a single fixation people can read a span of about 21 surrounding characters (Rayner, 1978), meaning that many short words are not fixated on, leading to difficulties with our desired analyses. Instead, we use the natural language processing toolkit (NLTK)'s stopwords list (Bird et al., 2009) to define each IA such that stopwords share an IA with the closest non-stopword. Specifically, each stopword is combined with the closest nonstopword, with non-stopwords to the right being preferred in the case of a tie. We also ensure that no IA contains a line break. We utilize two techniques for calculating each eye tracking-based metric for each IA i . Note that these techniques are applied across all eye tracking measures x \u2208 {DT, FRD, GP, DT, RR, PS} as defined in Section 3.2.",
+                "\u2022 z-score: For each participant p k , denote the eye tracking measurement in IA i as x ki . We calculate the participant-specific z-score of eye tracking measurement from IA i as z k (IA i ) =",
+                "x ki \u2212\u00b5 k \u03c3 k , where \u00b5 k and \u03c3 k are the participantspecific arithmetic mean and standard deviation, respectively. Then, the saliency score for IA i is given by 4 Experimental Results"
+            ],
+            "publication_ref": [
+                "b28",
+                "b2"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Comparison with Other Saliency Metrics",
+            "text": [
+                "We investigate how eye tracking metrics compare with other existing measures for lexical-level significance -namely, human annotations, integrated gradient scores, and large language model surprisal scores (see Figure 5 for a visualization of these scores):",
+                "\u2022 Surprisal scores: For the text in the i th interest area, denoted IA i , the surprisal is P (IA i |IA 0 , IA 1 , ...IA i\u22121 ). We obtain this probability estimate from the pre-trained GPT-2 model (Radford et al., 2019). 4 In the event that an IA includes multiple tokens, we sum the surprisal of those tokens. \u2022 Model gradient scores: The integrated gradient method (Sundararajan et al., 2017) is often used to obtain scores over the input tokens to a deep neural network, where a token's score reflects how much that token influenced the network's final output. We obtain these scores with the Captum codebase (Kokhlikyan et al., 2020), using the fine-tuned BERT model from Hayati et al. (2021). For IA i , the integrated gradient score is the average of the individual tokens within IA i . \u2022 Human annotations: Human annotations come from the Hummingbird dataset (Hayati et al., 2021). Three annotators per item were asked to highlight words that contribute to the text's style. We averaged these binary highlighting scores over each annotator to arrive at a saliency score for each interest area.",
+                "Throughout the comparison, we answer the following two questions: How much do the salient IAs derived from each measure overlap and how much does each measure agree on the saliency strength of each IA?",
+                "To find the overlap between salient interest areas derived from different measures, we compute a binary saliency map over the dataset for each measure. We then compute the pairwise Jaccard similarity coefficient for each possible pairing of salient text sets (Fig 6), where the Jaccard similarity coefficient is their intersection over union. We use the median saliency score as the threshold that determines whether the IA is labeled \"salient\" so that each measure results in the same number of salient words, allowing a more straightforward comparison between measures.",
+                "We find that the intersection over union of salient interest areas from eye tracking methods and both integrated gradient scores and human annotations falls between 0.26 and 0.31. Critically, the threeway intersection over union between salient text from integrated gradients, human annotations, and eye tracking metrics falls between 0.05 and 0.06, indicating that each metric captures a relatively unique set of text within the dataset (see Fig 7).",
+                "We also investigate what types of words are selected as salient by each method by performing part-of-speech (POS) tagging on the salient interest areas for each measure, finding that while distributions of parts of speech are similar, humans select proportionally more adjectives while eye tracking metrics select proportionally more verbs and adverbs (Figure 9). This discrepancy may be explained by human annotators focusing more on single words with high stand-alone style (oftentimes these are adjectives such as happy, gracious), while people's eyes attend to the context surrounding that word (oftentimes this context includes verbs and adverbs). For example, in the polite phrase \"Thank you for removing...,\" human annotators highlight   It's one of those baseball pictures where the hero is stoic, the wife is patient, the kids are as cute as all get-out and the odds against success are long enough to intimidate, but short enough to make a dream seem possible.",
+                "It's one of those baseball pictures where the hero is stoic, the wife is patient, the kids are as cute as all get-out and the odds against success are long enough to intimidate, but short enough to make a dream seem possible.",
+                "It's one of those baseball pictures where the hero is stoic, the wife is patient, the kids are as cute as all get-out and the odds against success are long enough to intimidate, but short enough to make a dream seem possible.",
+                "It's one of those baseball pictures where the hero is stoic, the wife is patient, the kids are as cute as all get-out and the odds against success are long enough to intimidate, but short enough to make a dream seem possible.   only \"thank you\" whereas eye gaze also focuses on the gerund verb \"removing.\"",
+                "To measure agreement between different measures with respect to saliency strength, we compute a saliency score for each IA in the dataset derived from each measure. We then compute the pairwise Pearson's r correlation coefficient, finding most coefficients are near 0 (see Appendix). In other words, while there is some agreement across human-, machine-, and eye-based methods with respect to which IAs are above median saliency, there is little correlation with respect to the saliency scores themselves."
+            ],
+            "publication_ref": [
+                "b27",
+                "b35",
+                "b19",
+                "b11",
+                "b11"
+            ],
+            "figure_ref": [
+                "fig_11"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Qualitative Results",
+            "text": [
+                "For a qualitative visualization of saliency over the politeness style, see Figure 8. In general, human annotations have a tendency to focus on segments of text with clear style markers. For instance, phrases such as \"please\" are consistently highlighted by human annotators. Our eye tracking data indicates that these phrases do not reliably draw the reader's gaze during the realtime reading process. We notice that the eyes often focus on the object of the politness marker rather than the politeness marker itself: For instance, the polite text \"Thank you for your kind comment,\" human annotators highlight only \"thank you\" whereas gaze data focuses on \"your kind comment.\"   We also observe that eye data, and in particular dwell time, shows high attention to certain nouns -i.e., names, usernames, and movie titles. This cannot be explained by word frequency effects, as participants in the control condition did not spend as long attending to these nouns."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_10"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "\"Eye-in-the-loop\" few-shot learning",
+            "text": [
+                "We utilize \"eye-in-the-loop\" few-shot learning in order to roughly probe the cognitive plausibility of GPT-3 (Brown et al., 2020). Our prompts present a classification task and include zero to four examples from our dataset, including an \"important words\" section that contains the salient text as defined by each eye-tracking measure, human annotations, and integrated gradient scores (see Section 3.5 for details). As a baseline, we omit the \"important words.\" We expect that if GPT-3 has a particularly strong cognitive understanding of style   processing, \"important words\" from eye movement data may improve its task performance (in these experiments, we use the text-davinci-002 model).",
+                "Results are relatively inconsistent across each of the four shots, but in most cases, it seems that including salient words has little effect on the model accuracy on the style classification task. A subset of the results are shown in Figure 10; see Appendix for full results and prompt details."
+            ],
+            "publication_ref": [
+                "b4"
+            ],
+            "figure_ref": [
+                "fig_12"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Key Findings and Discussion",
+            "text": [
+                "Here we discuss the relationship between our results and our research questions: RQ1: Does eye tracking data for saliency meaningfully differ from simply gathering word-level human annotations, or from model-based word importance measures? Our data show a substantial difference between eye-tracking-based saliency, model-based saliency, and human annotations. It is perhaps unintuitive that reading behavior would differ from self-reports after reading, but this is consistent with findings in psycholinguistics that establish strong distinctions between explicit measures (i.e., human annotations) and implicit measures (i.e., eye tracking) of human language processing. Interestingly, there is some intersection between eye tracking-based saliency and model-based saliency that is not shared with human annotators. This suggests that some automatic aspects of human language processing, accessible through eye tracking but not necessarily survey methods, may be shared with large language models.",
+                "RQ2: How can we measure eye movements specific to a high-level textual feature like style, and which eye tracking metrics and data processing methods are best suited to capturing textual saliency? The results from our experiment indicate that our experimental paradigm exploiting congruency effects may be effective in finding eye movements specific to certain text features. In a linear mixed effect model analyzing the data, we find significant effects of the congruency condition on dwell time and pupil size (see Appendix A.2). This suggests that the congruency effect does impact reading patterns -whether this impact is directly linked to the textual style is difficult to definitively answer, but given the overlap between eye-tracking-based style saliency and other style saliency measures, it seems reasonable to believe that the experimental manipulation resulted in an implicit measure of style perception. Experiments based on congruency effects may be a promising route for capturing eye movements related to other high-level textual features such as sarcasm and metaphor. We find that dwell time appears to be the strongest eye-tracking metrics for capturing textual saliency, as it has both the highest overlap with human-and machine-based saliency and most strongly responded to the experimental manipulation. Using the same criteria, we also find that using participant-level z-scores to represent the eye movement data yields the best results."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "In this exploratory study, our dataset and sample size are both small, limiting the possibilities for a more thorough evaluation of the data e.g. by fine-tuning a language model. We also note that by design, our experiment presents incongruent items rarely, and consequently we have considerably more congruent datapoints than incongruent datapoints -an inherent limitation of the proposed experimental paradigm. In light of our results, which suggest that eye-tracking data contains useful and unique information, we plan to develop methods for collecting this kind of real-time human reading data at scale -i.e., without the constraints of costly in-person eye tracking -in future work.",
+                "Finally, eye tracking analysis in general is limited by the eye-mind assumption, which holds that the eye fixates on what the mind is currently processing. While there is strong evidence supporting the eye-mind assumption during reading, there is a notable exception: retrieval processes (i.e. accessing memory) are not reflected in eye movements (Anderson et al., 2004).  pupil size 1 0.17 1 0.058 0.038 1 -0.0055-0.013 0.064 1 -0.019 -0.042 0.04 0.19 1 -0.027 -0.034 0.041 0.23 0.98 1 -0.056 0.015 0.038 0.22 -0.012 0.14 1 -0.037 -0.035 0.065 0.076 0.01 0.046 0.28 1 -0.019 -0.053 -0.066 -0.072 -0.021 -0.023 -0.031 -0.013 1 "
+            ],
+            "publication_ref": [
+                "b0"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgements",
+            "text": [
+                "We would like to thank Jeffrey Bye, Andrew Elfenbein, Charles Fletcher, Shirley Hayati, Brooke Lea, Andreas Schramm, and Mariya Toneva for their valuable feedback and insightful suggestions regarding the experimental procedure and data analysis. We would also like to thank Miguel Miguelez Diaz, Risako Owan, Faziel Khan, and Josh Spitzer-Resnick for testing and critiquing the initial experimental pipeline. This research received funding from the Sony Research Innovation Award."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Appendix",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1 Experimental Materials",
+            "text": [
+                "The following materials were presented to participants during the experiment. Informed consent was obtained from each participant before the experiment began. Instructions were displayed as shown in Figure 11.",
+                "The practice items, which participants completed after reading the instructions and before beginning the experiment, were as follows: See also Figure 11 for screenshots of the display shown to participants at various points in the experiment."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.2 Mixed Effect Modeling",
+            "text": [
+                "We fit linear mixed effect models to predict our eye tracking measures, using the R packages lme4 and lmetest. Our fixed effects are the number of characters in the interest area, the HAL frequency of the interest area, whether the previous interest area was viewed, and whether the interest area is in the congruent or incongruent condition. Our random effect is the participant ID. All variables are normalized prior to analysis.",
+                "The Dwell Time and Pupil Size eye tracking measure showed significance for the the fixed congruency effect. The other eye tracking measures -First Run Dwell Time, First Fixation Duration, Reread Time, and Go Past Time -result in a singular fit, likely because they are considerably more sparse (i.e., many interest areas have a null values for these metrics).  We tested variables for collinearity using the variance inflation factor (VIF) (Zuur et al., 2010) (none exceeded the recommended threshold of 3)."
+            ],
+            "publication_ref": [
+                "b39"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.3 Additional Saliency Comparisons",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.3.1 Saliency Scores",
+            "text": [
+                "Figure 12 shows the Pearson's r value for saliency score over interest areas derived from each method. We also include more example items from the dataset with associated saliency scores in Figure 5b."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.4 Few-Shot Learning Experiment Details and Results",
+            "text": [
+                "The full few-shot learning results can be found in Table 5. The experiment was conducted with the OpenAI API 5 completion endpoint and the following parameters: the text-davinci-002 model, a temperature of 0, and a top_p of 1. We generated in-context learning prompts over our dataset by including important words as follows: Table 5: Accuracy results on few-shot learning experiments over dataset. For 1-, 2-, and 4-shot learning, five different randomly selected prompts were chosen and the average accuracy is reported (the 95% confidence interval is reported in parentheses after the accuracy score)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Eye movements do not reflect retrieval processes: Limits of the eye-mind hypothesis",
+            "journal": "Psychological Science",
+            "year": "2004",
+            "authors": "Dan John R Anderson; Scott Bothell;  Douglass"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Sequence classification with human attention",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Maria Barrett; Joachim Bingel; Nora Hollenstein; Marek Rei; Anders S\u00f8gaard"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Natural language processing with Python: analyzing text with the natural language toolkit",
+            "journal": "Reilly Media, Inc",
+            "year": "2009",
+            "authors": "Steven Bird; Ewan Klein; Edward Loper"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Do people and neural nets pay attention to the same words: Studying eye-tracking data for nonfactoid QA evaluation",
+            "journal": "",
+            "year": "2020",
+            "authors": "Valeria Bolotova; Vladislav Blinov; Yukun Zheng; Bruce Croft; Falk Scholer; Mark Sanderson"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Language models are few-shot learners",
+            "journal": "",
+            "year": "2020",
+            "authors": "Tom Brown; Benjamin Mann; Nick Ryder; Melanie Subbiah; Jared Kaplan; Prafulla Dhariwal; Arvind Neelakantan; Pranav Shyam; Girish Sastry; Amanda "
+        },
+        {
+            "ref_id": "b5",
+            "title": "Meta-learning to compositionally generalize",
+            "journal": "Long Papers",
+            "year": "2021",
+            "authors": "Henry Conklin; Bailin Wang; Kenny Smith; Ivan Titov"
+        },
+        {
+            "ref_id": "b6",
+            "title": "A computational approach to politeness with application to social factors",
+            "journal": "ACL",
+            "year": "2013",
+            "authors": "Cristian Danescu-Niculescu-Mizil; Moritz Sudhof; Dan Jurafsky; Jure Leskovec; Christopher Potts"
+        },
+        {
+            "ref_id": "b7",
+            "title": "The Psychology of Speech and Language: An Introduction to Psycholinguistics. Random House",
+            "journal": "",
+            "year": "1970",
+            "authors": "A Joseph;  Devito"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Bert: Pre-training of deep bidirectional transformers for language understanding",
+            "journal": "",
+            "year": "2018",
+            "authors": "Jacob Devlin; Ming-Wei Chang; Kenton Lee; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Congruency sequence effects and cognitive control",
+            "journal": "Cognitive, Affective, & Behavioral Neuroscience",
+            "year": "2007",
+            "authors": "Tobias Egner"
+        },
+        {
+            "ref_id": "b10",
+            "title": "An eye-tracking evaluation of some parser complexity metrics",
+            "journal": "",
+            "year": "2014",
+            "authors": "J Matthew;  Green"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Does BERT learn as humans perceive? Understanding linguistic styles through lexica",
+            "journal": "",
+            "year": "2021",
+            "authors": "Shirley Hayati; Dongyeop Kang; Lyle Ungar"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Stylex: Explaining style using human lexical annotations",
+            "journal": "",
+            "year": "2023",
+            "authors": "Kyumin Shirley Anugrah Hayati; Dheeraj Park; Lyle Rajagopal; Dongyeop Ungar;  Kang"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Advancing NLP with cognitive language processing signals",
+            "journal": "",
+            "year": "2019",
+            "authors": "Nora Hollenstein; Maria Barrett; Marius Troendle; Francesco Bigiolli; Nicolas Langer; Ce Zhang"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Generating natural language under pragmatic constraints",
+            "journal": "Journal of Pragmatics",
+            "year": "1987",
+            "authors": "Eduard Hovy"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Deep learning for text style transfer: A survey",
+            "journal": "Computational Linguistics",
+            "year": "2022",
+            "authors": "Di Jin; Zhijing Jin; Zhiting Hu; Olga Vechtomova; Rada Mihalcea"
+        },
+        {
+            "ref_id": "b16",
+            "title": "A theory of reading: From eye fixations to comprehension",
+            "journal": "Psychological Review",
+            "year": "1980",
+            "authors": "A Marcel; Patricia A Just;  Carpenter"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Experimental paradigms in psycholinguistics",
+            "journal": "",
+            "year": "2013",
+            "authors": "Elsi Kaiser"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Looking hard: Eye tracking for detecting grammaticality of automatically compressed sentences",
+            "journal": "",
+            "year": "2015",
+            "authors": "Sigrid Klerke; Anders H\u00e9ctor Mart\u00ednez Alonso;  S\u00f8gaard"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Captum: A unified and generic model interpretability library for pytorch",
+            "journal": "",
+            "year": "2020",
+            "authors": "Narine Kokhlikyan; Vivek Miglani; Miguel Martin; Edward Wang; Bilal Alsallakh; Jonathan Reynolds; Alexander Melnikov; Natalia Kliushkina; Carlos Araya; Siqi Yan"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Lower perplexity is not always human-like",
+            "journal": "Long Papers",
+            "year": "2021",
+            "authors": "Tatsuki Kuribayashi; Yohei Oseki; Takumi Ito; Ryo Yoshida; Masayuki Asahara; Kentaro Inui"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Boosting coherence of language models",
+            "journal": "",
+            "year": "2022",
+            "authors": "Nikolay Malkin; Zhen Wang; Nebojsa Jojic"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Bridging information-seeking human gaze and machine reading comprehension",
+            "journal": "",
+            "year": "2020",
+            "authors": "Jonathan Malmaud; Roger Levy; Yevgeni Berzak"
+        },
+        {
+            "ref_id": "b23",
+            "title": "A survey on using gaze behaviour for natural language processing",
+            "journal": "",
+            "year": "2020",
+            "authors": "Sandeep Mathias; Diptesh Kanojia; Abhijit Mishra; Pushpak Bhattacharya"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Automatically predicting sentence translation difficulty",
+            "journal": "Short Papers",
+            "year": "2013",
+            "authors": "Abhijit Mishra; Pushpak Bhattacharyya; Michael Carl"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Harnessing cognitive features for sarcasm detection",
+            "journal": "Long Papers",
+            "year": "2016",
+            "authors": "Abhijit Mishra; Diptesh Kanojia; Seema Nagar; Kuntal Dey; Pushpak Bhattacharyya"
+        },
+        {
+            "ref_id": "b26",
+            "title": "The good-subject effect: Investigating participant demand characteristics",
+            "journal": "The Journal of general psychology",
+            "year": "2008",
+            "authors": "Austin Lee Nichols; Jon K Maner"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Language models are unsupervised multitask learners",
+            "journal": "",
+            "year": "2019",
+            "authors": "Alec Radford; Jeff Wu; Rewon Child; David Luan; Dario Amodei; Ilya Sutskever"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Eye movements in reading and information processing",
+            "journal": "Psychological Bulletin",
+            "year": "1978",
+            "authors": "Keith Rayner"
+        },
+        {
+            "ref_id": "b29",
+            "title": "The perceived awareness of the research hypothesis scale: Assessing the influence of demand characteristics",
+            "journal": "Figshare",
+            "year": "2016",
+            "authors": "Mark Rubin"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Rethinking explicit expectations: connecting placebos, social cognition, and contextual perception",
+            "journal": "Trends in cognitive sciences",
+            "year": "2016",
+            "authors": "A Katharina; Roland Schwarz; Christian Pfister;  B\u00fcchel"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Recursive deep models for semantic compositionality over a sentiment treebank",
+            "journal": "",
+            "year": "2013",
+            "authors": "Richard Socher; Alex Perelygin; Jean Wu; Jason Chuang; D Christopher;  Manning; Y Andrew; Christopher Ng;  Potts"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Evaluating word embeddings with fmri and eye-tracking",
+            "journal": "",
+            "year": "2016",
+            "authors": "Anders S\u00f8gaard"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Interpreting attention models with human visual attention in machine reading comprehension",
+            "journal": "",
+            "year": "2020",
+            "authors": "Ekta Sood; Simon Tannert; Diego Frassinelli; Andreas Bulling; Ngoc Thang Vu"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Improving natural language processing tasks with human gaze-guided neural attention",
+            "journal": "",
+            "year": "2020",
+            "authors": "Ekta Sood; Simon Tannert; Philipp Mueller; Andreas Bulling"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Axiomatic attribution for deep networks",
+            "journal": "PMLR",
+            "year": "2017",
+            "authors": "Mukund Sundararajan; Ankur Taly; Qiqi Yan"
+        },
+        {
+            "ref_id": "b36",
+            "title": "An eye-tracking study of named entity annotation",
+            "journal": "",
+            "year": "2017",
+            "authors": "Takenobu Tokunaga; Hitoshi Nishikawa; Tomoya Iwakura"
+        },
+        {
+            "ref_id": "b37",
+            "title": "The role of pragmatic principles in resolving attachment ambiguities: Evidence from eye movements",
+            "journal": "Memory & cognition",
+            "year": "2008",
+            "authors": "J Matthew; Lyn Traxler;  Frazier"
+        },
+        {
+            "ref_id": "b38",
+            "title": "On the predictive power of neural language models for human real-time comprehension behavior",
+            "journal": "",
+            "year": "2020",
+            "authors": "Ethan Gotlieb Wilcox; Jon Gauthier; Jennifer Hu; Peng Qian; Roger Levy"
+        },
+        {
+            "ref_id": "b39",
+            "title": "A protocol for data exploration to avoid common statistical problems",
+            "journal": "Methods in ecology and evolution",
+            "year": "2010",
+            "authors": "Elena N Alain F Zuur; Chris S Ieno;  Elphick"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Metric for Saliency Data aggregation",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "The movie, directed by Mick Jackson, leaves no cliche unturned, from the predictable plot to the characters straight out of central casting.An entertaining, colorful, action-filled crime story with an intimate heart.The mesmerizing performances of the leads keep the film grounded and keep the audience riveted.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "34",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 3 :Figure 4 :34Figure 3: Exemplary eye-tracking data showing saliency for polite style, with comparison to human word-level style importance highlighting. The eye-tracking data is visualized as a heat map showing gaze data from the incongruent style condition, with the gaze data from the congruent style (control) condition subtracted.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "n k=0 z k (IA i ) n . \u2022 raw: We aggregate the raw values of the eye tracking measurements from each IA. The saliency score for IA i is given by n k=0 x ki n.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Thank you for your kind comment. Do you have a suggestion where the portals should be placed in the article? Thank you for your kind comment. Do you have a suggestion where the portals should be placed in the article? Thank you for your kind comment. Do you have a suggestion where the portals should be placed in the article? Thank you for your kind comment. Do you have a suggestion where the portals should be placed in the article? Saliency scores for politeness.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "- 1 :1For not specifying what is to be done later with the data. If you claim the question is open-ended (interview and all) then why accept an answer? -1: For not specifying what is to be done later with the data. If you claim the question is open-ended (interview and all) then why accept an answer? -1: For not specifying what is to be done later with the data. If you claim the question is open-ended (interview and all) then why accept an answer? -1: For not specifying what is to be done later with the data. If you claim the question is open-ended (interview and all) then why accept an answer? Saliency scores for impoliteness.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "The movie, directed by Mick Jackson, leaves no cliche unturned, from the predictable plot to the characters straight out of central casting.The movie, directed by Mick Jackson, leaves no cliche unturned, from the predictable plot to the characters straight out of central casting.The movie, directed by Mick Jackson, leaves no cliche unturned, from the predictable plot to the characters straight out of central casting.The movie, directed by Mick Jackson, leaves no cliche unturned, from the predictable plot to the characters straight out of central casting. Saliency scores for negative sentiment.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Saliency scores for positive sentiment.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "Figure 5: A comparison of saliency scores from various methods: manual human annotations, language model introspection, and eye tracking. Darker highlights indicate stronger saliency scores.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_8",
+            "figure_caption": "Figure 6 :6Figure 6: Confusion matrix of the Jaccard similarity score for salient text derived from each metric. (See Appendix for the correlation coefficient for saliency scores derived from each metric.)",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_9",
+            "figure_caption": "Figure 7 :7Figure 7: Venn diagram illustrating the intersection of sets of salient interest areas derived from Dwell Time (blue), integrated gradients (green), and human annotations (red).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "figure",
+            "figure_id": "fig_10",
+            "figure_caption": "Figure 8 :8Figure 8: Venn diagram showing interest areas salient to the polite style. For each section of the Venn diagram, the interest areas with the top five highest saliency scores are shown.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "figure",
+            "figure_id": "fig_11",
+            "figure_caption": "Figure 9 :9Figure 9: Top 5 most common parts of speech for each measure's salient IA set. IN: prepositions and subordinating conjunctions, JJ: adjectives, NN: nouns, RB: adverbs, VB: verbs.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "figure",
+            "figure_id": "fig_12",
+            "figure_caption": "Figure 10 :10Figure 10: Few-shot learning classification experiment accuracy scores, averaged over 5 rounds with randomly selected demonstrations. Error bars indicate 95% confidence interval.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_13",
+            "figure_caption": "(a) Experiment instructions screen. (b) One of the \"context\" screens shown at the beginning of each block. This information makes participants aware of what type of text to expect in the following screens. (c) One of the screens displaying an item from the dataset. (d) One of the comprehension question screens.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "figure",
+            "figure_id": "fig_14",
+            "figure_caption": "Figure 11 :11Figure 11: Screenshots from the experiment program.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "12",
+            "figure_type": "figure",
+            "figure_id": "fig_15",
+            "figure_caption": "Figure 12 :12Figure 12: Correlations (Pearson's r) between the saliency scores derived from each method.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "",
+            "figure_data": "NLP Area H M learningfrom eyedataOursTextual Style\u2713 \u2713\u2717Kuribayashi et al. (2021) Perplexity\u2717 \u2713\u2717Malmaud et al. (2020)QA\u2717 \u2717 Joint learningBolotova et al. (2020)QA\u2717 \u2713\u2717Sood et al. (2020b)QA\u2717 \u2713\u2717Sood et al. (2020a)Paraphrasing \u2717 \u2717 Joint learningHollenstein et al. (2019)Sentiment Clf., NER\u2717 \u2717 Joint learningBarrett et al. (2018)PoS tagging \u2717 \u2717HMMTokunaga et al. (2017)NER\u2717 \u2717\u2717Klerke et al. (2015)Summarization \u2713 \u2717\u2717Green (2014)Parsing\u2717 \u2717\u2717"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "Applications N FFD FC FRD DT RR RC PL eyeStyliency (Ours) Textual Style 20 \u2713 \u2717 \u2713 \u2713 \u2713 \u2717 \u2713 Kuribayashi et al. (2021) Language model perplexity \u2717 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Malmaud et al. (2020) Question Answering 269 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Bolotova et al. (2020) Question Answering 20 \u2717 \u2713 \u2717 \u2713 \u2713 \u2717 \u2717 Sood et al. (2020b) Paraphrasing \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 \u2717 \u2717 Sood et al. (2020a) Question Answering 23 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Hollenstein et al. (2019) NER, Sentiment/Relation Classification \u2717 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 Barrett et al. (2018) PoS tagging \u2717 \u2713 \u2717 \u2717 \u2713 \u2713 \u2713 \u2717 Tokunaga et al. (2017) Named entity recognition (NER) \u2717 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Mishra et al. (2016) Sarcasm detection 7 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717 \u2717 Klerke et al. (2015) NLG evaluation 24 \u2717 \u2713 \u2717 \u2713 \u2713 \u2713 \u2713 Green (2014) Phrase-structure parsing 40 \u2717 \u2717 \u2717 \u2717 \u2713 \u2717 \u2717",
+            "formula_coordinates": [
+                4.0,
+                70.87,
+                77.13,
+                450.37,
+                193.71
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/K18-1030"
+}

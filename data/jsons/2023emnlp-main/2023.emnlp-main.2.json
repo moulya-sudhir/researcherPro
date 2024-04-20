@@ -1,0 +1,967 @@
+{
+    "title": "Absolute Position Embedding Learns Sinusoid-like Waves for Attention Based on Relative Position",
+    "authors": "Yuji Yamamoto; Takuya Matsuzaki",
+    "pub_date": "",
+    "abstract": "Attention weight is a clue to interpret how a Transformer-based model makes an inference. In some attention heads, the attention focuses on the neighbors of each token. This allows the output vector of each token to depend on the surrounding tokens and contributes to make the inference context-dependent. We analyze the mechanism behind the concentration of attention on nearby tokens. We show that the phenomenon emerges as follows: (1) learned position embedding has sinusoid-like components, (2) such components are transmitted to the query and the key in the selfattention, (3) the attention head shifts the phases of the sinusoid-like components so that the attention concentrates on nearby tokens at specific relative positions. In other words, a certain type of Transformer-based model acquires the sinusoidal positional encoding to some extent on its own through Masked Language Modeling.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "The architecture of Transformer (Vaswani et al., 2017) is symmetric with respect to the token position and it captures word order only through the position embedding included in the input. Thanks to this design, Transformer can flexibly learn relationships between tokens while allowing parallelization. To derive a representation of a context, previous language models have used, for instance, recurrent units to process tokens in the given token order, or convolution to aggregate tokens within a given range. In these models, the property of translation invariance of language has been captured through the architecture of the models. In contrast, Transformer receives all tokens at the same time and does not restrict the positions of the tokens on which each token depends; in exchange for it, the translation invariance has to be learned rather than imposed by the architecture.",
+                "Position embedding is thus the key to make inferences in Transformer context-dependent. While Transformer uses deterministic sinusoidal position embedding, BERT (Devlin et al., 2019) uses a learnable absolute position embedding. The latter learns the positional representation only through word cooccurrences. Clark et al. (2019) and Kovaleva et al. (2019) investigated the attention weights of the self-attention in BERT and found that the attention in some heads is largely determined by relative positions (Figure 1). This implies that even when the absolute position embedding is used, self-attention can make an inference depending on relative position. Wang et al. (2021) compared various position embedding methods based on the performance in downstream tasks. Their results showed that local translation invariance and asymmetric position bias with respect to the direction improved the performance. Ravishankar and S\u00f8gaard (2021) observed that some columns of absolute position embedding were periodic. Chang et al. (2022) showed that position representation was periodic even in hidden representations. However, it is not clear how the periodicity is used in the model.",
+                "In this work, we analyze how attention depends on relative position. As a result, we show that the relative positional dependence of attention emerges due to the following factors.",
+                "\u2022 The learnable absolute position embedding has sinusoid-like waves with several limited frequencies ( \u00a74.1.1).",
+                "\u2022 Attention heads extract periodic components derived from position embedding from the hidden states. It is made explicit by applying Singular Value Decomposition to the parameters of the pre-trained language model ( \u00a74.2).",
+                "\u2022 The self-attention shifts the phase of the periodic components in the query and the key to decide the direction of attention ( \u00a74.3, \u00a74.4).",
+                "Thus, it becomes partially clear how the selfattention equipped with learnable absolute position embeddings makes inferences based on context. However, it is suggested that, when the attention is strongly concentrated on the adjacent tokens, the word embedding is also a factor that enables inference based on relative position ( \u00a75)."
+            ],
+            "publication_ref": [
+                "b16",
+                "b2",
+                "b1",
+                "b6",
+                "b17",
+                "b13",
+                "b0"
+            ],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Background",
+            "text": [
+                "In this section, we review the multi-head selfattention mechanism and position embedding."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Multi-Head Self-Attention",
+            "text": [
+                "The self-attention mixes the representations of tokens at different positions. The input to the l-th attention layer is a matrix X l \u2208 R T \u00d7d whose kth row corresponds to the hidden representation of the k-th token as a vector in R d . The output of the self-attention layer is defined as follows:",
+                "A lh = softmax ( X l W Q lh (X l W K lh ) T \u221a d/n ) (1) O lh = A lh X l W V lh (2) MultiHead l = concat(O l1 , . . . , O ln )W O l(3)",
+                "where",
+                "W Q lh , W K lh , W V lh \u2208 R d\u00d7(d/n",
+                ") and W O l \u2208 R d\u00d7d are the parameters, n is the number of attention heads per layer, and the subscripts l and h are the indices of the layer and the head, respectively.",
+                "In this paper, we refer to the h-th head in the l-th layer as \"head(l, h)\" for short, and omit the subscripts l, h when the discussions are common to all layers and heads. The matrices XW Q , XW K , and A are called query, key, and attention weight, respectively. If the (i, j) element of A is large, it is interpreted that the i-th token in the sentence attends to the j-th token."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Position Embedding",
+            "text": [
+                "Transformer's position embedding is defined as follows (Sinusoidal Position Embedding; SPE):",
+                "SP E (pos,2i) = sin(pos/10000 2i/d ) (4)",
+                "SP E (pos,2i+1) = cos(pos/10000 2i/d ).",
+                "(5) Vaswani et al. (2017) hypothesized that it allows the model to easily learn to attend by relative positions, since the offset between two tokens can be expressed as a matrix product:",
+                "[ sin x i cos x i ] [ cos \u03b8 \u2212 sin \u03b8 sin \u03b8 cos \u03b8 ] = [ sin(x i + \u03b8) cos(x i + \u03b8) ] .(6)",
+                "BERT's position embedding is a learnable parameter. It is called the Absolute Position Embedding (APE) because each row represents an absolute position in the input sequence.",
+                "RoBERTa (Liu et al., 2019) is identical to BERT in architecture. RoBERTa is pre-trained with 512 tokens for all steps whereas BERT is pre-trained with 128 tokens for 90% of the steps. Hence, RoBERTa's APE recieves the same number of updates regardless of the positions. Wang and Chen (2020) showed that RoBERTa's APE is more orderly than BERT's. We thus use RoBERTa for all experiments to analyze the position dependence of inference."
+            ],
+            "publication_ref": [
+                "b16",
+                "b9",
+                "b18"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Relative Position Dependence of Attention",
+            "text": [
+                "In this section, we demonstrate that the attention depends on the relative position. Specifically, we analyze in how many heads the attention is dependent on the relative position, and the variation in the direction and concentration of the attention across the heads. The visualizations of the attention weight A lh in Figure 1 shows that, in (a) and (d), each token strongly attends only to the adjacent token, while in (b) and (e), the attention is put on a few nearby tokens on the left or right side. We show that such a pattern is largely invariant with respect to the inputs, by clustering the patterns of the attention on different inputs.",
+                "To focus on the relation between the attention and the relative positions, we summarized the attention weight for each input in each head into a vector and applied k-means clustering to them. For that, we defined t-offset trace tr t as follows:",
+                "tr t (A) = { \u2211 T \u2212t i=1 (A) i,i+t (t \u2265 0) \u2211 T +t i=1 (A) i\u2212t,i (t < 0)(7)",
+                "and transformed A lh to a vector:",
+                "a lh = [tr \u221210 (A lh ), . . . , tr 10 (A lh )] \u2208 R 21 . (8",
+                ")",
+                "These vectors represent the trend of attention A lh with respect to relative position. We input 100 sentences of length 512 created from wikitext-2 (Merity et al., 2017) into RoBERTa and computed vectors a lh for every head. Figure 2 shows the results of applying the k-means to a total of 100 \u00d7 12 \u00d7 12 vectors a lh when the number of clusters was set to 6. In the clusters named leftward and next-to-left (resp. rightward and next-to-right), the attention is concentrated on the nearby tokens on the left (resp. right). Particularly, in the clusters named next-to-left and next-to-right, the attention is strongly concentrated on the adjacent tokens. We found that, for each head, the vectors a lh corresponding to the 100 inputs were grouped into one or two clusters. This means that there are some heads that always attended to the same direction for all the input."
+            ],
+            "publication_ref": [
+                "b10"
+            ],
+            "figure_ref": [
+                "fig_0",
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Attention to Nearby Tokens",
+            "text": [
+                "In this section, we show that the attention depends on relative position due to periodic components in the position embeddings. First, we show that the learnable absolute position embeddings acquire several limited frequency components. Second, we show that some attention heads extract the periodicity derived from position embeddings. Finally, we show that the concentration of attention on the nearby tokens is due to the periodicity."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Learned Representation of Positions",
+            "text": [
+                "First, we show that APE includes sinusoid-like components using the Discrete Fourier Transform (DFT). Next, we show that the position embeddings are confined to a relatively low-dimensional subspace (~15 dimensions) using Principal Component Analysis (PCA). Finally, we show that the encoded positional information occupies a similar number of dimensions in the hidden states as in the position embedding, and the dimensionality becomes smaller in the higher layers using Canonical Correlation Analysis (CCA)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "APE Includes Sinusoid-like Waves",
+            "text": [
+                "We view the RoBERTa's position embedding E pos \u2208 R T \u00d7d as a collection of d time series of length T . We computed the amplitude spectrum of each column of E pos by applying DFT:",
+                "spec i = abs(DFT(E pos e i ))(9)",
+                "where e i \u2208 R d is the i-th elementary unit vector. The vector E pos e i is hence the i-th column of E pos .",
+                "Figure 3a shows the mean and the quartile range of the amplitude spectra of d = 768 time series. The amplitude spectra peak at some frequencies, indicating that the learnable APE has acquired periodicity through pre-training, even though it is not explicitly defined using sinusoidal waves as in Transformer. In contrast, there are no peaks in the amplitude spectrum of a word embedding sequence of a sample text. 1 The periodicity is thus an unique property of learned position embeddings.",
+                "We investigated whether similar properties are present in pre-trained models other than RoBERTa (Figure 3b and 13). The amplitude spectra of the encoder-only models are similar to RoBERTa regardless of language, but ones of GPT-2 (Radford et al., 2019) are higher at lower frequencies.",
+                "The decoder model probably can focus attention on the neighboring tokens of itself without periodicity-based mechanisms ( \u00a74.3). For example, if attention is paid more strongly to the backward token, in BERT, attention is focused on the end of the sentence, but in a decoder with causal attention mask, attention is focused on itself. We leave it to future research to clarify whether this Blue line is the mean of spec i and blue area is the quartile range. Orange line is the spectrum of word embeddings for an input before adding position embeddings. phenomenon really occurs in the causal model, and in this paper we focus on the case where selfattention is symmetric with respect to position."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [
+                "fig_2",
+                "fig_10"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Dimensionality of Positional Representation",
+            "text": [
+                "We applied PCA to the position embeddings to see how many dimensions were used to represent the positions. The cumulative principal component contribution rate of the position embedding was 50.51% for the top 4 dimensions, and 92.23% for the top 12 dimensions (see Figure 12 in Appendix A for a plot). This means that the positions are mostly encoded in a low dimensional subspace.",
+                "We then employed CCA to show how much the input to the self-attention layers included the positional representation. CCA is a method for investigating the relation of two sets of variables by finding the parameters a and b that maximizes the correlation between two synthetic variables Xa and Y b given two inputs X and Y . Raghu et al. (2017) showed that CCA allows layer-to-layer comparison of deep learning models. We used the representation of neurons and layers proposed by them and computed the correlation between the hidden layer and the position embeddings.",
+                "In this study, the i-th neuron z l i of layer l and the l-th layer Z l are represented as follows:",
+                "z l i = [ z l i (x 1 ), . . . , z l i (x m )",
+                "] T (10) where z l i (x j ) is the response of the i-th neuron to input x j . We input 200 sentences of length 512 created from wikitext-2 into RoBERTa and collected the responses of each layer for the input of m = 200 \u00d7 512 tokens. We then maximized their correlation coefficients \u03c1 k :",
+                "Z l = [ z l 1 , . . . , z l n ](11)",
+                "\u03c1 k = max a k ,b k Corr(Z l 1 a k , Z l 2 b k ) (12)",
+                "where a k is chosen such that it is orthogonal to a 1 , . . . , a k\u22121 and similarly for b k . The CCA coefficients in Figure 4 show that the hidden states of higher layers have lower correlations with the position embeddings. This is in agreement with Lin et al.'s (2019) result that BERT phases out positional information as it passes through the layers.",
+                "The CCA result indicates that the number of components that are highly correlated with position embedding is only 5~20-dimensions, and the PCA result suggests that it is enough to accommodate the positional representation. This indicates that the hidden states include positional representation in a low-dimensional subspace, similarly to position embedding."
+            ],
+            "publication_ref": [
+                "b12"
+            ],
+            "figure_ref": [
+                "fig_9",
+                "fig_3"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Positional Representation in",
+            "text": [
+                "Self-Attention",
+                "It is not at all clear how the positional representation in the hidden states contribute to the inference in self-attention. We thus analyzed how attention weight is calculated, which is one of the most important process in self-attention."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Rethinking About Query and Key",
+            "text": [
+                "The attention weight A is determined by the inner product of the rows of the query and the key matrix. We thus expect that the relative position dependence of the attention can be explained by analyzing the relationship between the query and the key. We begin by rethinking about their definition. The two parameter matrices W Q and W K contribute to the attention only through their product W Q (W K ) T (Eq. ( 1)). Hence, they can be seen as a parametrization of a rank-restricted d \u00d7 d matrix, and we may consider another decomposition of the product W Q (W K ) T . We found that some sinusoid-like components were obtained from the query and the key by applying Singular Value Decomposition (SVD) to W Q (W K ) T . Specifically, the query and the key are redefined as the product of the hidden state and the singular vectors:",
+                "W Q (W K ) T = U Q S(U K ) T (13) Q = XU Q , K = XU K (14)",
+                "where the matrix S \u2208 R d\u00d7d is a diagonal matrix diag(s 1 , . . . , s d/n , 0, . . . , 0) and each element s i is a singular value. In the rest of this paper, we refer to Q and K defined above as the query and the key, respectively. As shown in Figure 5, in the head in which the attention depends on relative position, sinusoid-like waves appear in several columns of the redefined query Q and the key K. Moreover, a sine wave is paired with a cosine wave of the same frequency, as the 5-th and the 6-th column for head(1, 1) shown in Figure 5. Furthermore, the introduction of SVD provides a new theoretical interpretation of self-attention. Let R be the orthogonal matrix R = (U Q ) T U K . Then U K can be written as U K = U Q R due to the orthogonality of the singular vectors. Thus, the key K can be written as:",
+                "K = XU K = XU Q R = QR (15)",
+                "That is to say, the rows of the key are the result of an orthogonal transformation of the rows of the query. The relation between the query and the key is thus summarized in the matrix R.",
+                "In addition, since the singular value matrix S is diagonal, the product of the query and the key can be written as follows:",
+                "XW Q (XW K ) T = QSK T = d/n \u2211 i=1 s i q i k T i (16)",
+                "where q i and k i are the i-th columns of Q and K, respectively. Eq. ( 16) says that the subsets of queries [q i ] and keys [k i ] corresponding to the top singular values [s i ] are more important in the calculation of the attention distribution. We hereafter call the matrix QSK T attention score (i.e., attention before applying softmax)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4",
+                "fig_4"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Spectral Analysis of Query and Key",
+            "text": [
+                "We computed the amplitude spectrum of each column of the query Q lh in each head, using the same procedure for the position embeddings in \u00a74.1.1:",
+                "spec lhi = abs(DFT(Q lh e i )) (17) max-spec l = [max h,i (spec lhi ) f ] f =0,...,T /2 . (18",
+                ")",
+                "By taking the maximum of spec lhi among the heads and the columns of Q lh , we check if there are high peaks in the spectra of the queries in the l-th layer (similarly for the keys and hidden states).",
+                "Figure 6 show that the query and key spectra peak at the same frequency bands as the position embeddings, indicating that attention heads extract periodic representations derived from the position embeddings. Furthermore, some of the peaks disappear in the higher layers (downward in the Figure 6), indicating that the periodic components derived from the position embeddings are not dominant in the higher layers. This is consistent with the result that the correlation between the position embeddings and the hiddem states of each layer gradually decreases ( \u00a74.1.2). It also agrees with the result shown by Lin et al. ( 2019) that position information is discarded between the 3rd and 4th layers."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_5",
+                "fig_5"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Attention Based on Relative Position is due to the Phase Shift",
+            "text": [
+                "As shown in Figure 5, there are phase shifts in the sinusoid-like components of the query and the key.",
+                "In this subsection, we focus on the phase shifts, and clarify that the direction and the width of the phase shifts determine where the attention is concentrated. We measure the direction and the width of the phase shift by cross-covariance and crosscorrelation, defined as follows:",
+                "xcov j (t) = { \u2211 T \u2212t i=1 q i,j k i+t,j (t \u2265 0) \u2211 T +t i=1 q i\u2212t,j k i,j (t < 0) (19) xcorr j (t) = xcov j (t) \u2212 E t [xcov j (t)] \u2225q j \u2225\u2225k j \u2225(20)",
+                "For example, Figure 7 shows the cross-correlation between the queries and keys in Figure 5. Both xcorr 5 (t) and xcorr 6 (t) attain a maximal value at t = \u22122 and t = \u22123. It means that the phase shift between the queries and the keys are approximately 2.5 tokens.",
+                "It can be explained theoretically that the direction of phase shift coincides with the direction of attention. The cross-covariance is related to the product of query and key (Eq. ( 16)): where tr t is the t-offset trace defined in Eq. ( 7) and s 1 , . . . , s d/n are the singular values of W Q (W K ) T . According to Eq. (21-23), the sum of the attention scores at relative position t is equal to the weighted sum of the inner product of q j and k j shifted by t. Therefore if the xcov j (t)s corresponding to the top singular values attain maximal values at the same t, the attention is likely to be concentrated around relative position t. Figure 8 and 9 show that it is actually the case. Figure 9 presents the cross-correlations of the query q j and the key k j for js corresponding to the top singular values. We can see how the concentration of attention on nearby tokens is formed by the weighted superposition of the crosscorrelations. In head(1, 1), the maxima of the cross-correlations near t = \u22121 stack up, while the maxima away from t = \u22121 cancel with the minima of other components. Since there are multiple periodic components with different frequencies (Figure 3a), the attention is not concentrated away from each token. In contrast, in head(8, 9), some cross-correlations have narrow peaks only at t = \u22121, and it makes the attention be very concentrated only on the adjacent tokens. However, it is unlikely that the cause of the narrow peaks is the sinusoid-like waves, because their period is approximately 8 tokens or more. 2",
+                "tr t (QSK T ) = T \u2212t \u2211 i=1 (QSK T ) i,i+t(21)",
+                "= T \u2212t \u2211 i=1 d/n \u2211 j=1 s j q i,j k i+t,j(22)",
+                "= d/n \u2211 j=1 s j xcov j (t)(23)"
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4",
+                "fig_4",
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Phase Shift Width is the Same even if",
+            "text": [
+                "Frequencies are Different",
+                "We saw in the previous subsection that the main factor of the concentration of attention is that the phases of multiple sinusoid-like waves are all shifted by the same number of tokens. In this subsection, we explain it based on the property of the eigenvalues and the eigenvectors of the matrix R that relates the query Q to the key K.",
+                "Let p i \u2208 C d and \u03bb i \u2208 C be an eigenvector and an eigenvalue of the matrix R, respectively. Since R is an orthogonal matrix, its eigenvalue can be expressed as \u03bb i = e j\u03b8 i where j is the imaginary unit. From Eq. ( 15), the following relation between the query and the key holds:",
+                "Kp i = QRp i = Q\u03bb i p i = Qp i \u2022 e j\u03b8 i .(24)",
+                "Let two conditions be assumed: (1) for each i = 1, . . . , d, the time series Qp i is sinusoidal with a single frequency f i and (2) the ratio of the argument \u03b8 i of the eigenvalue \u03bb i to the frequency f i is constant regardless of i. Then Eq. ( 24) implies that the phases of Qp i and Kp i differ by a constant number of tokens for any eigenvector p i :",
+                "(Qp i ) t = (Kp i ) t+\u2206(25)",
+                "where \u2206 = (T /2\u03c0) \u2022 (\u03b8 i /f i ). Furthermore, Q t = K t+\u2206 follows from Eq. ( 25). We provide the proofs in Appendix D. We verify whether the two conditions hold by analyzing the periodicity of Qp i and the ratio of the frequency to the argument \u03b8 i of the eigenvalue \u03bb i . To do so, we define the bivariate functions g for frequency and argument as follows:",
+                "g(f, \u03b8 i ) = abs(DFT(Qp i )) f (26)",
+                "This function g is shown in Figure 10 as a 2D histogram. Figure 10 shows that the spectrum of Qp i has peaks in different frequency bands according to \u03b8 i . It means that the component along each eigenvector p i is fairly band-limited, namely they are sinusoid-like. Furthermore, the spectral peaks 2 Figure 3a shows that the maximum frequency of the position embeddings is around 60. The minimum period is hence 512/60 (> 8) tokens. appear around a straight line. Specifically, the ratio \u2206(f, \u03b8) of frequency to phase defined as follows is nearly constant:",
+                "\u2206(f, \u03b8) = T 2\u03c0 \u2022 \u03b8 f . (27",
+                ")",
+                "Hence, the two conditions are in fact approximately hold. Thus, by multiplying the matrix R, the sinusoid-like components in the key are offset by a certain number of tokens relative to the query."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_7",
+                "fig_7",
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Attention to the Adjacent Tokens",
+            "text": [
+                "Figure 9 shows that, in head(8, 9), there are not only sinusoid-like waves but also spikes at the relative position t = \u22121. In this section, we dive deeper into the fact that, in some heads, the attention is focused only on the adjacent token. We analyze how the attention changes when we modify either the position embedding or the word embedding component. The following are the results on the modified inputs and insights from them.",
+                "Baseline The input is the sum of word embedding and position embedding as usual. This result is shown in Figure 8 and 9.",
+                "Only position embedding The word embeddings are replaced with zero vectors. Figure 11a shows that spikes of cross-correlation do not appear for this case. This suggests that position embedding is not the only cause of the spikes.",
+                "Only word embedding The position embeddings are replaced with zero vectors. Figure 11b shows that most of the cross-correlations are flat for this case. It suggests that word embedding contributes less to make the attention dependent on relative position. However, it is interesting that the cross-covariance at t = \u22121 (i.e., left neighbor) is relatively large even without position information.",
+                "Shuffling word embeddings The order of word embeddings is shuffled. Figure 11c shows that spikes appear at the relative position t = \u22121 even for this case. It suggests that the contribution of position embedding is significant in determining the direction of attention, since the attention is focused on the preceding word regardless of what it actually is.",
+                "As mentioned at the end of Section 4.3 and also suggested by Figure 11a, it is unlikely that position embedding is the only cause of the strong concentration of attention on the adjacent tokens. However, if the word embeddings identified the adjacent tokens (i.e., if the narrow peak of cross-correlation appeared due to an interaction of the word embeddings of a frequently occurring bigram), the attention would have been moved to non-neighboring positions by the shuffling of word embeddings, but this was not the case. It is thus suggested that the concept of adjacency in RoBERTa is built upon both word meaning and positional information."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_8",
+                "fig_8",
+                "fig_8",
+                "fig_8"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Remark on the Learning Process of Position Embeddings",
+            "text": [
+                "The training data of the masked language modeling is only word sequences without positional information. It suggests that the relative position dependence of attention is acquired by the combination of two factors: (1) the linguistic property that related words tend to appear nearby due to grammatical rules and collocations, and (2) the property that attention is focused on the word that is syntactically or semantically related and hence gives clue to fill the masked token. In appendix E, we demonstrate that the position representation can be acquired with a much smaller amount of training data than pre-training."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Works",
+            "text": [
+                "Ravishankar and S\u00f8gaard (2021) observed that some columns of absolute position embedding were periodic and sinusoidal position embedding was more effective in multilingual models than other embedding methods. Chang et al. (2022) showed that position representation was periodic even in hidden representations by using Linear Discriminant Analysis, i.e., by identifying the axes separating the different position representations. We showed that sinusoid-like components could be extracted from the hidden states by applying SVD to the pre-trained parameters of the selfattention even though SVD does not have the objective of separating positional representations. Vaswani et al. (2017) stated that the sinusoidal position embedding allowed position offsets to be represented by a rotation transformation (Eq. ( 6)), and this could prompt learning of attention that depends on relative position. We showed that the query and the key in the self-attention included sinusoid-like components and the learned parameters in the self-attention shift the phase of the query and the key relatively. This means that the mechanism hypothesized by Vaswani et al. is in fact acquired through pre-training by masked language modeling. However, the frequencies acquired by the position embedding of RoBERTa are only in the specific frequency bands, whereas sinusoidal position embedding has d/2 frequencies (Eq. ( 4)-( 5)). RoBERTa thus seems to have acquired a more economical positon embedding than sinusoidal position embedding.",
+                "Recently, there are many variants of position embedding and Dufter et al. (2022) surveyed them exhaustively. In particular, Rotary Position Embedding (RoPE) (Su et al., 2022), a type of Relative Position Embedding (RPE) (Shaw et al., 2018), relates to the property that the self attetnion acquires the rotation matrix through pre-training.",
+                "To acquire relative positional dependence, RoPE widens the angle between query and key proportionally to the relative position, while pre-trained self-attention rotates the hidden states containing absolute positional bias by the same angle regardless of position. In other words, APE and selfattention, which are distant components, must acquire frequency and angle of rotation, respectively, to satisfy the relation Eq. ( 27). If translation invariance is essential to language understanding, the cost of discovering this relation is a possible reason why APEs are inefficient to learn compared to RPEs."
+            ],
+            "publication_ref": [
+                "b0",
+                "b16",
+                "b3",
+                "b15",
+                "b14"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "We analyzed the concentration of attention based on relative position in the self-attention using the learnable absolute position embedding. As a result, we showed that it is due to relative phase shifts of the periodic components in the query and the key derived from position embeddings. Our results explain in part that absolute position embedding allows inference based on relative position."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "As mentioned in \u00a74.1.1, the positional representation of the GPT-2 differs significantly from ones of the encoder models. Thus, it is impossible to interpret the inferences of the decoder-only model in the same way as in this study.",
+                "In the tasks of predicting sentence structure (e.g., dependency parsing), the relative order of two tokens is important regardless of the distance between them. However, we analyzed the dependence of the output of each token only on the nearby tokens. Thus, it is unclear whether position embedding provides relative position information that helps determine which of the distant tokens precedes the other.",
+                "We obtained an interpretable representation by decomposing the attention scores before applying softmax function (Eq. ( 16)). When analyzing the contribution of the decomposed representations to downstream components (e.g., Value in self-attention), the non-linearity of softmax function should be taken into account."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Cumulative Principal Component",
+            "text": [
+                "Contribution Rate "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Amplitude Spectra of Various Models",
+            "text": [
+                "We computed the amplitude spectra of the position embeddings of bert-base-uncased, cl-tohoku/bert-base-japanese-whole-word -masking, xlm-roberta-base, and gpt2 in the same way as Figure 3a. In Figure 13, the encoder models BERT and RoBERTa both have peaks in their amplitude spectra, and RoBERTa has a higher peaks. On the other hand, the GPT-2 decoder model has only low-frequency components. This suggests that the representation of absolute position embedding is similar between encoder models, regardless of language, but differs significantly between encoder models and decoder models. In fact, Irie et al. (2019) and Kazemnejad et al. (2023) showed that the position embeddings is unnecessary for the decoder models."
+            ],
+            "publication_ref": [
+                "b4"
+            ],
+            "figure_ref": [
+                "fig_2",
+                "fig_10"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "C Comparing Different Architectures",
+            "text": [
+                "This paper analyzed an encoder-only model (RoBERTa). In this section, we apply our methods to other transformer-based architectures: decoderonly and encoder-decoder. The target pre-trained models are GPT-2 (gpt2) for decoder-only and BART (facebook/bart-base) (Lewis et al., 2020) for encoder-decoder, both of which use absolute position embedding and are available on huggingface. To reduce the gap between architectures, when analyzing the decoders, we use the attention scores, which is the matrix before causal masking and softmax function are applied, instead of the attention weights.",
+                "The attention matrices of GPT-2 show two main patterns: one related to position and the other not. Figure 14a shows that the attention head of GPT-2 pays stronger attention to the closer tokens by concentrating attention on the backward tokens, which are masked in the subsequent processing.",
+                "Figure 15 shows the result of clustering the attention scores of GPT-2 using k-means. The number of clusters was set to 2 and the inputs to k-means were t-offset traces (Eq.( 8)) from t = \u221230 to 30.",
+                "The heads that depend on position are found in the lower layers. Along \u00a74.4, we investigate the relationship between the frequency of the hidden state and the angle of the rotation matrix inherent in the parameters of attention head. Figure 16a differs from the case of RoBERTa (Figure 10) in that the peaks appear horizontally rather than holding a constant ratio between frequency and angle. Furthermore, according to Figure 13, the dominant components in position embedding of GPT-2 are those with frequencies below 10, i.e., with periods longer than 51.2 (= 512/10) tokens. These differences from RoBERTa imply that even when the attention is focused within a few tokens in a particular head, it cannot be attributed to the mechanism described in \u00a74.3.",
+                "In BART, the tendency in the positional dependence of attention differs between encoder and decoder. In encoder, the patterns of attention weights (Figure 17) and their trend (Figure 18), such as direction and strength, are similar to those of RoBERTa (Figure 1 and 2). On the other hand, comparing Figure 14 and Figure 20, the patterns of decoder is different from those of GPT-2. Such patterns in the BART decoder could not be clustered based on the strength or direction of attention using k-means. Like in GPT-2, Figure 21 shows that the peaks appear horizontally in the decoder.        Freezing parameters We freezed all parameters except position embeddings. This encourages the position embeddings to learn to focus attention only on position t = 1, 5, 9, 13, \u2022 \u2022 \u2022 and prevents positionindependent shortcut solutions (e.g., shortening the UNK embedding to ignore it)."
+            ],
+            "publication_ref": [
+                "b7"
+            ],
+            "figure_ref": [
+                "fig_11",
+                "fig_4",
+                "fig_5",
+                "fig_7",
+                "fig_10",
+                "fig_0",
+                "fig_0",
+                "fig_1",
+                "fig_11",
+                "fig_16",
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Figures for GPT-",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Position embedding The position embeddings",
+            "text": [
+                "were initialized with random values following a normal distribution N (0, 0.02 2 ) before training."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "E.2 Results",
+            "text": [
+                "Table 1 shows that, before the additional training, RoBERTa cannot fill MASK with the appropriate tokens (in this case, nouns beginning with a vowel) when UNKs are inserted, but after the additional 3 Since Transformer is symmetric with respect to position, this process is similar to padding. However, the PAD token of RoBERTa published on hugging face is zero-vector, which is inconvenient for analyzing interactions between word embeddings. Thus, we choose UNK tokens. training, the models can predict them. The attention weights during inference are visualized in Figure 22. Since the attentions are concentrated every fourth token, the model with relearned position embeddings recognizes the relative positions of the non-UNK tokens. This result suggests that the attention is not focused on the tokens that cooccur frequently, but on the tokens that are informative to fill the MASK token. Thus, the relative position dependence of attention is simply caused by the fact that related words appear nearby.",
+                "In summary, this experiment indicates that the relative position dependence of attention is caused by the combination of two factors: (1) the linguistic property that related words tend to appear nearby due to grammatical rules and collocations, and (2) the property that attention is focused on words that are related in some sense."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "D Theorems About the Phase Shift",
+            "text": [
+                "Between the Query and the Key Theorem 1. The following two assumptions are given:",
+                "1. Qp i is sinusoidal with a single frequency f i .",
+                "2. The ratio of the argument \u03b8 i of an eigenvalue \u03bb i to the frequency f i is constant regardless of i.",
+                "In this case, Eq. ( 25) is derived from Eq. ( 24):",
+                "Proof. Since Qp i is sinusoidal, the t-th element in polar form is as follows:",
+                "where r i is the absolute value of (Qp i ) t . Then the t-th element of Kp i can be written as follows from Eq. ( 24):",
+                "where",
+                ". Now, since the ratio of the argument \u03b8 i to the frequency f i is constant, \u2206 i is independent of i, namely, \u2206 i can be replaced with a constant \u2206. Thus, (Qp i ) t = (Kp i ) t+\u2206 holds from Eq. ( 28) and Eq. (31).",
+                "Let the matrix P = [p 1 , p 2 , . . . , p d ], then the following equation holds:",
+                "Theorem 2. When, in a given basis, the position of each token in the key is offset by \u2206(\u2208 Z) tokens relative to the query, then in any basis, there is an Proof. Let B be an arbitrary matrix. Then,",
+                "(KP ) t+\u2206,k (P \u22121 B) ki (\u2235 Eq. ( 33))",
+                "(37)",
+                "In particular, when B = I, the equation Q t = K t+\u2206 is obtained."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "E How the Relative Position Dependence of Attention Emerges",
+            "text": [
+                "How does a masked language model acquire the concept of \"neighborhood\" even though absolute position embedding learns without the information about the order of the tokens? In this section, we demonstrate the process of acquiring the ability to focus attention on nearby tokens by relearning the position embedding under the masked language modeling. Suppose that the following sentence is input into a pre-trained model: \"This <unk> is <unk> an <unk> <mask> .\"",
+                "Since this sentence is collapsed with many UNK tokens, the model cannot fill the MASK correctly. If we re-learn the position embedding, will the model be able to fill it?"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "The geometry of multilingual language model representations",
+            "journal": "",
+            "year": "2022",
+            "authors": "Tyler Chang; Zhuowen Tu; Benjamin Bergen"
+        },
+        {
+            "ref_id": "b1",
+            "title": "does BERT look at? an analysis of BERT's attention",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Kevin Clark; Urvashi Khandelwal; Omer Levy; Christopher D Manning"
+        },
+        {
+            "ref_id": "b2",
+            "title": "BERT: Pre-training of deep bidirectional transformers for language understanding",
+            "journal": "Long and Short Papers",
+            "year": "2019",
+            "authors": "Jacob Devlin; Ming-Wei Chang; Kenton Lee; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Position information in transformers: An overview",
+            "journal": "Computational Linguistics",
+            "year": "2022",
+            "authors": "Philipp Dufter; Martin Schmitt; Hinrich Sch\u00fctze"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Language Modeling with Deep Transformers",
+            "journal": "",
+            "year": "2019",
+            "authors": "Kazuki Irie; Albert Zeyer; Ralf Schl\u00fcter; Hermann Ney"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Karthikeyan Natesan Ramamurthy, Payel Das, and Siva Reddy. 2023. The impact of positional encoding on length generalization in transformers",
+            "journal": "",
+            "year": "",
+            "authors": "Amirhossein Kazemnejad; Inkit Padhi"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Revealing the dark secrets of BERT",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Olga Kovaleva; Alexey Romanov; Anna Rogers; Anna Rumshisky"
+        },
+        {
+            "ref_id": "b7",
+            "title": "BART: Denoising sequence-to-sequence pretraining for natural language generation, translation, and comprehension",
+            "journal": "",
+            "year": "2020",
+            "authors": "Mike Lewis; Yinhan Liu; Naman Goyal ; Abdelrahman Mohamed; Omer Levy; Veselin Stoyanov; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Open sesame: Getting inside BERT's linguistic knowledge",
+            "journal": "",
+            "year": "2019",
+            "authors": "Yongjie Lin; Yi Chern Tan; Robert Frank"
+        },
+        {
+            "ref_id": "b9",
+            "title": "RoBERTa: A robustly optimized bert pretraining approach",
+            "journal": "",
+            "year": "2019",
+            "authors": "Yinhan Liu; Myle Ott; Naman Goyal; Jingfei Du; Mandar Joshi; Danqi Chen; Omer Levy; Mike Lewis; Luke Zettlemoyer; Veselin Stoyanov"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Pointer sentinel mixture models",
+            "journal": "",
+            "year": "2017",
+            "authors": "Stephen Merity; Caiming Xiong; James Bradbury; Richard Socher"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Language models are unsupervised multitask learners",
+            "journal": "",
+            "year": "2019",
+            "authors": "Alec Radford; Jeff Wu; Rewon Child; David Luan; Dario Amodei; Ilya Sutskever"
+        },
+        {
+            "ref_id": "b12",
+            "title": "SVCCA: Singular vector canonical correlation analysis for deep learning dynamics and interpretability",
+            "journal": "Curran Associates, Inc",
+            "year": "2017",
+            "authors": "Maithra Raghu; Justin Gilmer; Jason Yosinski; Jascha Sohl-Dickstein"
+        },
+        {
+            "ref_id": "b13",
+            "title": "The impact of positional encodings on multilingual compression",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Vinit Ravishankar; Anders S\u00f8gaard"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Self-attention with relative position representations",
+            "journal": "",
+            "year": "2018",
+            "authors": "Peter Shaw; Jakob Uszkoreit; Ashish Vaswani"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Roformer: Enhanced transformer with rotary position embedding",
+            "journal": "",
+            "year": "2022",
+            "authors": "Jianlin Su; Yu Lu; Shengfeng Pan; Ahmed Murtadha; Bo Wen; Yunfeng Liu"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Attention is all you need",
+            "journal": "Curran Associates, Inc",
+            "year": "2017",
+            "authors": "Ashish Vaswani; Noam Shazeer; Niki Parmar; Jakob Uszkoreit; Llion Jones; Aidan N Gomez; Illia Kaiser;  Polosukhin"
+        },
+        {
+            "ref_id": "b17",
+            "title": "On position embeddings in BERT",
+            "journal": "",
+            "year": "2021",
+            "authors": "Benyou Wang; Lifeng Shang; Christina Lioma; Xin Jiang; Hao Yang; Qun Liu; Jakob Grue Simonsen"
+        },
+        {
+            "ref_id": "b18",
+            "title": "What do position embeddings learn? an empirical study of pre-trained language model positional encoding",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Yu-An Wang; Yun-Nung Chen"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Attention weights for the first 15 tokens of an input text.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure2: For each head, a pie chart illustrates the percentage of labels assigned to 100 vectors a lh (Eq. (7)).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :3Figure3: Amplitude spectra of position embeddings. Blue line is the mean of spec i and blue area is the quartile range. Orange line is the spectrum of word embeddings for an input before adding position embeddings.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 4 :4Figure 4: CCA coefficient for each layer compared to position embedding.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 5 :5Figure 5: Column i of the query and the key in head(1, 1).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 6 :6Figure 6: The frequency-wise maxima of the amplitude spectra. The l-th row of the heat map corresponds to max-spec l . The top figure is a reiteration of Figure 3a.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "789",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 7 :Figure 8 :Figure 9 :789Figure 7: The cross-correlation xcorr i (t) between the queries and the keys in Figure 5.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "Figure 10 :10Figure 10: 2D histogram of the function g(f, \u03b8). The section at \u03b8 = \u03b8 i is the amplitude spectrum of Qp i .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "figure",
+            "figure_id": "fig_8",
+            "figure_caption": "Figure 11 :11Figure 11: The cross-correlations (left) and the weighted sum of cross-covariances (right) in head(8, 9) when we modify either the position embedding or the word embedding component of the input.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "12",
+            "figure_type": "figure",
+            "figure_id": "fig_9",
+            "figure_caption": "Figure 12 :12Figure 12: Cumulative principal component contribution rate of RoBERTa position embedding.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "13",
+            "figure_type": "figure",
+            "figure_id": "fig_10",
+            "figure_caption": "Figure 13 :13Figure 13: Amplitude spectra of position embedding of various models.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "14",
+            "figure_type": "figure",
+            "figure_id": "fig_11",
+            "figure_caption": "Figure 14 :14Figures for GPT-2",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_12",
+            "figure_caption": "Figure 16: 2D histogram of the function g(f, \u03b8) in GPT-2.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_13",
+            "figure_caption": "FiguresFigures for BART encoder",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1719",
+            "figure_type": "figure",
+            "figure_id": "fig_14",
+            "figure_caption": "Figure 17 :Figure 19 :1719Figure 17: Attention weights of BART encoder for the first 15 tokens of an input text.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_15",
+            "figure_caption": "FiguresFigures for BART decoder",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "20",
+            "figure_type": "figure",
+            "figure_id": "fig_16",
+            "figure_caption": "Figure 20 :20Figure 20: Attention scores of BART decoder for the first 300 tokens of an input text.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_17",
+            "figure_caption": "Figure 22: Attention weight with relearned position embedding PE predicted top-5 tokens relearned exercise essay experiment article adventure RoBERTa base and the , . to",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Top 5 MASK candidates when 3 UNKs are put between each token in \"This is an MASK.\"E.1 ExperimentWe additionally train RoBERTa with the following configurations.Dataset We used 8645 samples consisting of more than 128 tokens from wikitext-2.Putting UNK token Three UNK tokens were inserted after each token in all sentences; the token sequence [t1 , t 2 , ..., t 128 ] was expanded to [t 1 , unk, unk, unk, t 2 , unk, unk, unk, . . . , t 128 , unk, unk, unk]. 3",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "A lh = softmax ( X l W Q lh (X l W K lh ) T \u221a d/n ) (1) O lh = A lh X l W V lh (2) MultiHead l = concat(O l1 , . . . , O ln )W O l(3)",
+            "formula_coordinates": [
+                2.0,
+                84.95,
+                326.45,
+                204.19,
+                77.42
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "W Q lh , W K lh , W V lh \u2208 R d\u00d7(d/n",
+            "formula_coordinates": [
+                2.0,
+                101.39,
+                408.68,
+                127.86,
+                21.76
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "SP E (pos,2i) = sin(pos/10000 2i/d ) (4)",
+            "formula_coordinates": [
+                2.0,
+                99.94,
+                629.57,
+                189.2,
+                14.7
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "[ sin x i cos x i ] [ cos \u03b8 \u2212 sin \u03b8 sin \u03b8 cos \u03b8 ] = [ sin(x i + \u03b8) cos(x i + \u03b8) ] .(6)",
+            "formula_coordinates": [
+                2.0,
+                103.65,
+                718.86,
+                185.48,
+                51.73
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "tr t (A) = { \u2211 T \u2212t i=1 (A) i,i+t (t \u2265 0) \u2211 T +t i=1 (A) i\u2212t,i (t < 0)(7)",
+            "formula_coordinates": [
+                2.0,
+                336.56,
+                553.04,
+                187.87,
+                40.95
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "a lh = [tr \u221210 (A lh ), . . . , tr 10 (A lh )] \u2208 R 21 . (8",
+            "formula_coordinates": [
+                2.0,
+                318.84,
+                627.46,
+                201.34,
+                20.96
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": ")",
+            "formula_coordinates": [
+                2.0,
+                520.18,
+                627.87,
+                4.24,
+                13.15
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "spec i = abs(DFT(E pos e i ))(9)",
+            "formula_coordinates": [
+                3.0,
+                354.08,
+                346.07,
+                170.34,
+                14.93
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": "z l i = [ z l i (x 1 ), . . . , z l i (x m )",
+            "formula_coordinates": [
+                4.0,
+                117.47,
+                719.79,
+                114.99,
+                25.22
+            ]
+        },
+        {
+            "formula_id": "formula_9",
+            "formula_text": "Z l = [ z l 1 , . . . , z l n ](11)",
+            "formula_coordinates": [
+                4.0,
+                115.76,
+                743.41,
+                173.37,
+                25.22
+            ]
+        },
+        {
+            "formula_id": "formula_10",
+            "formula_text": "\u03c1 k = max a k ,b k Corr(Z l 1 a k , Z l 2 b k ) (12)",
+            "formula_coordinates": [
+                4.0,
+                347.6,
+                344.91,
+                176.82,
+                20.74
+            ]
+        },
+        {
+            "formula_id": "formula_11",
+            "formula_text": "W Q (W K ) T = U Q S(U K ) T (13) Q = XU Q , K = XU K (14)",
+            "formula_coordinates": [
+                5.0,
+                118.15,
+                448.16,
+                170.98,
+                31.55
+            ]
+        },
+        {
+            "formula_id": "formula_12",
+            "formula_text": "K = XU K = XU Q R = QR (15)",
+            "formula_coordinates": [
+                5.0,
+                114.26,
+                725.99,
+                174.88,
+                13.55
+            ]
+        },
+        {
+            "formula_id": "formula_13",
+            "formula_text": "XW Q (XW K ) T = QSK T = d/n \u2211 i=1 s i q i k T i (16)",
+            "formula_coordinates": [
+                5.0,
+                314.03,
+                455.58,
+                210.39,
+                35.72
+            ]
+        },
+        {
+            "formula_id": "formula_14",
+            "formula_text": "spec lhi = abs(DFT(Q lh e i )) (17) max-spec l = [max h,i (spec lhi ) f ] f =0,...,T /2 . (18",
+            "formula_coordinates": [
+                5.0,
+                318.48,
+                673.44,
+                205.95,
+                35.97
+            ]
+        },
+        {
+            "formula_id": "formula_15",
+            "formula_text": ")",
+            "formula_coordinates": [
+                5.0,
+                519.88,
+                689.98,
+                4.54,
+                13.15
+            ]
+        },
+        {
+            "formula_id": "formula_16",
+            "formula_text": "xcov j (t) = { \u2211 T \u2212t i=1 q i,j k i+t,j (t \u2265 0) \u2211 T +t i=1 q i\u2212t,j k i,j (t < 0) (19) xcorr j (t) = xcov j (t) \u2212 E t [xcov j (t)] \u2225q j \u2225\u2225k j \u2225(20)",
+            "formula_coordinates": [
+                6.0,
+                82.55,
+                426.34,
+                206.58,
+                78.28
+            ]
+        },
+        {
+            "formula_id": "formula_17",
+            "formula_text": "tr t (QSK T ) = T \u2212t \u2211 i=1 (QSK T ) i,i+t(21)",
+            "formula_coordinates": [
+                6.0,
+                95.94,
+                654.13,
+                193.19,
+                34.93
+            ]
+        },
+        {
+            "formula_id": "formula_18",
+            "formula_text": "= T \u2212t \u2211 i=1 d/n \u2211 j=1 s j q i,j k i+t,j(22)",
+            "formula_coordinates": [
+                6.0,
+                150.27,
+                693.23,
+                138.86,
+                35.72
+            ]
+        },
+        {
+            "formula_id": "formula_19",
+            "formula_text": "= d/n \u2211 j=1 s j xcov j (t)(23)",
+            "formula_coordinates": [
+                6.0,
+                150.27,
+                734.67,
+                138.86,
+                35.72
+            ]
+        },
+        {
+            "formula_id": "formula_20",
+            "formula_text": "Kp i = QRp i = Q\u03bb i p i = Qp i \u2022 e j\u03b8 i .(24)",
+            "formula_coordinates": [
+                7.0,
+                88.45,
+                334.58,
+                200.68,
+                20.96
+            ]
+        },
+        {
+            "formula_id": "formula_21",
+            "formula_text": "(Qp i ) t = (Kp i ) t+\u2206(25)",
+            "formula_coordinates": [
+                7.0,
+                134.58,
+                472.1,
+                154.55,
+                13.76
+            ]
+        },
+        {
+            "formula_id": "formula_22",
+            "formula_text": "g(f, \u03b8 i ) = abs(DFT(Qp i )) f (26)",
+            "formula_coordinates": [
+                7.0,
+                117.99,
+                622.78,
+                171.15,
+                13.85
+            ]
+        },
+        {
+            "formula_id": "formula_23",
+            "formula_text": "\u2206(f, \u03b8) = T 2\u03c0 \u2022 \u03b8 f . (27",
+            "formula_coordinates": [
+                7.0,
+                372.63,
+                313.08,
+                147.25,
+                26.04
+            ]
+        },
+        {
+            "formula_id": "formula_24",
+            "formula_text": ")",
+            "formula_coordinates": [
+                7.0,
+                519.88,
+                318.56,
+                4.54,
+                13.15
+            ]
+        }
+    ],
+    "doi": ""
+}

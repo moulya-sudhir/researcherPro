@@ -1,0 +1,848 @@
+{
+    "title": "PHD: Pixel-Based Language Modeling of Historical Documents",
+    "authors": "Nadav Borenstein; Phillip Rust; Desmond Elliott; Isabelle Augenstein",
+    "pub_date": "",
+    "abstract": "The digitisation of historical documents has provided historians with unprecedented research opportunities. Yet, the conventional approach to analysing historical documents involves converting them from images to text using OCR, a process that overlooks the potential benefits of treating them as images and introduces high levels of noise. To bridge this gap, we take advantage of recent advancements in pixel-based language models trained to reconstruct masked patches of pixels instead of predicting token distributions. Due to the scarcity of real historical scans, we propose a novel method for generating synthetic scans to resemble real historical documents. We then pre-train our model, PHD, on a combination of synthetic scans and real historical newspapers from the 1700-1900 period. Through our experiments, we demonstrate that PHD exhibits high proficiency in reconstructing masked image patches and provide evidence of our model's noteworthy language understanding capabilities. Notably, we successfully apply our model to a historical QA task, highlighting its utility in this domain.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Recent years have seen a boom in efforts to digitise historical documents in numerous languages and sources (Chadwyck, 1998;Groesen, 2015;Moss, 2009), leading to a transformation in the way historians work. Researchers are now able to expedite the analysis process of vast historical corpora using NLP tools, thereby enabling them to focus on interpretation instead of the arduous task of evidence collection (Laite, 2020;Gerritsen, 2012).",
+                "The primary step in most NLP tools tailored for historical analysis involves Optical Character Recognition (OCR). However, this approach poses several challenges and drawbacks. First, OCR *This paper shows dataset samples that are racist in nature strips away any valuable contextual meaning embedded within non-textual elements, such as page layout, fonts, and figures. 1 Moreover, historical documents present numerous challenges to OCR systems. This can range from deteriorated pages, archaic fonts and language, the presence of nontextual elements, and occasional deficiencies in scan quality (e.g., blurriness), all of which contribute to the introduction of additional noise. Consequently, the extracted text is often riddled with errors at the character level (Robertson and Goldwater, 2018;Bollmann, 2019), which most large language models (LLMs) are not tuned to process. Token-based LLMs are especially sensitive to this, as the discrete structure of their input space cannot handle well the abundance of out-of-vocabulary words that characterise OCRed historical documents (Rust et al., 2023). Therefore, while LLMs have proven remarkably successful in modern domains, their performance is considerably weaker when applied to historical texts (Manjavacas and Fonteyn, 2022;Baptiste et al., 2021, inter alia). Finally, for many languages, OCR systems either do not exist or perform particularly poorly. As training new OCR models is laborious and expensive (Li et al., 2021a), the application of NLP tools to historical documents in these languages is limited.",
+                "This work addresses these limitations by taking advantage of recent advancements in pixel-based language modelling, with the goal of constructing a general-purpose, image-based and OCR-free language encoder of historical documents. Specifically, we adapt PIXEL (Rust et al., 2023), a language model that renders text as images and is trained to reconstruct masked patches instead of predicting a distribution over tokens. PIXEL's training methodology is highly suitable for the historical domain, as (unlike other pixel-based language models) it does not rely on a pretraining dataset  Given the paucity of large, high-quality datasets comprising historical scans, we pretrain our model using a combination of 1) synthetic scans designed to resemble historical documents faithfully, produced using a novel method we propose for synthetic scan generation; and 2) real historical English newspapers published in the Caribbeans in the 18th and 19th centuries. The resulting pixelbased language encoder, PHD (Pixel-based model for Historical Documents), is subsequently evaluated based on its comprehension of natural language and its effectiveness in performing Question Answering from historical documents.",
+                "We discover that PHD displays impressive reconstruction capabilities, being able to correctly predict both the form and content of masked patches of historical newspapers ( \u00a74.4). We also note the challenges concerning quantitatively evaluating these predictions. We provide evidence of our model's noteworthy language understanding capabilities while exhibiting an impressive resilience to noise. Finally, we demonstrate the usefulness of the model when applied to the historical QA task ( \u00a75.4).",
+                "To facilitate future research, we provide the dataset, models, and code at https://gith ub.com/nadavborenstein/pixel-bw."
+            ],
+            "publication_ref": [
+                "b6",
+                "b14",
+                "b28",
+                "b20",
+                "b13",
+                "b35",
+                "b2",
+                "b36",
+                "b27",
+                "b23",
+                "b36"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Background",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "NLP for Historical Texts",
+            "text": [
+                "Considerable efforts have been invested in improving both OCR accuracy (Li et al., 2021a;Smith, 2023) and text normalisation techniques for historical documents (Drobac et al., 2017;Robertson and Goldwater, 2018;Bollmann et al., 2018;Boll-mann, 2019;Lyu et al., 2021). This has been done with the aim of aligning historical texts with their modern counterparts. However, these methods are not without flaws (Robertson and Goldwater, 2018;Bollmann, 2019), and any errors introduced during these preprocessing stages can propagate to downstream tasks (Robertson and Goldwater, 2018;Hill and Hengchen, 2019). As a result, historical texts remain a persistently challenging domain for NLP research (Lai et al., 2021;De Toni et al., 2022;Borenstein et al., 2023b). Here, we propose a novel approach to overcome the challenges associated with OCR in historical material, by employing an image-based language model capable of directly processing historical document scans and effectively bypassing the OCR stage."
+            ],
+            "publication_ref": [
+                "b23",
+                "b12",
+                "b35",
+                "b3",
+                "b26",
+                "b35",
+                "b2",
+                "b35",
+                "b16",
+                "b19"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Pixel-based Models for NLU",
+            "text": [
+                "Extensive research has been conducted on models for processing text embedded in images. Most existing approaches incorporate OCR systems as an integral part of their inference pipeline (Appalaraju et al., 2021;Li et al., 2021b;Delteil et al., 2022). These approaches employ multimodal architectures where the input consists of both the image and the output generated by an OCR system.",
+                "Recent years have also witnessed the emergence of OCR-free approaches for pixel-based language understanding. Kim et al. (2022) introduce Donut, an image-encoder-text-decoder model for document comprehension. Donut is pretrained with the objective of extracting text from scans, a task they refer to as \"pseudo-OCR\". Subsequently, it is finetuned on various text generation tasks, reminiscent of T5 (Roberts et al., 2020). While architecturally similar to Donut, Dessurt (Davis et al., 2023) and Pix2Struct (Lee et al., 2022) were pretrained by masking image regions and predicting the text in both masked and unmasked image regions. Unlike our method, all above-mentioned models predict in the text space rather than the pixel space. This presupposes access to a pretraining dataset comprised of instances where the image and text are aligned. However, this assumption cannot hold for historical NLP since OCR-independent ground truth text for historical scans is, in many times, unprocurable and cannot be used for training purposes.",
+                "Text-free models that operate at the pixel level for language understanding are relatively uncommon. One notable exception is Li et al. (2022), which utilises Masked Image Modeling for pretraining on document patches. Nevertheless, their focus lies primarily on tasks that do not necessitate robust language understanding, such as table detection, document classification, and layout analysis. PIXEL (Rust et al., 2023), conversely, is a text-free pixel-based language model that exhibits strong language understanding capabilities, making it the ideal choice for our research. The subsequent section will delve into a more detailed discussion of PIXEL and how we adapt it to our task."
+            ],
+            "publication_ref": [
+                "b0",
+                "b24",
+                "b10",
+                "b17",
+                "b21",
+                "b36"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Model",
+            "text": [
+                "PIXEL We base PHD on PIXEL, a pretrained pixel-based encoder of language. PIXEL has three main components: A text renderer that draws texts as images, a pixel-based encoder, and a pixel-based decoder. The training of PIXEL is analogous to BERT (Devlin et al., 2019). During pretraining, input strings are rendered as images, and the encoder and the decoder are trained jointly to reconstruct randomly masked image regions from the unmasked context. During finetuning, the decoder is replaced with a suitable classification head, and no masking is performed. The encoder and decoder are based on the ViT-MAE architecture (He et al., 2022) and work at the patch level. That is, the encoder breaks the input image into patches of 16 \u00d7 16 pixels and outputs an embedding for each patch. The decoder then decodes these patch embeddings back into pixels. Therefore, random masking is performed at the patch level as well.",
+                "PHD We follow the same approach as PIXEL's pretraining and finetuning schemes. However, PIXEL's intended use is to process texts, not natural images. That is, the expected input to PIXEL is a string, not an image file. In contrast, we aim to use the model to encode real document scans. Therefore, we make several adaptations to PIXEL's training and data processing procedures to make it compatible with our use case ( \u00a74 and \u00a75).",
+                "Most crucially, we alter the dimensions of the model's input: The text renderer of PIXEL renders strings as a long and narrow image with a resolution of 16 \u00d7 8464 pixels (corresponding to 1 \u00d7 529 patches), such that the resulting image resembles a ribbon with text. Each input character is set to be not taller than 16 pixels and occupies roughly one patch. However, real document scans cannot be represented this way, as they have a natural twodimensional structure and irregular fonts, as "
+            ],
+            "publication_ref": [
+                "b11",
+                "b15"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Training a Pixel-Based Historical LM",
+            "text": [
+                "We design PHD to serve as a general-purpose, pixel-based language encoder of historical documents. Ideally, PHD should be pretrained on a large dataset of scanned documents from various historical periods and different locations. However, large, high-quality datasets of historical scans are not easily obtainable. Therefore, we propose a novel method for generating historical-looking artificial data from modern corpora (see subsection 4.1). We adapt our model to the historical domain by continuously pretraining it on a medium-sized corpus of real historical documents. Below, we describe the datasets and the pretraining process of the model."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Artificially Generated Pretraining Data",
+            "text": [
+                "Our pretraining dataset consists of artificially generated scans of texts from the same sources that BERT used, namely the BookCorpus (Zhu et al., 2015) and the English Wikipedia. 2 We generate the scans as follows.",
+                "We generate dataset samples on-the-fly, adopting a similar approach as Davis et al. (2023). First,  we split the text corpora into paragraphs, using the new-line character as a delimiter. From a paragraph chosen at random, we pick a random spot and keep the text spanning from that spot to the paragraph's end. We also sample a random font and font size from a pre-defined list of fonts (from Davis et al. ( 2023)). The text span and the font are then embedded within an HTML template using the Python package Jinja, 3 set to generate a Web page with dimensions that match the input dimension of the model. "
+            ],
+            "publication_ref": [
+                "b41"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Real Historical Scans",
+            "text": [
+                "We adapt PHD to the historical domain by continuously pretraining it on a medium-sized corpus of scans of real historical newspapers. Specifically, we collect newspapers written in English from the \"Caribbean Newspapers, 1718-1876\" database, 5 the largest collection of Caribbean newspapers from the 18th-19th century available online. We extend this dataset with English-Danish newspapers published between 1770-1850 in the Danish Caribbean colony of Santa Cruz (now Saint Croix) downloaded from the Danish Royal Library's website. 6 See Tab 1 for details of dataset sizes. While confined in its geographical and temporal context, this dataset offers a rich diversity in terms of content and format, rendering it an effective test bed for evaluating PHD.",
+                "Newspaper pages are converted into a 368 \u00d7 368 pixels crops using a sliding window approach over the page's columns. This process is described in more detail in App A.2. We reserve 5% of newspaper issues for validation, using the rest for training. See "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Pretraining Procedure",
+            "text": [
+                "Like PIXEL, the pretraining objective of PHD is to reconstruct the pixels in masked image patches. We randomly occlude 28% of the input patches with 2D rectangular masks. We uniformly sample their width and height from "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Pretraining Results",
+            "text": [
+                "Qualitative Evaluation. We begin by conducting a qualitative examination of the predictions made by our model.    2023), unsurprisingly, prediction quality is high and the results are sharp for smaller masks and when words are only partially obscured. However, as the completions become longer, the text quality deteriorates, resulting in blurry text. It is important to note that evaluating these blurry completions presents a significant challenge. Unlike token-based models, where the presence of multiple words with high, similar likelihood can easily be detected by examining the discrete distribution, this becomes impossible with pixel-based models. In pixel-based completions, high-likelihood words may overlay and produce a blurry completion. Clear completions are only observed when a single word has a significantly higher probability compared to others. This limitation is an area that we leave for future work. We now move to analyse PHD's ability to fill in single masked words. We randomly sample test scans and OCRed them using Tesseract. 7 Next, we randomly select a single word from the OCRed text and use Tesseract's word-to-image location functionality to (heuristically) mask the word from the image. Results are presented in Fig 4 . Similar to our earlier findings, the reconstruction quality of single-word completion varies. Some completions are sharp and precise, while others appear blurry. In some few cases, the model produces a sharp reconstruction of an incorrect word (Fig 4c). Unfortunately, due to the blurry nature of many of the results (regardless of their correctness), a quantitative analysis of these results (e.g., by OCRing the reconstructed patch and comparing it to the OCR output of the original patch) is unattainable.",
+                "Semantic Search. A possible useful application of PHD is semantic search. That is, searching in a corpus for historical documents that are semantically similar to a concept of interest. We now analyse PHD's ability to assign similar historical scans with similar embeddings. We start by taking a random sample of 1000 images from our test set and embed them by averaging the patch embeddings of the final layer of the model. We then reduce the dimensionality of the embeddings with     "
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_10"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Training for Downstream NLU Tasks",
+            "text": [
+                "After obtaining a pretrained pixel-based language model adapted to the historical domain ( \u00a74), we now move to evaluate its understanding of natural language and its usefulness in addressing historically-oriented NLP tasks. Below, we describe the datasets we use for this and the experimental settings. "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Language Understanding",
+            "text": [
+                "We adapt the commonly used GLUE benchmark (Wang et al., 2018) to gauge our model's understanding of language. We convert GLUE instances into images similar to the process described in \u00a74.1. Given a GLUE instance with sentences s 1 , s 2 (s 2 can be empty), we embed s 1 and s 2 into an HTML template, introducing a line break between the sentences. We then render the HTML files as images.",
+                "We generate two versions of this visual GLUE dataset -clean and noisy. The former is rendered using a single pre-defined font without applying degradations or augmentations, whereas the latter is generated with random fonts and degradations. Fig 6 presents a sample of each of the two dataset versions. While the first version allows us to measure PHD's understanding of language in \"sterile\" settings, we can use the second version to estimate the robustness of the model to noise common to historical scans."
+            ],
+            "publication_ref": [
+                "b40"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Historical Question Answering",
+            "text": [
+                "QA applied to historical datasets can be immensely valuable and useful for historians (Borenstein et al., 2023a). Therefore, we assess PHD's potential for assisting historians with this important NLP task. We finetune the model on two novel datasets. The first is an adaptation of the classical SQuAD-v2 dataset (Rajpurkar et al., 2016), while the second is a genuine historical QA dataset.",
+                "SQuAD Dataset We formulate SQuAD-v2 as a patch classification task, as illustrated in Fig 11 in App C. Given a SQuAD instance with question q, context c and answer a that is a span in c, we render c as an image, I (Fig 11a). Then, each patch of I is labelled with 1 if it contains a part of a or 0 otherwise. This generates a binary label mask M for I, which our model tries to predict (Fig 11b). If any degradations or augmentations are later applied to I, we ensure that M is affected accordingly. Finally, similarly to Lee et al. (2022), we concatenate to I a rendering of q and crop the resulting image to the appropriate input size (Fig 11c).",
+                "Generating the binary mask M is not straightforward, as we do not know where a is located inside the generated image I. For this purpose, we first use Tesseract to OCR I and generate \u0109. Next, we use fuzzy string matching to search for a within \u0109. If a match \u00e2 \u2208 \u0109 is found, we use Tesseract to find the pixel coordinates of \u00e2 within I. We then map the pixel coordinates to patch coordinates and label all the patches containing \u00e2 with 1. In about 15% of the cases, Tesseract fails to OCR I properly, and \u00e2 cannot be found in \u0109, resulting in a higher proportion of SQuAD samples without an answer compared to the text-based version.",
+                "As with GLUE, we generate two versions of visual SQuAD, which we use to evaluate PHD's performance in both sterile and historical settings.",
+                "Historical QA Dataset Finally, we finetune PHD for a real historical QA task. For this, we use the English dataset scraped from the website of the Runaways Slaves in Britain project, a searchable database of over 800 newspaper adverts printed between 1700 and 1780 placed by enslavers who wanted to capture enslaved people who had selfliberated (Newman et al., 2019). Each ad was manually transcribed and annotated with more than 50 different attributes, such as the described gender and age, what clothes the enslaved person wore, and their physical description.",
+                "Following Borenstein et al. (2023a), we convert this dataset to match the SQuAD format: given an ad and an annotated attribute, we define the transcribed ad as the context c, the attribute as the answer a, and manually compose an appropriate question q. We process the resulting dataset similarly to how SQuAD is processed, with one key difference: instead of rendering the transcribed ad c as an image, we use the original ad scan. Therefore, we also do not introduce any noise to the images. See Figure 7 for an example instance. We reserve 20% of the dataset for testing."
+            ],
+            "publication_ref": [
+                "b4",
+                "b32",
+                "b21",
+                "b29",
+                "b4"
+            ],
+            "figure_ref": [
+                "fig_1",
+                "fig_1",
+                "fig_15"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Training Procedure",
+            "text": [
+                "Similar to BERT, PHD is finetuned for downstream tasks by replacing the decoder with a suitable head. Tab 4 in App A.1 details the hyperparameters used to train PHD on the different GLUE tasks. We use the standard GLUE metrics to evaluate our model. Since GLUE is designed for models of modern English, we use this benchmark to evaluate a checkpoint of our model obtained after training on the artificial modern scans, but before training on the real historical scans. The same checkpoint is also used to evaluate PHD on SQuAD. Conversely, we use the final model checkpoint (after introducing the historical data) to finetune on the historical QA dataset: First, we train the model on the noisy SQuAD and subsequently finetune it on the Runaways dataset (see App A.1 for training details).",
+                "To evaluate our model's performance on the QA datasets, we employ various metrics. The primary metrics include binary accuracy, which indicates whether the model agrees with the ground truth regarding the presence of an answer in the context. Additionally, we utilise patch-based accuracy, which measures the ratio of overlapping answer patches between the ground truth mask M and the predicted mask M , averaged over all the dataset instances for which an answer exists. Finally, we measure the number of times a predicted answer and the ground truth overlap by at least a single patch. We balance the test sets to contain an equal number of examples with and without an answer."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results",
+            "text": [
+                "Baselines We compare PHD's performance on GLUE to a variety of strong baselines, covering both OCR-free and OCR-based methods. First, we use CLIP with a ViT-L/14 image encoder in the lin- ear probe setting, which was shown to be effective in a range of settings that require a joint understanding of image and text-including rendered SST-2 (Radford et al., 2021). While we only train a linear model on the extracted CLIP features, compared to full finetuning in PHD, CLIP is about 5\u00d7 the size with \u223c427M parameters and has been trained longer on more data. Second, we finetune Donut ( \u00a72.2), which has \u223c200M parameters and is the closest and strongest OCR-free alternative to PHD. Moreover, we finetune BERT and PIXEL on the OCR output of Tesseract. Both BERT and PIXEL are comparable in size and compute budget to PHD.",
+                "Although BERT has been shown to be overall more effective on standard GLUE than PIXEL, PIXEL is more robust to orthographic noise (Rust et al., 2023). Finally, to obtain an empirical upper limit to our model, we finetune BERT and PIXEL on a standard, not-OCRed version of GLUE. Likewise, for the QA tasks, we compare PHD to BERT trained on a non-OCRed version of the datasets (the Runaways dataset was manually transcribed). We describe all baseline setups in App B.",
+                "GLUE Tab 2 summarises the performance of PHD on GLUE. Our model demonstrates noteworthy results, achieving scores of above 80 for five out of the nine GLUE tasks. These results serve as evidence of our model's language understanding capabilities. Although our model falls short when compared to text-based BERT by 13 absolute points on average, it achieves competitive results compared to the OCR-then-finetune baselines. Moreover, PHD outperforms other pixel-based models by more than 10 absolute points on average, highlighting the efficacy of our methodology.",
+                "Question Answering According to Tab 3, our model achieves above guess-level accuracies on these highly challenging tasks, further strengthening the indications that PHD was able to obtain impressive language comprehension skills. Although the binary accuracy on SQuAD is low, hovering around 60% compared to the 72% of BERT, the relatively high \"At least one overlap\" score of above 40 indicates that PHD has gained the ability to locate the answer within the scan correctly. Furthermore, PHD displays impressive robustness to noise, with only a marginal decline in performance observed between the clean and noisy versions of the SQuAD dataset, indicating its potential in handling the highly noisy historical domain. The model's performance on the Runaways Slaves dataset is particularly noteworthy, reaching a binary accuracy score of nearly 75% compared to BERT's 78%, demonstrating the usefulness of the model in application to historically-oriented NLP tasks. We believe that the higher metrics reported for this dataset compared to the standard SQuAD might stem from the fact that Runaways Slaves in Britain contains repeated questions (with different contexts), which might render the task more trackable for our model.",
+                "Saliency Maps Our patch-based QA approach can also produce visual saliency maps, allowing for a more fine-grained interpretation of model predictions and capabilities (Das et al., 2017). "
+            ],
+            "publication_ref": [
+                "b30",
+                "b36",
+                "b7"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "In this study, we introduce PHD, an OCR-free language encoder specifically designed for analysing historical documents at the pixel level. We present a novel pretraining method involving a combination of synthetic scans that closely resemble historical documents, as well as real historical newspapers published in the Caribbeans during the 18th and 19th centuries. Through our experiments, we observe that PHD exhibits high proficiency in reconstructing masked image patches, and provide evidence of our model's noteworthy language understanding capabilities. Notably, we successfully apply our model to a historical QA task, achieving a binary accuracy score of nearly 75%, highlighting its usefulness in this domain. Finally, we note that better evaluation methods are needed to further drive progress in this domain."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "We see several limitations regarding our work. First, we focus on the English language only, a high-resource language with strong OCR systems developed for it. By doing so, we neglect lowresource languages for which our model can potentially be more impactful.",
+                "On the same note, we opted to pretrain our model on a single (albeit diverse) historical corpus of newspapers, and its robustness in handling other historical sources is yet to be proven. To address this limitation, we plan to extend our historical corpora in future research endeavours. Expanding the range of the historical training data would not only alleviate this concern but also tackle another limitation; while our model was designed for historical document analysis, most of its pretraining corpora consist of modern texts due to the insufficient availability of large historical datasets.",
+                "We also see limitations in the evaluation of PHD. As mentioned in Section 4.4, it is unclear how to empirically quantify the quality of the model's reconstruction of masked image regions, thus necessitating reliance on qualitative evaluation. This qualitative approach may result in a suboptimal model for downstream tasks. Furthermore, the evaluation tasks used to assess our model's language understanding capabilities are limited in their scope. Considering our emphasis on historical language modelling, it is worth noting that the evaluation datasets predominantly cater to models trained on modern language. We rely on a single historical dataset to evaluate our model's performance.",
+                "Lastly, due to limited computational resources, we were constrained to training a relatively smallscale model for a limited amount of steps, potentially impeding its ability to develop the capabilities needed to address this challenging task. Insufficient computational capacity also hindered us from conducting comprehensive hyperparameter searches for the downstream tasks, restricting our ability to optimize the model's performance to its full potential. This, perhaps, could enhance our performance metrics and allow PHD to achieve more competitive results on GLUE and higher absolute numbers on SQuAD. This package provides the location of every paragraph on the page, as well as their reading order.",
+                "As newspapers tend to be multi-columned, we \"linearise\" the page into a single-column document.",
+                "We crop each paragraph and resize it such that its width equals 368 pixels. We then concatenate all the resized paragraphs with respect to their reading order to generate a long, single-column document with a width of 368 pixels. Finally, we use a sliding window approach to split the linear page into 368 \u00d7 368 crops, applying a stride of 128 pixels. We reserve 5% of newspaper issues for validation, using the rest for training. See "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Historical GLUE Baselines",
+            "text": [
+                "For all baselines below, we compute and average scores over 5 random initializations. Donut We finetune Donut-base using an adaptation of ClovaAI's official codebase. 11 We frame each of the GLUE tasks as image-to-text tasks: the model receives the (noisy) input image and is trained to produce an output text sequence such as <s_glue><s_class><positive/> </s_class></s>. In this example, taken from SST-2, the < X > tags are new vocabulary items added to Donut and the label is an added vocabulary item for the positive sentiment class. All classification tasks in GLUE can be represented in this way. For STS-B, where the label is a floating point value denoting the similarity score between two sentences, we follow Raffel et al. (2020) to round and convert the floats into strings. 12 We finetune with batch size 32 and learning rate between 1e\u22125 and 3e\u22125 for a maximum of 30 epochs or 15 000 steps on images resized to a resolution of 320 \u00d7 320 pixels.",
+                "OCR-free BERT/PIXEL For GLUE, we take results reported in (Rust et al., 2021). For SQuAD, we take a BERT model finetuned on SQuAD-v2, 13  and evaluate it on the validation set of SQuAD-v2, after being balanced for the existence of an answer. For the Runaways Slaves in Britain dataset, we finetune a BERT-base-cased model 14 on a manually transcribed version of the dataset. We use the default SQuAD-v2 hyperparameters reported in the official Huggingface repository for training on SQuAD-v2. 15 We then evaluate the model on a balanced test set, containing 20% of the ads."
+            ],
+            "publication_ref": [
+                "b37"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Additional Material",
+            "text": [
+                "Figure 9 additional examples from our artificially generated dataset.",
+                "Figure 10 Sample scans from the real historical dataset, as described in Section 4.2.",
+                "Figure 11 The process of generating the Visual SQuAD dataset. We first render the context as an image (a), generate a patch-level label mask highlighting the answer (b), add noise and concatenate the question (c).",
+                "Figure 12 Additional examples of PHD's completions over test set samples.",
+                "Figure 13 Dimensionality reduction of embedding calculated by our model on historical scans. We see that scans are clustered based on visual similarity and page structure. However, further investigation is required to determine whether scans are also clustered based on semantic similarity. Figure 16 Examples of shipping ads Newspapers. Newspapers in the Caribbean region routinely reported on passenger and cargo ships porting and departing the islands. These ads are usually wellstructured and contain information such as relevant dates, the ship's captain, route, and cargo.",
+                "Figure 17 Input samples for PIXEL. The images are rolled, i.e., the actual input resolution is 16 \u00d7 8464 pixels. The grid represents the 16 \u00d7 16 patches that the inputs are broken into.",
+                "Figure 18 An example of a full newspaper page downloaded from the \"Caribbean project\".          "
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_20",
+                "fig_21",
+                "fig_1",
+                "fig_4",
+                "fig_24",
+                "fig_28",
+                "fig_29",
+                "fig_16"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgements",
+            "text": [
+                "This research was partially funded by a DFF Sapere Aude research leader grant under grant agreement No 0171-00034B, the Danish-Israeli Study Foundation in Memory of Josef and Regine Nachemsohn, the Novo Nordisk Foundation (grant NNF 20SA0066568), as well as by a research grant (VIL53122) from VILLUM FONDEN. The research was also supported by the Pioneer Centre for AI, DNRF grant number P1."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Reproducibility",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1 Training",
+            "text": [
+                "Pretraining We pretrain PHD for 1M steps on with the artificial dataset using a batch size of 176 (the maximal batch size that fits our system) using AdamW optimizer (Kingma and Ba, 2014;Loshchilov and Hutter, 2017) with a linear warmup over the first 50k steps to a peak learning rate of 1.5e\u22124 and a cosine decay to a minimum learning rate of 1e\u22125. We then train PHD for additional 100k steps with the real historical scans using the same hyperparameters but without warm-up. Pretraining took 10 days on 2 \u00d7 80GB Nvidia A100 GPUs.",
+                "GLUE Table 4 contains the hyperparameters used to finetune PHD on the GLUE benchmark. We did not run a comprehensive hyperparameter search due to compute limitations; these settings were manually selected based on a small number of preliminary runs.",
+                "SQuAD To finetune PHD on SQuAD, we used a learning rate of 6.75e\u22126, batch size of 128, dropout probability of 0.0 and weight decay of 1e\u22125. We train the model for 50 000 steps."
+            ],
+            "publication_ref": [
+                "b18",
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Runaways Slaves in Britain",
+            "text": [
+                "To finetune PHD on the Runaways Slaves in Britain dataset, first trained the model on SQuAD using the hyperparameters mentioned above. Then, we finetuned the resulting model for an additional 1000 steps on the Runaways Slaves in Britain. The only hyperparameter we changed between the two runs is the dropout probability, which we increased to 0.2."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.2 Dataset Generation",
+            "text": [
+                "List of dataset augmentations To generate the synthetic dataset described in Section 4.1, we applied the following transformations to the rendered images: text bleed-through effect; addition of random horizontal and lines; salt and pepper noise; Gaussian blurring; water stains effect; \"holes-inimage\" effect; colour jitters on image background; and random rotations.",
+                "Converting the Caribbean Newspapers dataset into 368 \u00d7 368 scans We convert full newspaper pages into a collection of 368 \u00d7 368 pixels using the following process. First, we extract the layout of the page using the Python package Eynollah. 8  "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Docformer: End-to-end transformer for document understanding",
+            "journal": "",
+            "year": "2021",
+            "authors": "Srikar Appalaraju; Bhavan Jasani; Yusheng Bhargava Urala Kota; R Xie;  Manmatha"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Transferring modern named entity recognition to the historical domain: How to take the step?",
+            "journal": "",
+            "year": "2021",
+            "authors": "Blouin Baptiste; Jeremy Benoit Favre; Christian Auguste;  Henriot"
+        },
+        {
+            "ref_id": "b2",
+            "title": "A large-scale comparison of historical text normalization systems",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Marcel Bollmann"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Multi-task learning for historical text normalization: Size matters",
+            "journal": "",
+            "year": "2018",
+            "authors": "Marcel Bollmann; Anders S\u00f8gaard; Joachim Bingel"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Multilingual event extraction from historical newspaper adverts",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Nadav Borenstein; Natalia Da; Silva Perez; Isabelle Augenstein"
+        },
+        {
+            "ref_id": "b5",
+            "title": "and Isabelle Augenstein. 2023b. Measuring intersectional biases in historical documents. Association for Computational Linguistics",
+            "journal": "",
+            "year": "",
+            "authors": "Nadav Borenstein; Karolina Sta\u0144czak; Thea Rolskov; Natacha Klein K\u00e4fer; Natalia Da; Silva Perez"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Early english books online : Eebo",
+            "journal": "",
+            "year": "1998",
+            "authors": " Chadwyck"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Human attention in visual question answering: Do humans and deep networks look at the same regions? Computer Vision and Image Understanding",
+            "journal": "",
+            "year": "2017",
+            "authors": "Abhishek Das; Harsh Agrawal; Larry Zitnick; Devi Parikh; Dhruv Batra"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Chris Tensmeyer, Curtis Wigington, and Vlad Morariu. 2023. End-to-end document recognition and understanding with dessurt",
+            "journal": "Springer-Verlag",
+            "year": "2022",
+            "authors": "Brian Davis; Bryan Morse; Brian Price"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Enrique Manjavacas, Stefan Schweter, and Daniel Van Strien. 2022. Entities, dates, and languages: Zero-shot on historical texts with t0",
+            "journal": "Association for Computational Linguistics",
+            "year": "",
+            "authors": "Francesco De Toni; Christopher Akiki; Javier De ; La Rosa; Cl\u00e9mentine Fourrier"
+        },
+        {
+            "ref_id": "b10",
+            "title": "MATrIX -Modality-Aware Transformer for Information eXtraction. arXiv e-prints",
+            "journal": "",
+            "year": "2022",
+            "authors": "Thomas Delteil; Edouard Belval; Lei Chen; Luis Goncalves; Vijay Mahadevan"
+        },
+        {
+            "ref_id": "b11",
+            "title": "BERT: Pre-training of deep bidirectional transformers for language understanding",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Jacob Devlin; Ming-Wei Chang; Kenton Lee; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Ocr and post-correction of historical finnish texts",
+            "journal": "",
+            "year": "2017",
+            "authors": "Senka Drobac; Pekka Kauppinen; Krister Lind\u00e9n"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Scales of a local: the place of locality in a globalizing world",
+            "journal": "A Companion to World History",
+            "year": "2012",
+            "authors": "Anne Gerritsen"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Digital gatekeeper of the past: Delpher and the emergence of the press in the dutch golden age",
+            "journal": "Tijdschrift voor Tijdschriftstudies",
+            "year": "2015",
+            "authors": " Michiel Van Groesen"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Masked autoencoders are scalable vision learners",
+            "journal": "",
+            "year": "2022",
+            "authors": "Kaiming He; Xinlei Chen; Saining Xie; Yanghao Li; Piotr Doll\u00e1r; Ross Girshick"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Quantifying the impact of dirty ocr on historical text analysis: Eighteenth century collections online as a case study",
+            "journal": "Digital Scholarship in the Humanities",
+            "year": "2019",
+            "authors": "J Mark; Simon Hill;  Hengchen"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Ocr-free document understanding transformer",
+            "journal": "Springer-Verlag",
+            "year": "2022-10-23",
+            "authors": "Geewook Kim; Teakgyu Hong; Moonbin Yim; Jeongyeon Nam; Jinyoung Park; Jinyeong Yim; Wonseok Hwang; Sangdoo Yun; Dongyoon Han; Seunghyun Park"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Adam: A method for stochastic optimization",
+            "journal": "",
+            "year": "2014",
+            "authors": "P Diederik; Jimmy Kingma;  Ba"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Event extraction from historical texts: A new dataset for black rebellions",
+            "journal": "",
+            "year": "2021",
+            "authors": "Viet Lai; Minh Van Nguyen; Heidi Kaufman; Thien Huu Nguyen"
+        },
+        {
+            "ref_id": "b20",
+            "title": "The emmet's inch: Small history in a digital age",
+            "journal": "Journal of Social History",
+            "year": "2020",
+            "authors": "Julia Laite"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Pix2struct: Screenshot parsing as pretraining for visual language understanding",
+            "journal": "",
+            "year": "2022",
+            "authors": "Kenton Lee; Mandar Joshi; Iulia Turc; Hexiang Hu; Fangyu Liu; Julian Eisenschlos; Urvashi Khandelwal; Peter Shaw; Ming-Wei Chang; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Dit: Self-supervised pre-training for document image transformer",
+            "journal": "Association for Computing Machinery",
+            "year": "2022",
+            "authors": "Junlong Li; Yiheng Xu; Tengchao Lv; Lei Cui; Cha Zhang; Furu Wei"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Trocr: Transformer-based optical character recognition with pre-trained models",
+            "journal": "",
+            "year": "2021",
+            "authors": "Minghao Li; Tengchao Lv; Jingye Chen; Lei Cui; Yijuan Lu; Dinei Florencio; Cha Zhang; Zhoujun Li; Furu Wei"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Selfdoc: Self-supervised document representation learning",
+            "journal": "",
+            "year": "2021",
+            "authors": "Peizhao Li; Jiuxiang Gu; Jason Kuen; I Vlad; Handong Morariu; Rajiv Zhao; Varun Jain; Hongfu Manjunatha;  Liu"
+        },
+        {
+            "ref_id": "b25",
+            "title": "",
+            "journal": "",
+            "year": "2017",
+            "authors": "Ilya Loshchilov; Frank Hutter"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Neural ocr post-hoc correction of historical corpora",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Lijun Lyu; Maria Koutraki; Martin Krickl; Besnik Fetahu"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Adapting vs. Pre-training Language Models for Historical Languages",
+            "journal": "Journal of Data Mining & Digital Humanities",
+            "year": "2022",
+            "authors": "Enrique Manjavacas; Lauren Fonteyn"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Guides: News and newspapers: Historical newspaper collections. Iowa's University Libraries",
+            "journal": "",
+            "year": "2009",
+            "authors": "Janalyn Moss"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Runaway Slaves in Britain: bondage, freedom and race in the eighteenth century",
+            "journal": "",
+            "year": "2019",
+            "authors": "P Simon; Stephen Newman; Nelson Mullen; Roslyn Mundell;  Chapman"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Learning transferable visual models from natural language supervision",
+            "journal": "PMLR",
+            "year": "2021-07-24",
+            "authors": "Alec Radford; Jong Wook Kim; Chris Hallacy; Aditya Ramesh; Gabriel Goh; Sandhini Agarwal; Girish Sastry; Amanda Askell; Pamela Mishkin; Jack Clark; Gretchen Krueger; Ilya Sutskever"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Exploring the limits of transfer learning with a unified text-to-text transformer",
+            "journal": "J. Mach. Learn. Res",
+            "year": "2020",
+            "authors": "Colin Raffel; Noam Shazeer; Adam Roberts; Katherine Lee; Sharan Narang; Michael Matena; Yanqi Zhou; Wei Li; Peter J Liu"
+        },
+        {
+            "ref_id": "b32",
+            "title": "SQuAD: 100,000+ Questions for Machine Comprehension of Text",
+            "journal": "",
+            "year": "2016",
+            "authors": "Pranav Rajpurkar; Jian Zhang; Konstantin Lopyrev; Percy Liang"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Sentence-bert: Sentence embeddings using siamese bert-networks",
+            "journal": "",
+            "year": "2019",
+            "authors": "Nils Reimers; Iryna Gurevych"
+        },
+        {
+            "ref_id": "b34",
+            "title": "How much knowledge can you pack into the parameters of a language model",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Adam Roberts; Colin Raffel; Noam Shazeer"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Evaluating historical text normalization systems: How well do they generalize?",
+            "journal": "",
+            "year": "2018",
+            "authors": "Alexander Robertson; Sharon Goldwater"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Language modelling with pixels. International Conference on Learning Representations",
+            "journal": "",
+            "year": "2023",
+            "authors": "Phillip Rust; Jonas F Lotz; Emanuele Bugliarello; Elizabeth Salesky; Desmond Miryam De Lhoneux;  Elliott"
+        },
+        {
+            "ref_id": "b37",
+            "title": "How good is your tokenizer? on the monolingual performance of multilingual language models",
+            "journal": "Long Papers",
+            "year": "2021",
+            "authors": "Phillip Rust; Jonas Pfeiffer; Ivan Vuli\u0107; Sebastian Ruder; Iryna Gurevych"
+        },
+        {
+            "ref_id": "b38",
+            "title": "2023. tesseract: Open source ocr engine",
+            "journal": "",
+            "year": "",
+            "authors": "Ray Smith"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Visualizing data using t-sne",
+            "journal": "Journal of Machine Learning Research",
+            "year": "2008",
+            "authors": "Laurens Van Der Maaten; Geoffrey Hinton"
+        },
+        {
+            "ref_id": "b40",
+            "title": "GLUE: A multi-task benchmark and analysis platform for natural language understanding",
+            "journal": "",
+            "year": "2018",
+            "authors": "Alex Wang; Amanpreet Singh; Julian Michael; Felix Hill; Omer Levy; Samuel Bowman"
+        },
+        {
+            "ref_id": "b41",
+            "title": "Aligning books and movies: Towards story-like visual explanations by watching movies and reading books",
+            "journal": "",
+            "year": "2015",
+            "authors": "Yukun Zhu; Ryan Kiros; Rich Zemel; Ruslan Salakhutdinov; Raquel Urtasun; Antonio Torralba; Sanja Fidler"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 1 :1Figure 1: Our proposed model, PHD. The model is trained to reconstruct the original image (a) from the masked image (b), resulting in (c). The grid represents the 16 \u00d7 16 pixels patches that the inputs are broken into. composed of instances where the image and text are aligned. Fig 1 visualises our proposed training approach.Given the paucity of large, high-quality datasets comprising historical scans, we pretrain our model using a combination of 1) synthetic scans designed to resemble historical documents faithfully, produced using a novel method we propose for synthetic scan generation; and 2) real historical English newspapers published in the Caribbeans in the 18th and 19th centuries. The resulting pixelbased language encoder, PHD (Pixel-based model for Historical Documents), is subsequently evaluated based on its comprehension of natural language and its effectiveness in performing Question Answering from historical documents.We discover that PHD displays impressive reconstruction capabilities, being able to correctly predict both the form and content of masked patches of historical newspapers ( \u00a74.4). We also note the challenges concerning quantitatively evaluating these predictions. We provide evidence of our model's noteworthy language understanding capabilities while exhibiting an impressive resilience to noise. Finally, we demonstrate the usefulness of the model when applied to the historical QA task ( \u00a75.4).To facilitate future research, we provide the dataset, models, and code at https://gith ub.com/nadavborenstein/pixel-bw.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Fig 1a demonstrates (and compare to Fig 17a in App C). Therefore, we set the input size of PHD to be 368 \u00d7 368 pixels (or 23 \u00d7 23 patches).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 2 :2Figure 2: Process of generating a single artificial scan. Refer to \u00a74.1 for detailed explanations.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Finally, we use the Python package WeasyPrint 4 to render the HTML file as a PNG image. Fig 2a visualises this process' outcome.In some cases, if the text span is short or the selected font is small, the resulting image contains a large empty space (as in Fig2a). When the empty space within an image exceeds 10%, a new image is generated to replace the vacant area. We create the new image by randomly choosing one of two options. In 80% of the cases, we retain the font of the original image and select the next paragraph. In 20% of the cases, a new paragraph and font are sampled. This pertains to the common case where a historical scan depicts a transition of context or font (e.g., Fig1a). This process can repeat multiple times, resulting in images akin toFig 2b. Finally, to simulate the effects of scanning ageing historical documents, we degrade the image by adding various types of noise, such as blurring, rotations, salt-and-pepper noise and bleed-through effect (see Fig 2c and Fig 9 in App C for examples). App A.2 enumerates the full list of the degradations and augmentations we use.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Fig 10 in App C for dataset examples.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "[2, 6] and [2, 4] patches, respectively, and then place them in random image locations (See Fig 1b for an example). Training hyperparameters can be found in App A.1.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_8",
+            "figure_caption": "Fig 3 presents a visual representa-",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_9",
+            "figure_caption": "Figure 3 :3Figure 3: Examples of some image completions made by PHD . Masked regions marked by dark outlines.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_10",
+            "figure_caption": "Figure 4 :4Figure 4: Single word completions made by our model. Figure captions depict the missing word. Fig (a) depicts a successful reconstruction, whereas Fig (b) and (c) represent fail-cases.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_11",
+            "figure_caption": "(a) Semantic search target. (b) Retrieved scans.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_12",
+            "figure_caption": "Figure 5 :5Figure 5: Semantic search using our model. (a) is the target of the search, and (b) are scans retrieved from the newspaper corpus.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_13",
+            "figure_caption": "FigFig 13, however, does not provide insights regarding the semantic properties of the clusters. Therefore, we also directly use the model in semantic search settings. Specifically, we search our newspapers corpus for scans that are semantically similar to instances of the Runaways Slaves in Britain dataset, as well as scans containing shipping ads (See Fig 16 in App C for examples).To do so, we embed 1M random scans from the corpus. We then calculate the cosine similarity between these embeddings and the embedding of samples from the Runaways Slaves in Britain and embeddings of shipping ads. Finally, we manually examine the ten most similar scans to each sample.Our results (Fig 5 and Fig 14 in App C) are encouraging, indicating that the embeddings capture not only structural and visual information, but also the semantic content of the scans. However, the results are still far from perfect, and many retrieved scans are not semantically similar to the search's target. It is highly plausible that additional specialised finetuning (e.g., SentenceBERT's(Reimers and Gurevych, 2019) training scheme) is necessary to produce more semantically meaningful embeddings.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_14",
+            "figure_caption": "Figure 6 :6Figure 6: Samples from the clean and noisy visual GLUE datasets.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_15",
+            "figure_caption": "Figure 7 :7Figure 7: Example from the Runaways Slaves in Britain dataset, rendered as visual question answering task. The gray overlay marks the patches containing the answer.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "figure",
+            "figure_id": "fig_16",
+            "figure_caption": "Figure 8 :8Figure 8: Saliency maps of PHD fine-tuned on the Runaways Slaves in Britain dataset. Ground truth label in a grey box. The figures were cropped in post-processing.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_17",
+            "figure_caption": "Fig 8 presents two such saliency maps produced by applying the model to test samples from the Runaways Slaves in Britain dataset, including a failure case (Fig 8a) and a successful prediction (Fig 8b). More examples can be found in Fig 15 in App C.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_18",
+            "figure_caption": "Fig 10 in App C for dataset examples.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "14",
+            "figure_type": "figure",
+            "figure_id": "fig_19",
+            "figure_caption": "Figure 1414Figure9additional examples from our artificially generated dataset. Figure10Sample scans from the real historical dataset, as described in Section 4.2. Figure11The process of generating the Visual SQuAD dataset. We first render the context as an image (a), generate a patch-level label mask highlighting the answer (b), add noise and concatenate the question (c). Figure12Additional examples of PHD's completions over test set samples. Figure13Dimensionality reduction of embedding calculated by our model on historical scans. We see that scans are clustered based on visual similarity and page structure. However, further investigation is required to determine whether scans are also clustered based on semantic similarity. Figure14Using PHD for semantic search. Figure14aand is the target of the search (the concept we are looking for), while Figure14band are the retrieved scans. Figure15Additional examples of PHD's saliency maps for samples from the test set of the Runaways Slaves in Britain dataset. Figure16Examples of shipping ads Newspapers. Newspapers in the Caribbean region routinely reported on passenger and cargo ships porting and departing the islands. These ads are usually wellstructured and contain information such as relevant dates, the ship's captain, route, and cargo. Figure17Input samples for PIXEL. The images are rolled, i.e., the actual input resolution is 16 \u00d7 8464 pixels. The grid represents the 16 \u00d7 16 patches that the inputs are broken into. Figure18An example of a full newspaper page downloaded from the \"Caribbean project\".",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "figure",
+            "figure_id": "fig_20",
+            "figure_caption": "Figure 9 :9Figure 9: Samples of our artificially generated dataset, and compare to Figure 10.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "figure",
+            "figure_id": "fig_21",
+            "figure_caption": "Figure 10 :10Figure 10: Sample scans from the real historical dataset.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_22",
+            "figure_caption": "(a) Rendering context c as an image I. (b) Generating a label mask M . (c) Adding q and degradations.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1112",
+            "figure_type": "figure",
+            "figure_id": "fig_23",
+            "figure_caption": "Figure 11 :Figure 12 :1112Figure 11: Process of generating the Visual SQuAD dataset. We first render the context as an image (a), generate a patch-level label mask highlighting the answer (b), add noise and concatenate the question (c).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "13",
+            "figure_type": "figure",
+            "figure_id": "fig_24",
+            "figure_caption": "Figure 13 :13Figure 13: Dimensionality reduction of embedding calculated by our model on historical scans.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "14",
+            "figure_type": "figure",
+            "figure_id": "fig_26",
+            "figure_caption": "Figure 14 :14Figure 14: Semantic search using our model. (a) is the target of the search, and (b) are scans retrieved from the newspaper corpus.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "15",
+            "figure_type": "figure",
+            "figure_id": "fig_27",
+            "figure_caption": "Figure 15 :15Figure 15: Additional examples of PHD's saliency maps for samples from the test set of the Runaways Slaves in Britain dataset.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "16",
+            "figure_type": "figure",
+            "figure_id": "fig_28",
+            "figure_caption": "Figure 16 :16Figure16: Shipping ads samples. Newspapers in the Caribbean region routinely reported on passenger and cargo ships porting and departing the islands. These ads are usually well-structured and contain information such as relevant dates, the ship's captain, route, and cargo.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "17",
+            "figure_type": "figure",
+            "figure_id": "fig_29",
+            "figure_caption": "Figure 17 :17Figure 17: Input samples for PIXEL. The images are rolled, i.e., the actual input resolution is 16 \u00d7 8464 pixels. The grid represents the 16 \u00d7 16 patches that the inputs are broken into.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "",
+            "figure_caption": "",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Statistics of the newspapers dataset.",
+            "figure_data": "Source#Issues#Train Scans#Test ScansCaribbean Project7 487 1 675 17287 721Danish Royal Library5 661300 78015 159Total13 148 1 975 952102 880"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Results for PHD finetuned on GLUE. The metrics are F 1 score for QQP and MRPC, Matthew's correlation for COLA, Spearman's \u03c1 for STS-B, and accuracy for the remaining datasets. Bold values indicate the best model in category (noisy/clean), while underscored values indicate the best pixel-based model.",
+            "figure_data": "Noise Images ModelMNLI QQP 393k 364kQNLI SST-2 COLA STS-B MRPC RTE 105k 67k 8.6k 5.8k 3.7k 2.5kWNLI AVG 635\u2717BERT PIXEL84.1 78.587.6 84.591.0 87.892.6 89.660.3 38.488.8 81.190.2 88.269.5 60.551.8 53.880.0 74.1\u2717\u2713CLIP lin Donut Ours50.2 64.0 70.164.7 77.8 82.767.4 69.7 82.379.8 82.1 82.54.2 13.9 15.956.4 14.4 80.274.1 81.7 83.451.5 54.0 59.925.6 57.7 54.152.7 57.2 67.9OCR+BERT OCR+PIXEL71.7 70.677.5 78.582.7 81.585.5 83.639.7 30.368.4 68.886.9 84.758.8 59.751.3 58.669.2 68.5\u2713\u2713CLIP lin Donut Ours45.3 61.6 68.067.4 74.1 80.464.4 75.1 81.879.2 75.5 83.93.5 10.2 15.157.9 20.6 80.478.8 81.9 83.647.3 56.7 58.532.7 60.0 57.852.9 57.3 67.2"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Results for PHD finetuned on our visual SQuAD (S) and the Runaways Slaves (R) datasets.",
+            "figure_data": "Task Model Noise / ImageBinary accPatch accOne OverlapSBERT Ours Ours\u2717/ \u2717 \u2717/ \u2713 \u2713/ \u271372.3 60.3 61.747.3 16.4 14.453.9 42.2 41.2RBERT Ours-/ \u2717 -/ \u271378.3 74.752.0 20.055.8 48.8"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "The hyperparameters used to train PHD on GLUE tasks.",
+            "figure_data": "ParameterMNLI QQP QNLI SST-2 COLA STS-B MRPC RTE WNLIClassification-head-pooling Optimizer Adam \u03b2 Adam \u03f5 Weight decay Learning rate Learning rate warmup steps Learning rate schedule Batch size Max steps Early stopping Eval interval (steps/epoch) Dropout probability172 500172 500128 500128 500Mean AdamW (0.9, 0.999) 1e\u22128 1e\u22125 5e\u22122 100 Cosine annealing 128 128 10 000 \u2713 100 100 0.0172 100172 250172 100"
+        }
+    ],
+    "formulas": [],
+    "doi": "10.18653/v1/N19-1389"
+}

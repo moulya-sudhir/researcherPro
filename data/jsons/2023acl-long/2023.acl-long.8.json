@@ -1,0 +1,1059 @@
+{
+    "title": "ACLM: A Selective-Denoising based Generative Data Augmentation Approach for Low-Resource Complex NER",
+    "authors": "Sreyan Ghosh; Utkarsh Tyagi; Manan Suri; \u2663 Sonal",
+    "pub_date": "",
+    "abstract": "Complex Named Entity Recognition (NER) is the task of detecting linguistically complex named entities in low-context text. In this paper, we present ACLM (Attention-map aware keyword selection for Conditional Language Model fine-tuning), a novel data augmentation approach, based on conditional generation, to address the data scarcity problem in lowresource complex NER. ACLM alleviates the context-entity mismatch issue, a problem existing NER data augmentation techniques suffer from and often generates incoherent augmentations by placing complex named entities in the wrong context. ACLM builds on BART and is optimized on a novel text reconstruction or denoising task -we use selective masking (aided by attention maps) to retain the named entities and certain keywords in the input sentence that provide contextually relevant additional knowledge or hints about the named entities. Compared with other data augmentation strategies, ACLM can generate more diverse and coherent augmentations preserving the true word sense of complex entities in the sentence. We demonstrate the effectiveness of ACLM both qualitatively and quantitatively on monolingual, crosslingual, and multilingual complex NER across various low-resource settings. ACLM outperforms all our neural baselines by a significant margin (1%-36%). In addition, we demonstrate the application of ACLM to other domains that suffer from data scarcity (e.g., biomedical). In practice, ACLM generates more effective and factual augmentations for these domains than prior methods.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Named Entity Recognition (NER) is a fundamental task in Natural Language Processing (NLP) that aims to detect various types of named entities (NEs) from text. Recently, there has been 1 Code: https://github.com/Sreyan88/ACLM * These authors contributed equally to this work.",
+                "considerable progress in NER using neural learning methods that achieve state-of-the-art (SOTA) performance (Wang et al., 2021;Zhou and Chen, 2021) on well-known benchmark datasets, including CoNLL 2003 (Tjong Kim Sang and De Meulder, 2003) and OntoNotes (Schwartz et al., 2012). However, these datasets are designed to evaluate the performance on detecting \"relatively easy\" NEs like proper names (e.g., people such as \"Barack Obama,\" locations such as \"New York,\" or organizations such as \"IBM\") in well-formed, contextrich text that comes from news articles (Augenstein et al., 2017). On the other hand, complex NER benchmarks like MultiCoNER (Malmasi et al., 2022) present several contemporary challenges in NER, including short low-context texts with emerging and semantically ambiguous complex entities (e.g., movie names in online comments) that reduce the performance of SOTA methods previously evaluated only on the existing NER benchmark datasets. Our experiments reveal that the performance of the current SOTA NER method (Zhou and Chen, 2021) (previously evaluated only on the CoNLL 2003 dataset) drops by 23% when evaluated on MultiCoNER and 31.8% when evaluated on a low-resource setting with just 500 training samples (more details in Table 8). Thus, we emphasize that research on building systems that can effectively detect complex NEs in the text is currently understudied in the field of NLP.",
+                "In the past, researchers have made several attempts at building supervised approaches to detect complex and compositional noun phrase entities in sentences (Doddington et al., 2004;Biggio et al., 2010;Magnolini et al., 2019). However, the scarcity of annotated training data for building effective systems has always been a challenge. Data augmentation has been shown to be an effective solution for low-resource NER (Ding et al., 2020;Liu et al., 2021;Zhou et al., 2022). In practice, though these systems perform well and generate coherent augmentations on common NER benchmark datasets with easy proper noun NEs, they fail to be effective for complex NER, often generating incoherent augmentations. We first argue that certain types of complex NEs follow specific linguistic patterns and appear only in specific contexts (examples in Appendix 4), and augmentations that do not follow these patterns impede a NER model from learning such patterns effectively. This sometimes also leads to augmentations with context-entity mismatch, further hurting the learning process. For e.g., unlike proper names, substituting complex NEs from other sentences in the corpus or replacing them with synonyms (Dai and Adel, 2020a) often leads to augmentations where the NE does not fit into the new context (e.g., swapping proper names across sentences might still keep the sentence coherent but swapping the name of a book with a movie (both creative work entity) or the name of a football team with a political party (both group entity) makes it incoherent). Fine-tuning pretrained language models (PLMs), similar to priorwork (Ding et al., 2020;Liu et al., 2021;Zhou et al., 2022), fail to generate new context around complex NEs or completely new NEs with the desired linguistic patterns due to low-context sentences and the lack of existing knowledge of such linguistically complex NEs (examples in Fig. 3). This leads to in-coherent augmentations and poses a severe problem in knowledge-intensive tasks like biomedical NER, where non-factual augmentations severely hurt learning. Our experiments also reveal that introducing new context patterns around NEs proves to be a more effective data augmentation technique for complex NER than diversifying NEs (ACLM vs. MELM in Table 1).",
+                "Main Results: To overcome the aforesaid problems, we formulate data augmentation as a conditional generation task and propose ACLM, a conditional text generation model that generates augmentation samples by introducing new and diverse context patterns around a NE. ACLM builds on BART (Lewis et al., 2020) and is fine-tuned on a modification of the text reconstruction from corrupted text task, a common denoising-based PLM pre-training objective. In contrast to other PLM pretraining strategies, which randomly mask a portion of the text for corruption, our modified objective is based on selective masking, wherein we mask all other words in the sentence except the NEs and a small percentage of keywords related to the NEs.",
+                "We refer to this corrupted sentence as a template, and it serves as input to the model for both the training and generation phases. These keywords are other non-NE tokens in the sentence that provide contextually relevant additional knowledge or hints to BART about the complex NEs without the need of retrieving knowledge from any external sources. We select these keywords using attention maps obtained from a transformer model fine-tuned on the NER task, and they help the PLM overcome the problem where it might not possess enough knowledge about a semantically ambiguous complex NE (example in Fig. 3). Training ACLM on this modified objective allows us to generate diverse, coherent, factual, and high-quality augmentations given templates. We also propose mixner, a novel algorithm that mixes two templates during the augmentation generation phase and boosts the diversity of augmentations. Our primary contributions are as follows:",
+                "\u2022 We propose ACLM, a novel data augmentation framework specially designed for lowresource complex NER. Compared with previous methods in the literature, ACLM effectively alleviates the context-entity mismatch problem by preserving the true sense of semantically ambiguous NEs in augmentations.",
+                "Additionally, to accompany ACLM, we propose mixner, which boosts the diversity of ACLM generations.",
+                "\u2022 We qualitatively and quantitively show the benefits of ACLM for monolingual, crosslingual, and multilingual complex NER across various low-resource settings on the Multi-CoNER dataset. Our proposed ACLM outperforms all other baselines in literature by a significant margin (1%-36%) and generates more diverse, coherent, and high-quality augmentations compared to them.",
+                "\u2022 We perform extensive experiments to study the application of ACLM in three other domains, including science and medicine. ACLM outperforms all our baselines in these domains (absolute gains in the range of 1%-11%) and generates more factual augmentations."
+            ],
+            "publication_ref": [
+                "b37",
+                "b42",
+                "b36",
+                "b33",
+                "b42",
+                "b12",
+                "b4",
+                "b26",
+                "b11",
+                "b25",
+                "b41",
+                "b9",
+                "b11",
+                "b25",
+                "b41",
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_9",
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Background and Related Work",
+            "text": [
+                "Complex NER Background: Complex NER is a relatively understudied task in the field of NLP.",
+                "Building on insights from Augenstein et al. ( 2017), we discuss key reasons behind high performance on common NER benchmark datasets and try to understand why modern SOTA NER algorithms do not work well on complex NER benchmarks:",
+                "(1) Context: Most of the common benchmark datasets are curated from articles in the news domain. This gives them several advantages, including rich context and surface features like proper punctuation and capitalized nouns, all of which are major drivers of success in these datasets (Mayhew et al., 2019). In contrast, for entity recognition beyond news text, like search queries or voice commands, the context is less informative and lacks surface features (Guo et al., 2009;Carmel et al., 2014); (2) Entity Complexity: Data from news articles contain proper names or \"easy\" entities with simple syntactic structures, thus allowing pretrained models to perform well due to their existing knowledge of such entities. On the other hand, complex NEs like movie names are syntactically ambiguous and linguistically complex and which makes Complex NER a difficult task (Ashwini and Choi, 2014). Examples of such entities include noun phrases (e.g., Eternal Sunshine of the Spotless Mind), gerunds (e.g., Saving Private Ryan), infinitives (e.g., To Kill a Mockingbird), or full clauses (e.g., Mr. Smith Goes to Washington); (3) Entity Overlap: Models trained on these common benchmark datasets suffer from memorization effects due to the large overlap of entities between the train and test sets. Unseen and emerging entities pose a huge challenge to complex NER (Bernier-Colborne and Langlais, 2020).",
+                "Complex NER: Prior work has mostly focused on solving the entity complexity problem by learning to detect complex nominal entities in sentences (Magnolini et al., 2019;Meng et al., 2021;Fetahu et al., 2022;Chen et al., 2022). Researchers have often explored integrating external knowledge in the form of gazetteers for this task. Gazetteers have also proven to be effective for low-resource NER (Rijhwani et al., 2020). GemNet (Meng et al., 2021), the current SOTA system for complex NER, conditionally combines the contextual and gazetteer features using a Mixture-of-Experts (MoE) gating mechanism. However, gazetteers are difficult to build and maintain and prove to be ineffective for complex NER due to their limited entity coverage and the nature of unseen and emerging entities in complex NER.",
+                "Data Augmentation for Low-Resource NER: Data Augmentation to handle data scarcity for lowresource NLP is a well-studied problem in the literature and is built on word-level modifications, including simple synonym replacement strategies (Wei and Zou, 2019), or more sophisticated learning techniques like LSTM-based language models (Kobayashi, 2018), Masked Language Modeling (MLM) using PLMs (Kumar et al., 2020), auto-regressive PLMs (Kumar et al., 2020), or constituent-based tagging schemes (Zhou et al., 2019). However, most of these methods, though effective for classification tasks, suffer from tokenlabel misalignment when applied to token-level tasks such as NER and might require complex preprocessing steps (Bari et al., 2020;Zhong and Cambria, 2021). One of the first works to explore effective data augmentation for NER replaces NEs with existing NEs of the same type or replaces tokens in the sentence with one of their synonyms retrieved from WordNet (Dai and Adel, 2020b). Following this, many neural learning systems were proposed that either modify the Masked Language Modelling (MLM) training objective using PLMs (Zhou et al., 2022;Liu et al.) or use generative language modeling with LSTM LMs (Ding et al., 2020) or mBART (Liu et al., 2021), to produce entirely new sentences from scratch. However, all these systems were designed for low-resource NER on common benchmark datasets and failed to generate effective augmentations for low-resource complex NER with semantically ambiguous and complex entities."
+            ],
+            "publication_ref": [
+                "b28",
+                "b15",
+                "b5",
+                "b1",
+                "b26",
+                "b29",
+                "b6",
+                "b32",
+                "b29",
+                "b38",
+                "b21",
+                "b22",
+                "b22",
+                "b40",
+                "b2",
+                "b39",
+                "b10",
+                "b41",
+                "b11",
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Methodology",
+            "text": [
+                "In this section, we give an overview of our approach. Fig. 1 represents the entire workflow of our ACLM data augmentation framework. A sentence is first passed through a fine-tuned XLM-RoBERTa fine-tuned on only gold data to generate the attention map for each token in the sentence. This attention map is then used to selectively mask the sentence and create a template. This template is then used as an input to optimize the model on the text reconstruction objective for fine-tuning ACLM: the model is asked to reconstruct the entire original sentence from only the content in the template. While generating augmentations, ACLM follows the same template generation process in addition to adding two templates through mixner, which we discuss in detail in Section 3.3."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Keyword Selection",
+            "text": [
+                "he advanced, attacked the enemy 's infantry with the lance, and then retired while the enemy swarmed out of hidden ground where royal artillery GRP guns could attack them. Semantically similar sentence the enemy's infantry was swarmed to the ground with royal artilleryGRP guns.",
+                "ashby was wounded on the foot while a regiment member of the kentuckyLOC regiment was sent to the war.",
+                "ashby conducted raids across the line from kentucky LOC and the enemy were attacked and later retired by hidden ground royal artilleryGRP guns."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Generated Samples:",
+            "text": [
+                "he advanced, attacked the enemy's infantry with the lance, and then retired while the enemy swarmed out of hidden ground where <b-grp> royal <b-grp> <i-grp> artillery <i-grp> guns could attack them.",
+                "Text Reconstruction:  \u20dd Labeled Sequence Linearization: Label tokens are added before and after each entity in the sentence. 4",
+                "\u20dd Dynamic Masking: The template goes through further masking where a small portion of the keywords are dynamically masked at each training iteration. While generation we also apply mixner, which randomly joins two templates after 3 \u20dd and before 4 \u20dd. Post generating augmentations with ACLM, the generated augmentations are concatenated with the gold data and used to fine-tune our final NER model."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Template Creation",
+            "text": [
+                "To corrupt a sentence and create a template, we follow a 4-step process described below:",
+                "1. Keyword Selection: For each sentence in our training corpus, we first obtain a set of non-NE tokens in the sentence that are most attended to by its NEs. We call these tokens keywords. For our research, we consider a non-NE token as a keyword if the NEs in the sentence contextually depend on them the most. We measure contextual dependency between NE and non-NE tokens using attention scores from attention maps extracted from a transformer-based NER model fine-tuned only on gold data. We hypothesize that attention heads in a transformer when fine-tuned for NER, formulated as a token-level tagging task, tend to pay the highest attention to the most contextually relevant tokens around it. Thus, formally put, consider a sentence with a total of T tokens comprised of t other non-NE and t entity NE tokens. Our primary aim is to find the top p% of t other tokens, which we call keywords. To calculate the total attention score that each token in the sentence assigns to each other token, we sum up the attention scores across each of the heads in the transformer network and across the last a layers (a = 4 in our case). Different heads in different layers tend to capture different properties of language, and taking the average attention scores across the last 4 layers ensures that diverse linguistic relations are taken into account while choosing the keywords (e.g., syntactic, semantic, etc.). This also makes the keyword selection process more robust, as in low-resource conditions the attention maps may be noisy, and the NEs might not be focusing on the right context always. Additionally, the choice of just the last four layers is inspired by the fact that the lower layers have very broad attention and spend at most 10% of their attention mass on a single token (Clark et al., 2019). Note t entity might be comprised of (1) multiple contiguous tokens forming an individual NE and (2) multiple such individual NEs. To handle the first case, inspired from Clark et al. (2019), we sum up the attention scores over all the individual tokens in the NE. For the second case, we find t attn for each individual NE and take a set union of tokens in these t attn . Thus, as an extra pre-processing step, to improve robustness, we also ignore punctuations, stop words, and other NEs from the top p% of t other tokens to obtain our final keywords. We provide examples of templates in Appendix C.",
+                "2. Selective Masking: After selecting the top p% of t other tokens in the sentence as keywords, we now have K non-NE keyword tokens and E entity tokens. To create the template, we now substitute each non-NE token not belonging to the K with the mask token and remove contiguous mask tokens.",
+                "3. Labeled Sequence Linearization: After we have our initial template, inspired by Zhou et al. (2022), we perform labeled sequence linearization to explicitly take label information into consideration during fine-tuning and augmentation generation. Similar to Zhou et al. (2022), as shown in Figure 1, we add label tokens before and after each entity token and treat them as the normal context in the sentence. Additionally, these label tokens before and after each NE provide boundary supervision for NEs with multiple tokens.",
+                "4. Dynamic Masking: Post labeled sequence linearization, our template goes through further masking wherein we dynamically mask a small portion of the K keywords during each iteration of training and generation. To be precise, we first sample a dynamic masking rate \u03b5 from a Gaussian distribution N (\u00b5, \u03c3 2 ), where the Gaussian variance \u03c3 is set to 1/K. Next, we randomly sample tokens from the K keywords in the sentence according to the masking rate \u03b5 and replace this with mask tokens, followed by removing consecutive mask tokens. At every round of generation, dynamic masking helps boost 1) context diversity by conditioning ACLM generation on different templates with a different set of keywords and 2) length diversity by asking ACLM to infill a different number of mask tokens."
+            ],
+            "publication_ref": [
+                "b7",
+                "b7",
+                "b41",
+                "b41"
+            ],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Fine-tuning ACLM",
+            "text": [
+                "As discussed earlier, ACLM is fine-tuned on a novel text reconstruction from corrupted text task wherein the created templates serve as our corrupted text and ACLM learns to recover the original text from the template. Text reconstruction from the corrupted text is a common denoising objective that PLMs like BART and BERT are pre-trained on. For this work, we use it as our fine-tuning objective and differ from other existing pre-training objectives by our selective masking strategy for creating templates."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Data Generation",
+            "text": [
+                "Post fine-tuning on the text reconstruction task, we utilize ACLM to generate synthetic data for data augmentation. For each sentence in the training dataset, we apply steps 1-4 in the Template Creation pipeline for R rounds to randomly corrupt the sentence and obtain a template which is then passed through the fine-tuned ACLM model to generate a total of R\u00d7 augmented training samples. Additionally, to boost diversity, during auto-regressive the 1988 elections were also held on a non party basis, although around 30 candidates sympathetic to the muslim brotherhood GRP were elected.",
+                "a nonpartisan candidate, george washington PER , carried the state twice ( in 1789 and 1792 ). generation, we randomly sample the next word from the top-k most probable words and choose the most probable sequence with beam search. mixner: During the R rounds of augmentation on our training dataset, we propose the use of mixner, a novel template mixing algorithm that helps ACLM generate diverse sentences with new context and multiple NEs in the sentence. More specifically, given the template for any arbitrary sentence a in the training set in step 3 of the template creation process, we retrieve the template for another sentence b that is semantically similar to a and join both the templates before passing on the template to step 4. We show examples of sentences generated with mixner in Fig. 3 and Section D.1. Note that we apply mixner only in the generation step and not during fine-tuning.",
+                "As mentioned earlier, to retrieve b from the training set, we randomly sample a sentence from the top-k sentences with the highest semantic similarity to a. To calculate semantic similarity between each sentence in the training set, we first take the embedding e for each sentence from a multi-lingual Sentence-BERT (Reimers and Gurevych, 2019) and then calculate semantic similarity by: sim(e i , e j ) = e i \u22c5 e j \u2225e i \u2225 \u2225e j \u2225",
+                "(1)",
+                "where sim(. ) is the cosine similarity between two embeddings , and i, j \u2208 N where i \u2260 j, and N is the size if the training set. Additionally, we don't apply mixner on all rounds R but sample a probability \u03b3 from a Gaussian distribution N (\u00b5, \u03c3 2 ) and only apply mixner if \u03b3 crosses a set threshold \u03b2."
+            ],
+            "publication_ref": [
+                "b31"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Post-Processing",
+            "text": [
+                "As a post-processing step, we remove augmentations similar to the original sentence and also the extra label tokens added in the labeled sequence linearization step. Finally, we concatenate the augmented data with the original data to fine-tune our NER model."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments and Results",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Dataset",
+            "text": [
+                "All our experiments were conducted on the Multi-CoNER dataset (Malmasi et al., 2022), a large multilingual dataset for complex NER. MultiCoNER covers 3 domains, including Wiki sentences, questions, and search queries, across 11 distinct languages. The dataset represents contemporary challenges in NER discussed in Section 2 and is labeled with six distinct types of entities: person, location, corporation, groups (political party names such as indian national congress), product (consumer products such as apple iPhone 6), and creative work (movie/song/book titles such as on the beach). We conduct experiments on a set of 10 languages L where L = {English (En), Bengali (Bn, Hindi (Hi), German (De), Spanish (Es), Korean (Ko), Dutch (Nl), Russian (Ru), Turkish (Tr), Chinese (Zh)}. Language-wise dataset statistics can be found in Table 12. We would also like to highlight that the number of sentences in MultiCoNER test sets ranges from 133,119 -217,887, which is much higher than test sets of other existing NER datasets. For more details on the dataset, we refer our readers to Malmasi et al. (2022). For monolingual and cross-lingual low-resource experiments, we perform iterative stratified sampling over all the sentences by using the entity classes in a sample as its target label across four low-resource settings (100, 200, 500, and 1000). We downsample the development set accordingly. For multi-lingual experiments, we combine all the data sampled for our monolingual settings. We evaluate all our systems and baselines on the original MultiCoNER test sets. We report micro-averaged F1 scores averaged across 3 runs for 3 different random seeds."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Algorithm 1 ACLM: Our proposed augmentation framework",
+            "text": [
+                "Given training set D train , and PLM L",
+                "D masked \u2190 \u2205, D aug \u2190 \u2205 for {X, Y } \u2208 D train do \u25b7 Training Loop t other , t entity \u2190 X K \u2190 T op p% of ATTNMAP(t other ) \u25b7 Keyword Selection X \u2190 GENTEMPLATE(X, {t other } \u2212 {K}) \u25b7 Selective Masking X \u2190 LINEARIZE( X, Y ) \u25b7 Labeled Sequence Linearization D masked \u2190 D masked \u222a { X} end for for {X, Y } \u2208 D masked do X \u2190 DYNAMICMASK(X, \u03b7) \u25b7 Dynamic Masking L f inetune \u2190 FINETUNE(L, X) \u25b7 Fine-tune ACLM end for for {X, Y } \u2208 D train do \u25b7 Generation Loop repeat R times: X \u2190 GENTEMPLATE(X, {t other } \u2212 {K}) \u25b7 Selective masking X \u2190 LINEARIZE( X, Y ) \u25b7 Labeled Sequence Linearization X \u2190 DYNAMICMASK( X, \u00b5) \u25b7 Dynamic Masking X aug \u2190 GENAUG(L f inetune ( X)), if \u03b3 < \u03b2 X augmix \u2190 MIXNER(L f inetune ( X)), if \u03b3 > \u03b2 D aug \u2190 D aug \u222a {X aug } \u222a {X augmix } end for D aug \u2190 POSTPROCESS(D aug ) \u25b7 Post-processing return D train \u222a D aug 4.2 Experimental Setup",
+                "ACLM. We use mBart-50-large (Tang et al., 2020) with a condition generation head to fine-tune ACLM. We fine-tune ACLM for 10 epochs using Adam optimizer (Kingma and Ba, 2014) with a learning rate of 1e",
+                "\u22125 and a batch size of 32.",
+                "NER. We use XLM-RoBERTa-large with a linear head as our NER model. Though the field of NER has grown enormously, in this paper, we adhere to the simplest formulation and treat the task as a token-level classification task with a BIO tagging scheme. We use the Adam optimizer to optimize our model, set the learning rate to 1e \u22122 , and train with a batch size of 16. The NER model is trained for 100 epochs, and the model with the best performance on the dev set is used for testing.",
+                "Hyper-parameter Tuning. For template creation during fine-tuning and generation, we set the selection rate p and the Gaussian \u00b5 to be 0.3 and 0.5, respectively. The number of augmentation rounds R is set as 5. For mixner we set Gaussian \u00b5 and \u03b2 to be 0.5 and 0.7, respectively. All hyper-parameters are tuned on the development set with grid search. More details can be found in Appendix A."
+            ],
+            "publication_ref": [
+                "b35"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Baselines",
+            "text": [
+                "To prove the effectiveness of our proposed ACLM, we compare it with several strong NER augmentation baselines in the literature. In this sub-section, we briefly describe each of these baselines. All baselines were run for R rounds.",
+                "Gold-Only. The NER model is trained using only gold data from the MultiCoNER dataset without any augmentation. ACLM random. We train and infer ACLM with templates created with randomly sampled keywords instead of taking keywords with high attention scores. This baseline proves the effectiveness of our keyword selection algorithm which provides NEs in the template with rich context. ACLM only entity. We train and infer ACLM with templates created with only linearized entities and no keywords. This baseline proves the effectiveness of additional context in our templates."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental Results",
+            "text": [
+                "Monolingual Complex NER. and 500) which we acknowledge is a reasonable size in real-world conditions.",
+                "Cross-lingual Complex NER. We also study the cross-lingual transferability of a NER model trained on a combination of gold and generated augmentations. Thus, we evaluated a model, trained on En, on 4 other languages, including Hi, Bn, De, and Zh in a zero-shot setting. ACLM outperforms our neural baselines by a significant margin (absolute gains in the range of 1% -21%). None of these systems perform well in cross-lingual transfer to Zh which was also observed by (Hu et al., 2021).",
+                "Multi-lingual Complex NER. Table 2 compares the performance of all our baselines with ACLM on the MultiCoNER test sets under various multilingual low-resource settings. As clearly evident, ACLM outperforms all our baselines by a significant margin (absolute gains in the range of 1%-21% across individual languages). All our baselines, including our Gold-Only baseline, also perform better than their monolingual counterparts which demonstrates the effectiveness of multi-lingual finetuning for low-resource complex NER.",
+                "5 Further Analysis 5.1 Generation Quality Quantitative Analysis. Table 3 compares augmentations from various systems on the quantitative measures of perplexity and diversity. Perplexity (Jelinek et al., 1977) is a common measure of text fluency, and we measure it using GPT2 (Radford et al., 2019). We calculate 3 types of diversity metrics: for Diversity-E and Diversity-N, we calculate the average percentage of new NE and non-NE words in the generated samples compared with the original samples, respectively. For Diversity-L, we  "
+            ],
+            "publication_ref": [
+                "b17",
+                "b18",
+                "b30"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_2",
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "Original",
+            "text": [
+                "The control group consisted of 40 consecutive [FMF]DISEASE patients, who arrived at the [FMF]DISEASE clinic for their regular follow-up visit and were 40 years of age or older at the time of the examination.",
+                "\uf0fc The original sentence describes an occasion where a group of 40 patients diagnosed with a certain kind of disease visited a clinic, and the sentence provides us with information on the age statistics of the patients."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "LwTR",
+            "text": [
+                "The control, consisted of 40 consecutive [fragile]DISEASE patients, who arrived at the [FMF]DISEASE status for their regular follow -up and were 40 years of age or older at the time of the examination analyzed \u274c LwTR replaces \"FMF\" in the sentence with \"fragile\" and the phrase \"fragile patients\" does not make sense. It also adds an extra word, \"analyzed\", at the end of the sentence."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "MELM",
+            "text": [
+                "The control group consisted of 40 consecutive [FMR]DISEASE patients, who arrived at the [PDA]DISEASE clinic for their regular follow-up visit and were 40 years of age or older at the time of the examination.",
+                "\u274c MELM replaces the 1st occurrence of \"FMF\" in the sentence with \"FMR\" and the second occurrence with \"PDA\". \"FMR\" is not the name of a disease and is closest to \"FMR1\", which is the name of a gene. \"PDA\" stands for \"Patent ductus arteriosus.\" Thus, the entire sentence does not make much sense."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ACLM w/o mixner",
+            "text": [
+                "The data-sensitive domains. We show samples of generated augmentations in Fig. 3 and Appendix D.1."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "In this paper, we propose ACLM, a novel data augmentation framework for low-resource complex NER. ACLM is fine-tuned on a novel text reconstruction task and is able to generate diverse augmentations while preserving the NEs in the sentence and their original word sense. ACLM effectively alleviates the context-entity mismatch problem and generates diverse, coherent, and highquality augmentations that prove to be extremely effective for low-resource complex NER. Additionally, we also show that ACLM can be used as an effective data augmentation technique for low-resource NER in the domains of medicine and science due to its ability to generate extremely reliable augmentations."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "We list down some potential limitations of ACLM: 1) PLMs are restricted by their knowledge to generate entirely new complex entities due to their syntactically ambiguous nature. Adding to this, substituting complex NEs in existing sentences leads to context-entity mismatch. Thus, as part of future work, we would like to explore if integrating external knowledge into ACLM can help generate sentences with new complex entities in diverse contexts. 2) We do not conduct experiments in the language Farsi from the MultiCoNER dataset as neither mBart-50-large nor XLM-RoBERTa-large was pre-trained on this language.",
+                "3) The use of mBart-50-large for generation also restricts ACLM from being transferred to code-switched settings, and we would like to explore this as part of future work."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Hyperparameter Tuning",
+            "text": [
+                "All hyperparameters were originally tuned with grid search on the development set. Augmentation rounds R: Augmenting the training dataset with several augmentation rounds R proves effective until a saturation point is reached. Continuing to add more augmented data to the gold dataset starts introducing noise to the combined data. Additionally, with an increase in R, the chances of auto-regressive generation with top-k sampling generating similar sentences increase. To determine the optimal value of R, we experiment on 2 low-resource settings on the English sub-set of MultCoNER and report the micro F1 results on the test-set for R ranging from 1 to 7. All other hyperparameters are kept constant. As shown in Table 5, R = 5 gives us the best test-set performance, and the performance decreases after 5 rounds. Attention layers a for Keyword Selection: Selecting the right keywords for creating a template is integral to the success of ACLM. A clear example of this can be seen in Table 1, where ACLM outperforms ACLM random (which chooses random tokens as keywords for template creation) by a significant margin. Transformer encoders consist of multiple layers, and each layer consists of multiple attention heads. While all heads in the same layer tend to behave similarly, different layers generally encode different semantic and syntactic information (Clark et al., 2019). Thus we experiment with different values of \u03b1, or different combinations of transformer encoder layers which are used for calculating the attention scores for keyword selection. As mentioned in Section 3.1, by default, we average attention scores across all tokens, all heads, and the last \u03b1 layers. For all our low-resource experiments, we use attention maps from a 24-layer XLMRoBERTa-large fine-tuned on the low-resource gold dataset for that particular setting. Table 7 compares the performance of 3 settings of \u03b1 on 2 low-resource settings on the English sub-set of MultCoNER: 1. Only last layer 2. Last 4 layers. 3. All 24 layers. As clearly evident, though setting 2 achieves the best performance, the difference in performance among different values of \u03b1 is not too high. As part of future work, we would like to explore better ways to search for the optimal \u03b1. Training on the entire dataset: Beyond just evaluating ACLM performance on low-resource settings, we also compare ACLM with all our baselines on the entire MultiCoNER dataset (each language split contains \u2248 15300 sentences). Similar to low-resource settings, ACLM outperforms all our baselines across all languages and achieves an absolute average gain of 1.58% over our best baseline. Entity-wise Performance Analysis: Previous to MultiCoNER, common benchmark datasets like CoNLL 2003 had only \"easy entities\" like names of Persons, Locations, and Organizations. The Mul-tiCoNER dataset has 3 additional types of NEs, namely Products (PROD), Groups (GRP), and Creative Work (CW). These entities are syntactically ambiguous, which makes it challenging to recognize them based on their context. The top system from WNUT 2017 achieved 8% recall for creative work entities. Length-wise Performance Analysis: As mentioned in Section 2, low-context is a major problem in complex NER, and an effective complex NER system should be able to detect NEs in sentences with both low and high context (by context we refer to the number of words around the NEs in the sentence). By the nature of its fine-tuning pipeline, ACLM is able to generate augmentations of variable length, and our dynamic masking step further boosts the length diversity of generated augmentations. Adding to this, we acknowledge that effective augmentations for syntactically complex entity types should enable a model to learn to detect these entities in even low-context. Table 11 compares the entity-wise performance of ACLM with our various baselines on two low-resource settings on the MultiCoNER dataset. All results are averaged across all 10 languages. ACLM outperforms all our baselines across all length settings, which re-affirms ACLM's ability to generate effective augmentation for complex NER. To be specific, ACLM improves over our best baseline by 8.8% and 7.4% for 200 and 3.2% and 6.7% for 500 for low-and high-context sentences, respectively.  Context entity mismatch occurs when the generated NEs do not fit the surrounding context. Linguistic incoherence refers to cases where a generated NE does not follow the linguistic pattern for that particular type of NE or context."
+            ],
+            "publication_ref": [
+                "b7"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0",
+                "tab_8",
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "C Templates and Attention Maps",
+            "text": [
+                "Creating templates with keywords that effectively provides the PLM with additional knowledge about the NEs in the sentence is an integral part of ACLM. Fig. 11,12,13,14,15 shows examples of templates created for our sentences in MultiCoNER English subset, Spanish subset, Hindi subset NCBI Disease and TDMSci datasets, respectively. Additionally, we provide examples of attention maps used to create templates in Fig. 16f."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_18"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "D Qualitative Analysis of Augmentations D.1 Augmentation Examples",
+            "text": [
+                "MultiCoNER Dataset: We provide additional examples of augmentations generated by ACLM and all our baselines in Fig. 9 and Fig. 10 "
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_9"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Original",
+            "text": [
+                "To determine the genetic basis for the differences between the cardiac and [brain AE3 variants] GENE , we isolated and characterized the rat gene."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "LwTR",
+            "text": [
+                "To determine the genetic basis for the differences between the cardiac and [IgA AE3 related] GENE , we isolated and characterized the rat immunodeficiency increased"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "MELM",
+            "text": [
+                "To determine the genetic basis for the differences between the cardiac and [mouse EFR varianter] GENE , we isolated and characterized the rat gene."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ACLM w/o mixner",
+            "text": [
+                "The genetic basis for the cardiac [brain AE3 variants] GENE in the rat population is unknown."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ACLM w/ mixner",
+            "text": [
+                "On basis of the differences in both [brain AE3 variants] GENE and [estrogen receptors] GENE we isolated the mechanisms that govern the variations in mouse and human genes.  "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Original",
+            "text": [
+                "These data show that if we are ever to fully master [natural language generation] TASK , especially for the genres of news and narrative, researchers will need to devote more attention to understanding how to generate descriptive, and not just distinctive, referring expressions."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "LwTR",
+            "text": [
+                "These data show that if we are ever to runs focus [Urdu/generation] TASK , proposed for the genres of + and narrative, researchers will need to devote more attention to understanding how to Fixed descriptive, and not just raw transformed morphological supervised corpora."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "MELM",
+            "text": [
+                "These data show that if we are ever to fully master [the text interpretation] TASK , especially for the genres of news and narrative, researchers will need to devote more attention to understanding how to generate descriptive, and not just distinctive, referring expressions."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ACLM w/o mixner",
+            "text": [
+                "These results show that in the [natural language generation] TASK of news text, researchers are able to generate descriptive text with distinctive language expressions."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ACLM w/ mixner",
+            "text": [
+                "These data show that if we are ever to fully master [natural language generation] TASK for genres other than narrative, researchers will be able to generate descriptive and distinctive meaning by referring to them. We propose a holistic approach to [image description generation] TASK that is noisy and challenging.     Original Template The goal of fully unsupervised [word segmentation] TASK , then, is to recover the correct boundaries for arbitrary natural language corpora without explicit human parameterization. In particular , for [question classification] TASK , no labeled question corpus is available for French, so this paper studies the to use existing English corpora and transfer a classification by translating the question and their labels .      ",
+                "\u0906\u093f\u0927\u0915\u093e \u0930\u0915 \u0924\u094c\u0930 \u092a\u0930 \u092c \u0921 \u0938\u092e\u093e \u0939\u094b \u0917\u092f\u093e, \u0932\u0947 \u093f\u0915\u0928 \u0968\u0966\u0966\u0967 \u092e \u0905\u092a\u0928\u0947 \u090f \u092e [\u091c\u0940\u0935\u0928 \u0915\u0940 \u0938\u093e\u0901 \u0938\u0947 ] CW \u0915 \u0947 \u0938\u093e\u0925 \u0935\u093e\u092a\u0938\u0940 \u0915\u0940\u0964 [M] \u0906\u093f\u0927\u0915\u093e \u0930\u0915 [M] \u092c \u0921 [M] \u0968\u0966\u0966\u0967 [M] \u090f \u092e [M] <B-CW> \u091c\u0940\u0935\u0928 <B-CW> <I-CW> \u0915\u0940 <I-CW> <I-CW> \u0938\u093e\u0901 \u0938\u0947 <I-CW> [M] \u0935\u093e\u092a\u0938\u0940 \u0915\u0940 [M] \u0905\u0917\u0932\u0947 \u0938\u092b\u0932 \u0935\u0937 \u092e \u0907\u0938\u0915\u093e \u093f\u0935 \u093e\u0930 \u0906 \u0914\u0930 [\u092e\u0947 \u091f \u094b \u092e\u093f\u0928\u0932\u093e] LOC \u0947 \u092e \u0928\u090f \u092a \u0930\u0938\u0930\u094b\u0902 \u0915\u0940 \u093e\u092a\u0928\u093e \u0908 | [M] <B-LOC> \u092e\u0947 \u091f \u094b <B-LOC> <I-LOC> \u092e\u093f\u0928\u0932\u093e <I-LOC> \u0947 [M] \u0928\u090f \u092a \u0930\u0938\u0930\u094b\u0902 [M] \u093e\u092a\u0928\u093e \u0908 [M] \u092a\u093e \u093e \u0915\u094b [\u092e\u0947 \u095b] PROD \u0941 \u0927\u093e\u0935\u0927 \u0915 \u0915 \u0947 \u092a \u092e \u092d\u0940 \u092a\u0930\u094b\u0938\u093e \u091c\u093e \u0938\u0915\u0924\u093e \u0939\u0948 \u0964 [M] \u092a\u093e \u093e [M] <B-PROD> \u092e\u0947 \u095b <B-PROD> [M] \u092a\u0930\u094b\u0938\u093e [M]"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "",
+            "text": [
+                "Limitations Section (After conclusion and before citations).",
+                "A2. Did you discuss any potential risks of your work?",
+                "Section E.",
+                "A3. Do the abstract and introduction summarize the paper's main claims?",
+                "Section 1 and Abstract.",
+                "A4. Have you used AI writing assistants when working on this paper?",
+                "Left blank.",
+                "B Did you use or create scientific artifacts?",
+                "Section 4.1.",
+                "B1. Did you cite the creators of artifacts you used?",
+                "Citations.",
+                "B2. Did you discuss the license or terms for use and / or distribution of any artifacts?",
+                "Section E.",
+                "B3. Did you discuss if your use of existing artifact(s) was consistent with their intended use, provided that it was specified? For the artifacts you create, do you specify intended use and whether that is compatible with the original access conditions (in particular, derivatives of data accessed for research purposes should not be used outside of research contexts)? Section E.",
+                "B4. Did you discuss the steps taken to check whether the data that was collected / used contains any information that names or uniquely identifies individual people or offensive content, and the steps taken to protect / anonymize it? Section E.",
+                "B5. Did you provide documentation of the artifacts, e.g., coverage of domains, languages, and linguistic phenomena, demographic groups represented, etc.? Section E.",
+                "B6. Did you report relevant statistics like the number of examples, details of train / test / dev splits, etc. for the data that you used / created? Even for commonly-used benchmark datasets, include the number of examples in train / validation / test splits, as these provide necessary context for a reader to understand experimental results. For example, small differences in accuracy on large test sets may be significant, while on small test sets they may not be. Section E.",
+                "C Did you run computational experiments?",
+                "Section E.",
+                "C1. Did you report the number of parameters in the models used, the total computational budget (e.g., GPU hours), and computing infrastructure used? Section E.",
+                "The Responsible NLP Checklist used at ACL 2023 is adopted from NAACL 2022, with the addition of a question on AI writing assistance."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "FLAIR: An easy-to-use framework for state-of-theart NLP",
+            "journal": "",
+            "year": "2019",
+            "authors": "Alan Akbik; Tanja Bergmann; Duncan Blythe; Kashif Rasul; Stefan Schweter; Roland Vollgraf"
+        },
+        {
+            "ref_id": "b1",
+            "title": "recognition: A quantitative analysis",
+            "journal": "",
+            "year": "2014",
+            "authors": "Sandeep Ashwini; D Jinho;  Choi"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Uxla: A robust unsupervised data augmentation framework for zero-resource cross-lingual nlp",
+            "journal": "",
+            "year": "2020",
+            "authors": "Tasnim Bari; Shafiq Mohiuddin;  Joty"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Hardeval: Focusing on challenging tokens to assess robustness of ner",
+            "journal": "",
+            "year": "2020",
+            "authors": "Gabriel Bernier-Colborne; Philippe Langlais"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Entity mention detection using a combination of redundancy-driven classifiers",
+            "journal": "",
+            "year": "2010",
+            "authors": "Silvana Marianela Bernaola Biggio; Manuela Speranza; Roberto Zanoli"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Erd'14: entity recognition and disambiguation challenge",
+            "journal": "Acm",
+            "year": "2014",
+            "authors": "David Carmel; Ming-Wei Chang; Evgeniy Gabrilovich; Bo-June Hsu; Kuansan Wang"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Ustc-nelslip at semeval-2022 task 11: Gazetteer-adapted integration network for multilingual complex named entity recognition",
+            "journal": "",
+            "year": "2022",
+            "authors": "Beiduo Chen; Jun-Yu Ma; Jiajun Qi; Wu Guo; Zhen-Hua Ling; Quan Liu"
+        },
+        {
+            "ref_id": "b7",
+            "title": "What does bert look at? an analysis of bert's attention",
+            "journal": "",
+            "year": "2019",
+            "authors": "Kevin Clark; Urvashi Khandelwal; Omer Levy; Christopher D Manning"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Unsupervised cross-lingual representation learning at scale",
+            "journal": "",
+            "year": "2019",
+            "authors": "Alexis Conneau; Kartikay Khandelwal; Naman Goyal; Vishrav Chaudhary; Guillaume Wenzek; Francisco Guzm\u00e1n; Edouard Grave; Myle Ott; Luke Zettlemoyer; Veselin Stoyanov"
+        },
+        {
+            "ref_id": "b9",
+            "title": "An analysis of simple data augmentation for named entity recognition",
+            "journal": "",
+            "year": "2020",
+            "authors": "Xiang Dai; Heike Adel"
+        },
+        {
+            "ref_id": "b10",
+            "title": "An analysis of simple data augmentation for named entity recognition",
+            "journal": "",
+            "year": "2020",
+            "authors": "Xiang Dai; Heike Adel"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Daga: Data augmentation with a generation approach for low-resource tagging tasks",
+            "journal": "",
+            "year": "2020",
+            "authors": "Bosheng Ding; Linlin Liu; Lidong Bing; Canasai Kruengkrai; Hai Thien; Shafiq Nguyen; Luo Joty; Chunyan Si;  Miao"
+        },
+        {
+            "ref_id": "b12",
+            "title": "The automatic content extraction (ace) program-tasks, data, and evaluation",
+            "journal": "",
+            "year": "2004",
+            "authors": "Alexis George R Doddington;  Mitchell; A Mark;  Przybocki; A Lance; Stephanie M Ramshaw; Ralph M Strassel;  Weischedel"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Ncbi disease corpus: a resource for disease name recognition and concept normalization",
+            "journal": "Journal of biomedical informatics",
+            "year": "2014",
+            "authors": "Robert Rezarta Islamaj Dogan; Zhiyong Leaman;  Lu"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Dynamic gazetteer integration in multilingual models for cross-lingual and cross-domain named entity recognition",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Besnik Fetahu; Anjie Fang; Oleg Rokhlenko; Shervin Malmasi"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Named entity recognition in query",
+            "journal": "",
+            "year": "2009",
+            "authors": "Jiafeng Guo; Gu Xu; Xueqi Cheng; Hang Li"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Tdmsci: A specialized corpus for scientific literature entity tagging of tasks datasets and metrics",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021-04",
+            "authors": "Yufang Hou; Charles Jochim; Martin Gleize; Francesca Bonin; Debasis Ganguly"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Investigating transfer learning in multilingual pretrained language models through chinese natural language inference",
+            "journal": "",
+            "year": "2021",
+            "authors": "Hai Hu; He Zhou; Zuoyu Tian; Yiwen Zhang; Yina Ma; Yanting Li; Yixin Nie; Kyle Richardson"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Perplexity-a measure of the difficulty of speech recognition tasks",
+            "journal": "The Journal of the Acoustical Society of America",
+            "year": "1977",
+            "authors": "Fred Jelinek; L Robert;  Mercer; R Lalit; James K Bahl;  Baker"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Yejin Bang, Andrea Madotto, and Pascale Fung. 2022. Survey of hallucination in natural language generation",
+            "journal": "ACM Computing Surveys",
+            "year": "",
+            "authors": "Ziwei Ji; Nayeon Lee; Rita Frieske; Tiezheng Yu; Dan Su; Yan Xu; Etsuko Ishii"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Adam: A method for stochastic optimization",
+            "journal": "",
+            "year": "2014",
+            "authors": "P Diederik; Jimmy Kingma;  Ba"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Contextual augmentation: Data augmentation by words with paradigmatic relations",
+            "journal": "",
+            "year": "2018",
+            "authors": "Sosuke Kobayashi"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Data augmentation using pre-trained transformer models",
+            "journal": "",
+            "year": "2020",
+            "authors": "Varun Kumar; Ashutosh Choudhary; Eunah Cho"
+        },
+        {
+            "ref_id": "b23",
+            "title": "BART: Denoising sequence-to-sequence pre-training for natural language generation, translation, and comprehension",
+            "journal": "",
+            "year": "2020",
+            "authors": "Mike Lewis; Yinhan Liu; Naman Goyal; Marjan Ghazvininejad; Abdelrahman Mohamed; Omer Levy; Veselin Stoyanov; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Low-resource ner by data augmentation with prompting",
+            "journal": "",
+            "year": "",
+            "authors": "Jian Liu; Yufeng Chen; Jinan Xu"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Mulda: A multilingual data augmentation framework for low-resource cross-lingual ner",
+            "journal": "Long Papers",
+            "year": "2021",
+            "authors": "Linlin Liu; Bosheng Ding; Lidong Bing; Shafiq Joty; Luo Si; Chunyan Miao"
+        },
+        {
+            "ref_id": "b26",
+            "title": "How to use gazetteers for entity recognition with neural models",
+            "journal": "",
+            "year": "2019",
+            "authors": "Simone Magnolini; Vevake Valerio Piccioni; Marco Balaraman; Bernardo Guerini;  Magnini"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Multiconer: a largescale multilingual dataset for complex named entity recognition",
+            "journal": "",
+            "year": "2022",
+            "authors": "Shervin Malmasi; Anjie Fang; Besnik Fetahu; Sudipta Kar; Oleg Rokhlenko"
+        },
+        {
+            "ref_id": "b28",
+            "title": "ner and pos when nothing is capitalized",
+            "journal": "",
+            "year": "2019",
+            "authors": "Stephen Mayhew; Tatiana Tsygankova; Dan Roth"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Gemnet: Effective gated gazetteer representations for recognizing complex entities in low-context input",
+            "journal": "",
+            "year": "2021",
+            "authors": "Tao Meng; Anjie Fang; Oleg Rokhlenko; Shervin Malmasi"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Language models are unsupervised multitask learners",
+            "journal": "",
+            "year": "2019",
+            "authors": "Alec Radford; Jeff Wu; Rewon Child; David Luan; Dario Amodei; Ilya Sutskever"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Sentence-bert: Sentence embeddings using siamese bert-networks",
+            "journal": "",
+            "year": "2019",
+            "authors": "Nils Reimers; Iryna Gurevych"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Soft gazetteers for lowresource named entity recognition",
+            "journal": "",
+            "year": "2020",
+            "authors": "Shruti Rijhwani; Shuyan Zhou; Graham Neubig; Jaime Carbonell"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Improving supervised sense disambiguation with web-scale selectors",
+            "journal": "",
+            "year": "2012",
+            "authors": "Andrew Schwartz; Fernando Gomez; Lyle Ungar"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Overview of biocreative ii gene mention recognition",
+            "journal": "Genome biology",
+            "year": "2008",
+            "authors": "Larry Smith; K Lorraine; Cheng-Ju Tanabe;  Kuo; Chun-Nan Chung; Yu-Shi Hsu; Roman Lin; Christoph M Klinger; Kuzman Friedrich; Manabu Ganchev;  Torii"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Multilingual translation with extensible multilingual pretraining and finetuning",
+            "journal": "",
+            "year": "2020",
+            "authors": "Yuqing Tang; Chau Tran; Xian Li; Peng-Jen Chen; Naman Goyal; Vishrav Chaudhary; Jiatao Gu; Angela Fan"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Introduction to the conll-2003 shared task: Languageindependent named entity recognition",
+            "journal": "",
+            "year": "2003",
+            "authors": "Erik F Tjong; Kim Sang; Fien De Meulder"
+        },
+        {
+            "ref_id": "b37",
+            "title": "Automated Concatenation of Embeddings for Structured Prediction",
+            "journal": "",
+            "year": "2021",
+            "authors": "Xinyu Wang; Yong Jiang; Nguyen Bach; Tao Wang; Zhongqiang Huang; Fei Huang; Kewei Tu"
+        },
+        {
+            "ref_id": "b38",
+            "title": "EDA: Easy data augmentation techniques for boosting performance on text classification tasks",
+            "journal": "",
+            "year": "2019",
+            "authors": "Jason Wei; Kai Zou"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Time Expression and Named Entity Recognition",
+            "journal": "Springer",
+            "year": "2021",
+            "authors": "Xiaoshi Zhong; Erik Cambria"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Dual adversarial neural transfer for lowresource named entity recognition",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Joey Tianyi Zhou; Hao Zhang; Di Jin; Hongyuan Zhu; Meng Fang; Rick Siow Mong Goh; Kenneth Kwok"
+        },
+        {
+            "ref_id": "b41",
+            "title": "Melm: Data augmentation with masked entity language modeling for low-resource ner",
+            "journal": "Long Papers",
+            "year": "2022",
+            "authors": "Ran Zhou; Xin Li; Ruidan He; Lidong Bing; Erik Cambria; Luo Si; Chunyan Miao"
+        },
+        {
+            "ref_id": "b42",
+            "title": "Learning from noisy labels for entity-centric information extraction",
+            "journal": "",
+            "year": "2021",
+            "authors": "Wenxuan Zhou; Muhao Chen"
+        },
+        {
+            "ref_id": "b43",
+            "title": "Did you discuss the experimental setup, including hyperparameter search and best-found hyperparameter values?",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b44",
+            "title": "error bars around results, summary statistics from sets of experiments), and is it transparent whether you are reporting the max, mean, etc",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b45",
+            "title": "for preprocessing, for normalization, or for evaluation",
+            "journal": "",
+            "year": "",
+            "authors": " Nltk;  Spacy;  Rouge"
+        },
+        {
+            "ref_id": "b46",
+            "title": "crowdworkers) or research with human participants? Left blank",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b47",
+            "title": "Did you report the full text of instructions given to participants, including e.g., screenshots, disclaimers of any risks to participants or annotators",
+            "journal": "",
+            "year": "",
+            "authors": " D1"
+        },
+        {
+            "ref_id": "b48",
+            "title": "crowdsourcing platform, students) and paid participants, and discuss if such payment is adequate given the participants' demographic",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b49",
+            "title": "Did you discuss whether and how consent was obtained from people whose data you're using/curating? For example, if you collected data via crowdsourcing, did your instructions to crowdworkers explain how the data would be used?",
+            "journal": "",
+            "year": "",
+            "authors": " D3"
+        },
+        {
+            "ref_id": "b50",
+            "title": "Was the data collection protocol approved (or determined exempt) by an ethics review board? No response",
+            "journal": "",
+            "year": "",
+            "authors": " D4"
+        },
+        {
+            "ref_id": "b51",
+            "title": "Did you report the basic demographic and geographic characteristics of the annotator population that is the source of the data? No response",
+            "journal": "",
+            "year": "",
+            "authors": " D5"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "[M] enemy [M] infantry [M] retired [M] enemy swarmed [M] hidden ground [M] ground [M] royal artillery guns [M] attack [enemy [M] infantry [M] retired [M] enemy swarmed [M] hidden ground [M] <b-grp> royal <b-grp> <i-grp> artillery <i-grp> guns [M] attack [M] [M] enemy [M] infantry [M] swarmed [M] hidden ground [M] <b-grp> royal <b-grp> <i-grp> artillery <i-grp> guns [M] ashby was wounded in the right foot during one of three raids into kentuckyLOC made by his regiment during 1862 . ashby [M] wounded [M] foot [M] raids [M] allegiance [M] rejoin <b-loc> kentucky <b-loc> [",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "attacked the enemy 's infantry with the lance , and then retired while the enemy swarmed out of hidden ground where royal artillery guns could attack them .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 1 :1Figure 1: Overview of ACLM: ACLM follows a 4-step template creation process, which serves as an input to the model during fine-tuning and generation. 1 \u20dd Keyword Selection: The most important keywords (in red) associated with the NEs (in bold) in the sentence is first extracted using attention maps obtained from a fine-tuned NER model. 2 \u20dd Selective Masking: All words except the NEs and the keywords obtained from the previous step is replaced with mask tokens [M]. 3\u20dd Labeled Sequence Linearization: Label tokens are added before and after each entity in the sentence. 4\u20dd Dynamic Masking: The template goes through further masking where a small portion of the keywords are dynamically masked at each training iteration. While generation we also apply mixner, which randomly joins two templates after 3 \u20dd and before 4 \u20dd. Post generating augmentations with ACLM, the generated augmentations are concatenated with the gold data and used to fine-tune our final NER model.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "42",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "4 Figure 2 :42Figure 2: Overview of mixner: During the augmentation generation process, for a particular sentence in the training dataset, we retrieve another semantically similar sentence and concatenate them before step 4\u20dd of the template creation process. This merged template is then passed through ACLM to generate diverse augmentations that incorporate semantics and NEs from both sentences.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "OriginalFigure 4 :4Figure 4: Analysis and comparison of augmentations generated by our baselines with ACLM. Words underlined are the NEs.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 5 :5Figure 5: Augmentation examples of the CoNLL 2003 dataset from the news domain. All generations are produced in a low-resource setting (500 training examples).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 6 :6Figure 6: Augmentation examples of BC2GM from the bio-medical domain. All generations are produced in a low-resource setting (500 training examples).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "Figure 7 :7Figure 7: Augmentation examples of NCBI dataset from the bio-medical domain. All generations are produced in a low-resource setting (500 training examples).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "figure",
+            "figure_id": "fig_8",
+            "figure_caption": "Figure 8 :8Figure 8: Augmentation examples of TDMSci from the science domain. All generations are produced in a low-resource setting (500 training examples).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "figure",
+            "figure_id": "fig_9",
+            "figure_caption": "Figure 10 :10Figure 10: Augmentation examples on the English subset of the MultiCoNER dataset. All generations are produced in a low-resource setting (500 training examples).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "figure",
+            "figure_id": "fig_10",
+            "figure_caption": "Figure 11 :11Figure 11: Examples of templates created for sentences taken from the English subset of the MultiCoNER dataset. All templates shown are created in a low-resource setting (500 training examples). Words underlined are identified keywords.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "12",
+            "figure_type": "figure",
+            "figure_id": "fig_11",
+            "figure_caption": "Figure 12 :12Figure 12: Examples of templates created for sentences taken from the Spanish subset of the MultiCoNER dataset. All templates shown are created in a low-resource setting (500 training examples). Words underlined are identified keywords.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "13",
+            "figure_type": "figure",
+            "figure_id": "fig_12",
+            "figure_caption": "Figure 13 :13Figure 13: Examples of templates created for sentences taken from the Hindi subset of the MultiCoNER dataset. All templates shown are created in a low-resource setting (500 training examples). Words underlined are identified keywords.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_13",
+            "figure_caption": "[M] goal [M] unsupervised <B-TASK> word <B-TASK> <I-TASK> segmentation <I-TASK> [M] correct boundaries [M] language corpora [M] human parameterization [M]",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_14",
+            "figure_caption": "[M] <B-TASK> question <I-TASK>classification <I-TASK> [M] labeled question corpus [M] French [M] paper [M] existing English corpora [M] classification [M] translating [M] question [M] labels [M]",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "15",
+            "figure_type": "figure",
+            "figure_id": "fig_15",
+            "figure_caption": "Figure 15 :15Figure 15: Examples of templates created for sentences taken from the TDMSci dataset. All templates shown are created in a low-resource setting (500 training examples). Words underlined are identified keywords.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_16",
+            "figure_caption": "Sentence: bamboo, like [wood] PROD is a natural [composite material] PROD with a high strength to weight ratio useful for structures. Sentence: [michael sanchez] PER , who was member of the band [deep forest] GRP , co wrote the lyrics.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_17",
+            "figure_caption": "Sentence: his last theatrical composition was music for [joan the woman] CW starring [geraldine farrar] PER . Sentence: while auditioning for television and film roles, she worked on [theatre] GRP productions of [romeo and juliet] CW and [arsenic and old lace] CW . CORP purchased the intellectual property in 2012 and provided funding for the project again,reimagining it as an [actionadventure game] CW for release on multiple platforms. Sentence: the bulk of the locality is used for growing [sugarcane] PROD and tropical fruit, while some of the locality, particularly surrounding the creeks is left as swampy wetlands.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "16",
+            "figure_type": "figure",
+            "figure_id": "fig_18",
+            "figure_caption": "Figure 16 :16Figure 16: Attention maps for different sentences from the MULTICONER dataset. All the sentences are picked from a low-resource setting (1000 training examples).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Results",
+            "figure_data": "MONOLINGUALCROSS-LINGUAL#Gold MethodEnBnHiDeEsKoNlRuTrZhAvgEn \u2192 Hi En \u2192 Bn En \u2192 De En \u2192 Zh AvgGold-only29.36 14.49 18.80 37.04 36.30 12.76 38.78 23.89 24.13 14.18 24.9716.3612.1529.710.3114.63LwTR48.60 20.25 29.95 48.38 44.08 35.09 43.00 39.22 30.58 27.70 36.6832.3624.5946.052.1126.28DAGA16.24 5.87 10.40 32.44 27.78 19.28 15.44 11.14 16.17 10.33 16.514.543.2814.210.135.54100 MELM40.12 6.22 27.84 43.94 37.45 34.10 37.82 32.38 20.13 25.11 30.5126.3720.3334.322.7120.93ACLM only entity 14.06 17.55 19.60 29.72 38.10 31.57 38.47 27.40 35.62 26.34 27.8421.7216.5530.931.5817.69ACLM random43.59 20.13 28.04 45.83 42.27 33.64 41.82 38.20 36.79 25.99 35.6329.6821.6445.273.0524.91ACLM (ours)48.76 23.09 33.53 48.80 44.14 38.35 46.22 39.48 37.20 35.12 39.4732.5223.9146.483.5826.62Gold-only51.83 19.31 33.68 49.62 45.16 42.51 47.83 31.55 26.76 32.34 38.0636.9027.4448.703.7629.20LwTR52.88 23.85 34.27 50.31 47.01 42.77 52.01 40.18 35.92 30.57 40.9840.0732.3648.956.0431.85DAGA33.30 17.12 19.58 35.10 33.56 26.50 38.04 29.83 23.35 25.66 28.2018.9214.3729.321.7916.10200 MELM47.83 5.47 29.67 45.85 42.08 36.62 49.47 41.84 31.25 32.27 36.2427.5518.8041.106.2123.41ACLM only entity 50.06 25.58 37.78 50.95 48.21 43.39 48.46 34.87 34.92 28.20 40.2430.7622.5344.176.5025.99ACLM random52.69 35.26 39.83 51.14 48.70 42.19 48.71 39.68 37.26 34.22 42.9636.5227.1947.737.1229.64ACLM (ours)54.99 38.39 40.55 53.36 49.57 44.32 53.19 43.97 39.71 39.31 45.7445.2236.6454.518.5536.23Gold-only55.51 34.6 38.66 55.95 51.52 48.57 50.97 45.14 38.83 38.84 45.8635.9325.6450.137.2329.73LwTR56.97 35.42 37.83 55.91 54.74 49.36 56.10 46.82 39.00 38.55 47.0743.1434.6051.6111.4035.19DAGA44.62 22.36 24.30 43.02 42.77 36.23 47.11 30.94 30.84 33.79 35.6026.5021.5237.894.8222.68500 MELM52.57 9.46 31.57 53.57 46.40 45.01 51.90 46.73 38.26 39.64 41.5134.9727.1744.317.3128.44ACLM only entity 57.55 35.69 35.82 56.15 53.64 50.20 53.07 46.40 41.58 38.65 46.8735.4829.3749.107.9930.48ACLM random57.92 38.24 39.33 57.14 53.24 49.81 55.06 48.27 42.22 40.55 48.1841.7232.1652.2713.6334.95ACLM (ours)58.31 40.26 41.48 59.35 55.69 51.56 56.31 49.40 43.57 41.23 49.7244.3635.5954.0416.2737.57Gold-only57.22 30.20 39.55 60.18 55.86 53.39 60.91 49.93 43.67 43.05 44.4043.4433.2754.615.3434.17LwTR59.10 39.65 43.90 61.28 57.29 51.37 59.25 52.04 44.33 43.71 51.1943.3233.7453.327.3834.44DAGA50.24 32.09 35.02 51.45 49.47 42.41 51.88 41.56 33.18 39.51 42.6833.1226.2242.135.1526.651000 MELM53.48 6.88 37.02 58.69 52.43 50.50 56.25 48.99 36.83 38.88 44.0035.2325.6446.508.2228.90ACLM only entity 55.46 38.13 41.84 60.05 56.99 53.32 58.22 50.17 45.11 39.62 49.8937.3829.7741.106.4928.69ACLM random58.87 41.00 46.27 61.19 57.29 53.61 59.52 52.77 45.01 43.60 51.9143.9634.1453.377.2534.68ACLM (ours)60.14 42.42 48.20 63.80 58.33 55.55 61.22 54.31 48.23 45.19 53.7444.5935.7056.748.9436.49"
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": ".66 42.16 55.71 54.98 45.14 57.48 46.13 44.40 30.72 46.86  LwTR  55.65 38.47 43.44 54.71 53.95 44.78 56.50 46.93 45.41 31.56  47.14 MulDA 46.87 29.25 34.52 45.92 45.55 33.91 48.21 38.65 35.56 27.33 38.58 MELM 53.27 23.43 41.55 48.17 51.28 39.23 51.37 45.73 41.97 30.67 42.67 ACLM (ours) 58.74 41.00 46.22 59.13 56.93 51.22 60.30 50.26 49.32 40.93 51.40 200 \u00d710 Gold-Only 58.67 39.84 46.34 59.65 58.50 50.70 60.79 51.66 47.12 40.98 51.42 LwTR 51.78 35.93 38.87 52.73 51.59 42.55 54.49 43.99 41.23 35.19 44.83 MulDA 48.89 31.45 36.76 48.41 48.30 39.78 51.09 42.01 35.98 31.65 41.43 MELM 52.53 24.27 40.10 49.69 52.42 43.56 47.28 44.35 40.62 34.28 47.45 ACLM (ours) 59.75 42.61 48.52 61.49 59.05 53.46 61.59 53.34 49.96 44.72 53.45    ",
+            "figure_data": "compares"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Results of multi-lingual low-resource complex NER.ACLM obtains absolute gains in the range of 1% -21%.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Quantitative evaluation of generation quality from various systems on the measures of perplexity and diversity. Diversity-E, N, and L stand for Entity, Non-Entity, and Length, respectively.calculate the average absolute difference between the number of tokens in generated samples and the original samples. ACLM achieves the lowest perplexity and highest non-NE and length diversity compared with other baselines. NE diversity in ACLM is achieved with mixner where ACLM fairs well compared to MELM which just replaces NEs. LwTR achieves the highest perplexity, thereby reaffirming that it generates incoherent augmentations.Original it was developed by a team led by former [blizzard entertainment]CORP employees, some of whom had overseen the creation of the [diablo]CW series.LwTRit was developed by a makers led by, [blizzard entertainment]CORP ., some of whom had elevation the serving of the [diablo]CW 12th. \u274c LwTR replaces random words in the sentence, which makes it incoherent.MELMit was developed by a team led by former [blizzago games]CORP employees, some of whom had overseen the creation of the [hablo]CW series.\u274c MELM keeps the sentence coherent but generates new NEs that do not correspond to real-world entities.ACLM w/o mixner [blizzard entertainment]CORP employees have overseen the production of the animated films, including the production of the [diablo]CW series.",
+            "figure_data": "Qualtitative Analysis. Fig. 3 illustrates the superi-ority of augmentations generated by ACLM whencompared with our other baselines. As clearly evi-dent, while MELM generates just minor changesin NEs, augmentations produced by LwTR oftentend to be nonsensical and incoherent. On the otherhand, ACLM generates meaningful and diverse sen-tences around NEs, which is further boosted withmixner. We provide examples in Appendix D.1.5.2 Application to other domainsTo evaluate the transferability of ACLM to otherdomains, we evaluate ACLM on 4 more datasets be-yond MultiCoNER. These datasets include CoNLL2003 (Tjong Kim Sang and De Meulder, 2003)(news), BC2GM (Smith et al., 2008) (bio-medical),NCBI Disease (Dogan et al., 2014) (bio-medical)and TDMSci (Hou et al., 2021) (science). Table 4compares our baselines with ACLM across 2 low-resource settings on all 4 datasets. ACLM outper-forms all our baselines on all settings except LwTRon CoNLL 2003. This occurs because LwTR gen-erates a large variety of effective augmentationswith NE replacement on easy entities in CoNLL2003. The results demonstrate the effectiveness ofACLM over diverse domains, including domainswith an acute scarcity of data (bio-medical). Addi-tionally, we also emphasize that ACLM producesmore factual augmentations and, unlike our otherbaselines, avoids context-entity mismatch, whichmakes the NER model store wrong knowledge in"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "sample consisted of four consecutive [FMF]DISEASE patients who arrived at the [FMF]DISEASE clinic for a visit of examination. Only one of the 4 remaining patients had [FMF]DISEASE . Comparison",
+            "figure_data": "\uf0fc ACLM introduces a new context pattern around the sentence. The entire sentenceis coherent."
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "In this section, we show performance on the test set for better analysis. Too less context, like our ACLM only entity baseline with only linearized NEs in the template, might make it difficult for the model to know the appropriate context of the syntactically ambiguous complex NE and thus might lead to sentences generated with a context-entity mismatch (for e.g. sam is reading on the Beach where on the beach might be a name of a movie). On the contrary, retaining too many words from the original sentence in our template might lead to a drop in the diversity of generated sentences the model needs to infill only a small portion of the words. To determine the optimal value of p we experiment on 2 low-resource settings on the English sub-set of MultiCoNER and report the micro F1 results on the test-set for p \u2208 Test set F1 for various Keyword Selection rates.",
+            "figure_data": "Keyword Selection rate p: The keywords in our template provide the model with contextually rel-evant additional knowledge about the NEs duringtraining and generation. However, we are facedwith the question: How much context is good con-text?. {0, 0.1, 0.2, 0.3. 0.4, 0.5, 0.6, 0.7}. All other hyper-parameters are kept constant. As shown in Table 5,p = 0.3 gives us the best test-set performance, andthe performance decreases after 0.4.#Gold 200 50.06 51.82 53.99 54.99 51.05 54.28 52.16 54.34 0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 500 57.55 56.12 57.93 58.31 57.55 56.88 56.60 58.10"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": ".96 52.40 50.05 54.99 53.46 53.75  500 58.24 58.17 57.90 58.11 58.31 57.20 57.40    Test set F1 for the number of augmentation rounds.",
+            "figure_data": "#Gold1234567200 52.37 53"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "Test set F1 for various settings of \u03b1",
+            "figure_data": "#Gold 200 5001 52.43 54.99 54.13 2 3 58.09 58.31 58.15B Additional ResultsCurrent state of state-of-the-art: Most current state-of-the-art systems are built and evaluated oncommon NER benchmarks like CoNLL 2003 andOntoNotes v5.0. As discussed in Section 2, thesebenchmarks do not represent contemporary chal-lenges in NER and contain sentences with easyentities and rich context. Table 8 compares theperformance of a simple XLM-R (Conneau et al.,2019), and Co-regularized LUKE (Zhou and Chen,"
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "Performance comparison of XLM-RoBERTa(Conneau et al., 2019) and Co-regularized LUKE(Zhou and Chen, 2021) on two common benchmark NER datasets and Multi-CoNER(Malmasi et al., 2022)  (complex NER benchmark) in both high-and low-resource settings. Co-regularized LUKE is the current SOTA NER system on both CoNLL 2003 and OntoNotes v5.0. Complex NER remains a difficult NLP task in both low-and high-resource labeled data settings.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "Result comparison Complex NER. Avg is the average result across all languages. ACLM outperforms all our baselines.",
+            "figure_data": "MethodEnBnHiDeEsKoNlRuTrZhAvgGold-only71.25 59.10 61.59 75.33 67.71 65.29 71.55 68.76 62.44 60.56 66.36LwTR71.22 58.86 60.72 75.50 70.06 65.80 72.94 68.26 62.70 58.74 66.48DAGA64.30 47.93 53.03 67.70 62.07 59.84 65.37 60.72 52.45 55.32 58.87MELM ACLM (ours) 72.69 60.13 62.58 77.26 70.89 67.01 73.28 69.90 65.24 61.63 68.06 66.27 56.27 61.04 71.25 65.56 63.71 70.43 66.28 60.74 57.72 63.93"
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "table",
+            "figure_id": "tab_11",
+            "figure_caption": "Table 10 compares the entity-wise performance of ACLM with our various baselines on two low-resource settings on the MultiCoNER dataset. All results are averaged across all 10 lan-guages. ACLM outperforms all our baselines on all individual entities, including PROD, GRP, and CW, which re-affirms ACLM's ability to generate effective augmentation for complex NER. Entity-wise performance comparison of different augmentation methods. Results are averaged across all languages.",
+            "figure_data": "#Gold Method 200 Gold-Only LwTR DAGA MELM ACLM (ours) 64.42 48.92 PER LOC PROD GRP CORP 56.35 42.32 30.10 31.36 33.83 56.13 41.78 34.87 36.52 39.30 45.19 35.40 19.96 21.92 19.60 52.16 41.16 30.24 28.61 34.13 41.76 37.31 44.08 500 Gold-Only 63.05 48.48 42.75 37.55 45.10 LwTR 64.80 54.17 45.70 44.06 50.80 DAGA 51.82 41.11 28.58 30.50 34.10 MELM 58.41 45.64 37.04 34.11 40.42 ACLM (ours) 66.49 51.24 48.87 42.00 51.55CW 23.30 27.46 14.33 22.77 30.61 31.34 35.10 21.61 28.33 35.18"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_13",
+            "figure_caption": "-medical as it may make the model store wrongful knowledge. Our detailed analysis of generated augmentations shows that: (1) LwTR is prone to generating such incoherent sentences because it randomly samples entities from the corpus with the same tag for replacement. (2) MELM on the other hand, fine-tuned on a transformerencoder-based PLM, gets to see the entire context of the sentence for generating a new NE. However, it does not learn to focus on particular keywords and tends to generate a new NE based on the broader context of the sentence (e.g., it does not learn to differentiate between human and cow diseases and generates a new NE based on the broader context of the sentence). (3) ACLM generates highly reliable samples by conditioning on templates with keywords related to the NE. We illustrate examples of such templates in Fig.14 and 15.OriginalThe [European Commission] ORG said on Thursday it disagreed with [German] MISC advice to consumers to shun [British] MISC lamb until scientists determine whether mad cow disease can be transmitted to sheep.LwTRThe [European Sox] ORG seed on Thursday it disagreed with [German] MISC advice to consumers to shun [British] MISC regarding until scientists determine whether mad 70 disease can be --to sheep 1MELM[France] LOC 's [Aquaculture Committee] ORG suggested on Wednesday that consumers avoid eating meat from [German] MISC sheep until scientists determine whether mad cow disease can be transmitted to the animals. ORG said on Thursday that consumers should shun [British] MISC lamb until scientists determine whether the disease can be transmitted to humans. ORG has a scientific and multidisciplinary group of veterinary scientists who disagreed with the consumers on Thursday and decided to shun them out until scientists determine whether the [Bovine Spongiform Encephalopathy] MISC ( BSE ) --mad cow disease can be transmitted.",
+            "figure_data": "ACLM w/o mixner The [European Commission] ACLM w/ mixner The [European Commission]for Hindi and English subsets of MultiCoNER dataset respec-tively. Extra Datasets: Fig 5, 6, 7 and 8 illustrate augmetation examples for CoNLL 2003 (Tjongdomains like bioE Additional DetailsKim Sang and De Meulder, 2003) (news), BC2GM (Smith et al., 2008) (bio-medical), NCBI Disease (Dogan et al., 2014) (bio-medical) and TDMSci (Hou et al., 2021) (science) datasets respectively. Except for on CoNLL 2003 datasets, both our base-lines, LwTR and MELM, generate incoherent and unreliable training samples for the other 2 datasets. We only compare ACLM with LwTR and MELM as these methods don't generate augmentations from scratch and modify existing sentences. WeModel Parameters: XLM-RoBERTa-large has \u2248 355M parameters with 24-layers of encoder, 1027-hidden-state, 4096 feed-forward hidden-state and 16-heads. mBART-50-large \u2248 has 680M parame-ters with 12 layers of encoder, 12 layers of decoder, 1024-hidden-state, and 16-heads. Compute Infrastructure: All our experiments are conducted on a single NVIDIA A100 GPU. An entire ACLM training pipeline takes \u2248 40 minutes.define unreliable sentences as sentences generatedwith an entity-context mismatch (eg. a NE de-scribing a disease prone to cows is placed in the context of humans or vice-versa). Generating unre-Dataset Details: We use 5 datasets in total for our experiments: MultiCoNER 2 (Malmasi et al.,liable augmentations prove fatal in data-sensitive"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_14",
+            "figure_caption": "Original [\u0939\u0901 \u0938\u0947 \u0932 \u0914\u0930 \u0947 \u091f\u0932] CW , \u090f\u0915 \u092a\u0930\u0940 \u0915\u0925\u093e \u093f\u091c\u0938\u092e \u0928\u093e\u092e\u093e\u0902 \u093f\u0915\u0924 \u092a\u093e \u0947 \u0921 \u0902 \u092c \u0915\u093e \u093f\u0928\u0936\u093e\u0928 \u091b\u094b\u095c\u0924\u0947 \u0939 LwTR [\u0913\u092a\u0928\u0911\u093f\u092b\u0938 \u0914\u0930 \u0947 \u091f\u0932] CW , \u090f\u0915 \u093f\u0915\u092f\u093e \u0924\u0915 \u093f\u091c\u0938\u092e \u0930\u0947 \u093f\u091f\u0902 \u0917 \u092a\u093e \u0947 \u0921 \u0902 \u092c \u0915\u093e \u092e \u093f\u0915\u092f\u093e\u0964 \u0939 MELM [\u25cc\u0940 \u0915 \u0947 \u091c\u0942 \u0930\u093e] CW , \u090f\u0915 \u092a\u0930\u0940 \u0915\u0925\u093e \u093f\u091c\u0938\u092e \u0928\u093e\u092e\u093e\u0902 \u093f\u0915\u0924 \u092a\u093e \u0947 \u0921 \u0902 \u092c \u0915\u093e \u093f\u0928\u0936\u093e\u0928 \u091b\u094b\u095c\u0924\u0947 \u0939 ACLM w/o mixner [\u0939\u0901 \u0938\u0947 \u0932 \u0914\u0930 \u0947 \u091f\u0932] CW \u0915\u0940 \u0915\u0925\u093e \u0915\u094b \u0967\u096f\u096f\u096f \u092e \u0928\u093e\u092e\u093e\u0902 \u093f\u0915\u0924 \u093f\u0915\u092f\u093e \u0917\u092f\u093e \u0925\u093e\u0964 ACLM w/ mixner [\u0939\u0901 \u0938\u0947 \u0932 \u0914\u0930 \u0947 \u091f\u0932] CW \u0915\u0940 \u092a\u0930\u0940 \u0915\u0925\u093e \u0915\u094b \u0928\u093e\u092e\u093e\u0902 \u093f\u0915\u0924 \u093f\u0915\u092f\u093e \u0917\u092f\u093e \u0925\u093e , \u093f\u091c\u0938\u0947 [\u093f\u0928\u0932\u0947 \u0938\u093e\u0924\u094b] GRP \u0938\u0948 \u091f\u0947 \u0932\u093e\u0907\u091f \u0928\u0947 \u091f\u0935\u0915 \u093e\u0930\u093e \u0938\u093e \u0930\u0924 \u093f\u0915\u092f\u093e \u091c\u093e\u0924\u093e \u0939\u0948 \u0964 [\u0939\u093e\u0935 \u0921 \u093f\u0935 \u093f\u0935 \u093e\u0932\u092f] GRP \u0938\u0947 \u0906\u093f\u0915 \u091f\u0947 \u0930 \u0915\u0940 \u093f\u0921 \u0940 \u093e \u0915\u0940\u0964 ACLM w/ mixner \u0935\u0939 [\u0939\u093e\u0935 \u0921 \u093f\u0935 \u093f\u0935 \u093e\u0932\u092f] GRP \u0938\u0947 \u093e\u0924\u0915 \u0915\u0940 \u093f\u0921 \u0940 \u093e \u0915\u0930\u0928\u0947 \u0915 \u0947 \u092c\u093e\u0926 \u0921\u0949 \u0930\u0947 \u091f \u0915\u0940 \u0909\u092a\u093e\u093f\u0927 \u093e \u0915\u0930\u0928\u0947 \u0915 \u0947 \u093f\u0932\u090f [\u093f\u0921\u091c\u093e\u0907\u0928 \u0915 \u0947 \u0939\u093e\u0935 \u0921 \u0947 \u091c\u0941 \u090f\u091f \u0942 \u0932] GRP \u092e \u0906\u093f\u0915 \u091f\u0947 \u0930 \u0907\u0902 \u091c\u0940\u093f\u0928\u092f\u0930 \u092c\u0928 \u0917\u090f\u0964 Figure 9: Augmentation examples on the Hindi subset of the MultiCoNER dataset. All generations are produced in a low-resource setting (500 training examples). gibson was educated at [harrow school] GRP , where he played in the cricket team, and at [trinity college] LOC . PER on the soundtracks of his films [du, the ware] CW and walkaway in 1986 and 1987. PER wrote the soundtracks for his films [sid and nancy walker] CW in 1987 . PER wrote the soundtracks for his film [sid and nancy and walker] CW and appeared in many of his films, including [powder] CW , [simply irresistible] CW and [dtox] CW .",
+            "figure_data": "Original\u0909 \u094b\u0902 \u0928\u0947 \u0967\u096f\u0966\u0966 \u092e [\u0939\u093e\u0935 \u0921 \u093f\u0935 \u093f\u0935 \u093e\u0932\u092f] GRP \u0938\u0947 \u092e\u093e \u0930 \u093f\u0921 \u0940 \u0914\u0930 \u0967\u096f\u0966\u096a \u092e \u0921\u0949 \u0930\u0947 \u091f \u0915\u0940 \u0909\u092a\u093e\u093f\u0927 \u093e \u0915\u0940\u0964LwTR\u0909 \u094b\u0902 \u0928\u0947 \u0967\u096f\u0966\u0966 \u0939\u0948 \u0964 [\u0939\u093e\u0935 \u0921 \u093f\u0935 \u093f\u0935 \u093e\u0932\u092f] GRP \u0938\u0947 \u0967\u096f\u096f\u0969 \u093f\u0921 \u0940 \u0914\u0930 \u0967\u096f\u0966\u096a \u092e \u0921\u0949 \u0930\u0947 \u091f \u0915\u0940 \u0909\u092a\u093e\u093f\u0927 \u093e \u0915\u0940\u0964MELM\u0909 \u094b\u0902 \u0928\u0947 \u0967\u096f\u0966\u0966 \u092e [\u092c\u0949 \u0921 \u0915\u0949\u0932\u0947 \u091c] GRP \u0938\u0947 \u092e\u093e \u0930 \u093f\u0921 \u0940 \u0914\u0930 \u0967\u096f\u0966\u096a \u092e \u0921\u0949 \u0930\u0947 \u091f \u0915\u0940 \u0909\u092a\u093e\u093f\u0927 \u093e \u0915\u0940\u0964ACLM w/o mixner \u0909 \u094b\u0902 \u0928\u0947 \u0967\u096f\u0966\u0966 \u092e OriginalACLM w/o mixner [alex cox] ACLM w/ mixner [alex cox]"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "D masked \u2190 \u2205, D aug \u2190 \u2205 for {X, Y } \u2208 D train do \u25b7 Training Loop t other , t entity \u2190 X K \u2190 T op p% of ATTNMAP(t other ) \u25b7 Keyword Selection X \u2190 GENTEMPLATE(X, {t other } \u2212 {K}) \u25b7 Selective Masking X \u2190 LINEARIZE( X, Y ) \u25b7 Labeled Sequence Linearization D masked \u2190 D masked \u222a { X} end for for {X, Y } \u2208 D masked do X \u2190 DYNAMICMASK(X, \u03b7) \u25b7 Dynamic Masking L f inetune \u2190 FINETUNE(L, X) \u25b7 Fine-tune ACLM end for for {X, Y } \u2208 D train do \u25b7 Generation Loop repeat R times: X \u2190 GENTEMPLATE(X, {t other } \u2212 {K}) \u25b7 Selective masking X \u2190 LINEARIZE( X, Y ) \u25b7 Labeled Sequence Linearization X \u2190 DYNAMICMASK( X, \u00b5) \u25b7 Dynamic Masking X aug \u2190 GENAUG(L f inetune ( X)), if \u03b3 < \u03b2 X augmix \u2190 MIXNER(L f inetune ( X)), if \u03b3 > \u03b2 D aug \u2190 D aug \u222a {X aug } \u222a {X augmix } end for D aug \u2190 POSTPROCESS(D aug ) \u25b7 Post-processing return D train \u222a D aug 4.2 Experimental Setup",
+            "formula_coordinates": [
+                6.0,
+                306.14,
+                93.31,
+                218.28,
+                224.19
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "\u0906\u093f\u0927\u0915\u093e \u0930\u0915 \u0924\u094c\u0930 \u092a\u0930 \u092c \u0921 \u0938\u092e\u093e \u0939\u094b \u0917\u092f\u093e, \u0932\u0947 \u093f\u0915\u0928 \u0968\u0966\u0966\u0967 \u092e \u0905\u092a\u0928\u0947 \u090f \u092e [\u091c\u0940\u0935\u0928 \u0915\u0940 \u0938\u093e\u0901 \u0938\u0947 ] CW \u0915 \u0947 \u0938\u093e\u0925 \u0935\u093e\u092a\u0938\u0940 \u0915\u0940\u0964 [M] \u0906\u093f\u0927\u0915\u093e \u0930\u0915 [M] \u092c \u0921 [M] \u0968\u0966\u0966\u0967 [M] \u090f \u092e [M] <B-CW> \u091c\u0940\u0935\u0928 <B-CW> <I-CW> \u0915\u0940 <I-CW> <I-CW> \u0938\u093e\u0901 \u0938\u0947 <I-CW> [M] \u0935\u093e\u092a\u0938\u0940 \u0915\u0940 [M] \u0905\u0917\u0932\u0947 \u0938\u092b\u0932 \u0935\u0937 \u092e \u0907\u0938\u0915\u093e \u093f\u0935 \u093e\u0930 \u0906 \u0914\u0930 [\u092e\u0947 \u091f \u094b \u092e\u093f\u0928\u0932\u093e] LOC \u0947 \u092e \u0928\u090f \u092a \u0930\u0938\u0930\u094b\u0902 \u0915\u0940 \u093e\u092a\u0928\u093e \u0908 | [M] <B-LOC> \u092e\u0947 \u091f \u094b <B-LOC> <I-LOC> \u092e\u093f\u0928\u0932\u093e <I-LOC> \u0947 [M] \u0928\u090f \u092a \u0930\u0938\u0930\u094b\u0902 [M] \u093e\u092a\u0928\u093e \u0908 [M] \u092a\u093e \u093e \u0915\u094b [\u092e\u0947 \u095b] PROD \u0941 \u0927\u093e\u0935\u0927 \u0915 \u0915 \u0947 \u092a \u092e \u092d\u0940 \u092a\u0930\u094b\u0938\u093e \u091c\u093e \u0938\u0915\u0924\u093e \u0939\u0948 \u0964 [M] \u092a\u093e \u093e [M] <B-PROD> \u092e\u0947 \u095b <B-PROD> [M] \u092a\u0930\u094b\u0938\u093e [M]",
+            "formula_coordinates": [
+                17.0,
+                73.0,
+                256.93,
+                456.09,
+                65.93
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/2020.coling-main.343"
+}

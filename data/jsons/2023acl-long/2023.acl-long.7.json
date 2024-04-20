@@ -1,0 +1,718 @@
+{
+    "title": "EM Pre-training for Multi-party Dialogue Response Generation",
+    "authors": "Yiyang Li; Hai Zhao",
+    "pub_date": "",
+    "abstract": "Dialogue response generation requires an agent to generate a response according to the current dialogue history, in terms of which twoparty dialogues have been well studied, but leaving a great gap for multi-party dialogues at the same time. Different from two-party dialogues where each response is a direct reply to its previous utterance, the addressee of a response utterance should be specified before it is generated in the multi-party scenario. Thanks to the huge amount of two-party conversational data, various pre-trained language models for two-party dialogue response generation have been proposed. However, due to the lack of annotated addressee labels in multi-party dialogue datasets, it is hard to use them to pre-train a response generation model for multi-party dialogues. To tackle this obstacle, we propose an Expectation-Maximization (EM) approach that iteratively performs the expectation steps to generate addressee labels, and the maximization steps to optimize a response generation model. Theoretical analyses and extensive experiments have justified the feasibility and effectiveness of our proposed method. The official implementation of this paper is available at https://github.com/EricLee8/MPDRG.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Inspired by the tremendous success in pre-training large language models (PLMs) in general domains (Devlin et al., 2019;Clark et al., 2020;Radford et al., 2018), efforts have been made to train PLMs for dialogue response generation (Zhang et al., 2020;Bao et al., 2020;Chen et al., 2022). However, they constrain the dialogues to be either two-party, or sequential structured (i.e. each utterance replies directly to its previous utterance). Different from them, a multi-party dialogue can involve multiple interlocutors, where each interlocutor can reply to any preceding utterances, making the response relations of the dialogue tree-structured and much more complicated (Zhang et al., 2018;Le et al., 2019;Shi and Huang, 2019;Wang et al., 2020). Besides, the speaker and addressee of a response utterance should be specified before it is generated in multi-party scenario, making the annotated data for multi-party dialogue response generation (MP-DRG) less available. Figure 1 illustrates an example of MPDRG task taken from the Ubuntu IRC benchmark (Hu et al., 2019). The upper part shows the tree-structured addressee relations of the dialogue, where the arrows point from addressees to speakers, and different colors represent different interlocutors. The middle part displays the content of the dialogue history, where U 7 is the response to be generated. The addressee (U 6 ) and the speaker (#4) of it are given, and the content of this response is the target of our model. The lower part gives the human response, which is also called the ground truth reference.",
+                "Previous works on MPDRG fine-tune generative PLMs on small multi-party dialogue datasets with explicit addressee annotations. They utilize the response annotations to form a tree-structured response graph, then encode the dialogue history using either homogeneous or heterogeneous Graph Neural Networks (GNNs) (Hu et al., 2019;Gu et al., 2022). Nevertheless, none of them make attempts to pre-train a response generation model for multiparty dialogues due to the lack of large-scale corpora with annotated addressee labels.",
+                "To solve the aforementioned problem of data scarcity, we propose an EM approach that iteratively performs the expectation steps to generate addressee labels, and the maximization steps to optimize a response generation model. Specifically, we treat the addressee of each utterance in the dialogue history as a discrete latent variable z. During the E-steps, given the current dialogue history c t and the the response utterance r t , we model the distribution of the current addressee z t as p(z t |c t , r t ; \u03b8), where \u03b8 is the current model parameters. During the M-steps, we sample (c t , r t , z t ) triplets from distribution p(z t |c t , r t ; \u03b8) and optimize the generative model p(r t |c t , z t ; \u03b8) on these samples. With the iteration number increasing, the accuracy of latent variable prediction and the quality of generated responses will grow together. It is worth noting that during these iterations, annotated addressee labels are not required, which makes it possible to leverage the huge amount of multi-party dialogue corpora without addressee labels. We provide theoretical analyses to prove the feasibility of our EM method, and conduct experiments on the Ubuntu IRC benchmark, which is used in previous works (Hu et al., 2019;Gu et al., 2022).",
+                "The contributions of our work can be summarized as the following three folds: \u2022 To the best of our knowledge, we are the first to study the pre-training of multi-party dialogue response generation, which is much more challenging and complicated than two-party dialogues. \u2022 We put forward an EM approach to alleviate the scarcity of multi-party dialogue data with addressee labels, making it possible to pre-train a model with huge amount of unlabeled corpora. \u2022 We provide theoretical analyses to prove the feasibility of our EM pre-training method, and experimental results on the Ubuntu IRC benchmark show our pre-trained model achieves state-of-theart performance compared with previous works.",
+                "2 Related Works"
+            ],
+            "publication_ref": [
+                "b3",
+                "b2",
+                "b16",
+                "b21",
+                "b0",
+                "b20",
+                "b7",
+                "b17",
+                "b4",
+                "b4"
+            ],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Pre-training for Response Generation",
+            "text": [
+                "In recent years, researchers have gradually drawn their attention from retrieval-based dialogue systems to generation-based ones. Thanks to the huge amount of two-party dialogue corpora, various PLMs for two-party dialogue response generation have been proposed. Zhang et al. (2020) propose DialoGPT, which utilizes the sequential response chains in the Reddit Corpus to pre-train an auto-regressive response generation model based on the architecture of GPT (Radford et al., 2018). Different from their work, which focuses on sequential dialogue history, our work aims to solve the case where the agent can respond to any previous utterance in a tree-structured dialogue history. Bao et al. (2020) propose PLATO, which models the conversational intents as K discrete latent  variables, then utilizes response selection, bag-ofwords prediction, and language modeling objectives to train the model. DialogVED (Chen et al., 2022) further extends the discrete latent variables to continuous ones, and models them with a multivariable Gaussian distribution. It utilizes KL divergence reduction to optimize the parameters of the latent distribution and applies masked language modeling, response generation, and bag-of-words prediction to train the whole model. PLATO and DialogVED focus on two-party conversations, and the conversational intents they put forward have no corresponding concepts of actual entities (e.g., intent to argue, intent to end a conversation, and so on). Distinct from their works, we lay emphasis on multi-party dialogues, and the latent variables of our method have actual meanings: variable z t = j indicates that the addressee of the response at the t th turn is the j th utterance."
+            ],
+            "publication_ref": [
+                "b21",
+                "b16",
+                "b0"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Human Response:",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Multi-party Dialog Response Generation",
+            "text": [
+                "Several previous works have studied the MPDRG task. Hu et al. (2019) extract a subset of the Ubuntu Dialogue Corpus (Lowe et al., 2015)  of a dialogue as a node, and the addressee relations as edges to construct a dialogue graph, then make use of GNNs to encode the dialogue history. Finally, they adopt a Gated Recurrent Unit (GRU) with cross attention as the decoder to generate responses. Gu et al. (2022) put forward Het-erMPC, which models the dialogue history as a heterogeneous graph. In detail, they first design six types of edges: reply and replied-by, address and addressed-by, speak and spoken-by, among two kinds of nodes: interlocutor nodes and utterance nodes, and then encode the dialogue history using Transformers (Vaswani et al., 2017) together with heterogeneous GNNs. Finally, they utilize a Transformer Decoder to generate responses. Instead of fine-tuning models on a small dataset with annotated addressee labels as these existing work did, our work focuses on the utilization of large unlabeled corpora to pre-train a response generation model for multi-party dialogues."
+            ],
+            "publication_ref": [
+                "b13",
+                "b4",
+                "b18"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Methodology",
+            "text": [
+                "To design a model for multi-party dialogue response generation and make it compatible with the EM training algorithm, there are two important things to consider: how to model p(r t |c t , z t ; \u03b8) in the maximization step, and how to compute p(z t |c t , r t ; \u03b8) in the expectation step. In this section, we will first address these two problems, then mathematically derive the feasibility of our EM pre-training algorithm."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Task Formulation",
+            "text": [
+                "Given an input sequence of the dialogue history and the speaker of the response at time step t,",
+                "X = {S 1 : U 1 [SEP]S 2 : U 2 [SEP] . . . S t-1 : U t-1 [SEP]S t :},",
+                "together with the addressee of the response z t = j, our goal is to train a model that can generate an response Y = U t . Here each S i is the name of the speaker at time step i, which is represented as Speaker #S i like those in Figure 1. U i = {w i1 , w i2 , . . . , w in i } is the content of the i th utterance with n i words. z t = j represents that S t speaks to S j , who utters U j , and [SEP] is a special token that indicates the end of a dialogue turn."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Addressee Modeling",
+            "text": [
+                "In this section, we answer the first question: how to model p(r t |c t , z t ; \u03b8), or in other words, how to incorporate the addressee information z t = j into the process of generating a response r t . We design a straightforward method that adds addressee embeddings to the positional encodings and word embeddings, before they are further encoded by a PLM. The left part of Figure 2 illustrates this method, where we use an embedding look-up table with 2 entries to indicate whether a word belongs to the addressee utterance or not. Specifically, if a word is in the addressee utterance, it will get its addressee embedding from entry 1, otherwise from entry 0. Since addressee modeling is not the key contribution of this work, we just adopt the most straightforward and effective way. In our experiments, we use BART (Lewis et al., 2020) as the backbone PLM, following previous works (Gu et al., 2022). Due to the page limit, the proverbial architecture of Transformer and BART are omitted here."
+            ],
+            "publication_ref": [
+                "b8",
+                "b4"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Latent Variable Prediction",
+            "text": [
+                "In this section, we answer the second question: how to compute p(z t |c t , r t ; \u03b8) in the expectation step, or in other words, how to predict the distribution of the unlabeled addressee z t , given the current dialogue context c t , response r t , under parameters \u03b8. The solution to this question is essentially the most important part of our method since it delicately solves the problem of data scarcity in MPDRG.",
+                "Let's consider what humans will do to participate in a multi-party conversation. First, we will read the dialogue history c t , then choose an addressee z t to reply. Once c t and z t are determined, we will utter a response according to the content of the whole dialogue and the addressee utterance. The right part of Figure 2 gives the Bayesian Network of the above process, where the joint distribution of (c t , z t , r t ) can be factorized as:",
+                "p(c, z, r) = p(c) \u2022 p(z|c) \u2022 p(r|c, z)(1)",
+                "Here we omit the subscript t and model parameters \u03b8 for simplicity. Given Eq. ( 1), p(z|c, r; \u03b8) can be derived as:",
+                "p(z|c, r) = p(c, z, r) p(c, r) = p(c) \u2022 p(z|c) \u2022 p(r|c, z) p(c) \u2022 p(r|c) = p(z|c) \u2022 p(r|c, z) p(r|c)(2)",
+                "We assume that the probability of choosing any previous utterance as the addressee is the same given the current dialogue history, which means p(z|c) obeys a uniform distribution. Meanwhile, the denominator p(r|c) is independent of z, leaving only the term p(r|c, z). Now, we can induce that:",
+                "p(z|c, r) \u221d p(r|c, z)(3)",
+                "Therefore, for each z i , i = 1, 2, . . . , t \u2212 1, we have:",
+                "p(z i |c, r) = p(r|c, z i ) t\u22121 j=1 p(r|c, z j )(4)",
+                "In practice, we can use the generative model p(r t |c t , z t ; \u03b8) to compute the probability distribution of p(z t |c t , r t ; \u03b8) by Eq. (4). parameters \u03b8, where Eq. ( 4) gives a reasonable approximation of this value. Specifically, for a sample (c t , r t ), with the model parameters \u03b8 fixed, we first calculate the un-normalized probability of each of the i th (i < t) utterance being the addressee: p(r t |c t , z i t ; \u03b8) using Eq. ( 3), then normalize them to get the conditional distribution of z t using Eq. ( 4). Once P (z t |c t , r t ; \u03b8) is obtained, we sample (c t , r t , z t ) triplets from this distribution, which is further used in the maximization step. The Maximization Step is analogical to the normal training process. Given the sampled"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Expectation-Maximization Process",
+            "text": [
+                "{(c k t , r k t , z k t )} N k=1",
+                "triplets, where N is the total number of samples, our goal is to minimize the auto-regressive language modeling loss:",
+                "L G = \u2212 N k=1 n k i=1 log p w k i | w k <i , c k t , z k t ; \u03b8 (5)",
+                "where w k i is the i th word in the response of the k th sample:",
+                "r k t = {w k i } n i i=1",
+                ", and n i is the length of this response.",
+                "Compared with the vanilla EM algorithm, there are several differences in our implementations. First of all, we do not use the initial model to generate the training data for the first round of the maximization step. Instead, we utilize the discourse parser provided by Shi and Huang (2019) to predict the addressee of each utterance in the unlabeled corpus to get a coarse initial training dataset. The reason for this initialization method is that the initialization of training data (or model parameters) is vital to the EM method, which helps it converge to a better point. Second, rather than sampling z t from its conditional distribution, we adopt a hard EM approach which takes the value z i t with highest probability as the predicted label, where i = arg max i p(z i t |c t , r t ; \u03b8). This hard EM approach is proved as more effective to boost the performance (Min et al., 2019). Finally, to ensure the quality of the generated training data in the maximization step, we set a hyper-parameter \u03b1 \u2208 [0, 1] to control the proportion of training data that is actually used. Specifically, we first rank the prediction confidence of each z k t according to the value of p(z k t |c k t , r k t ; \u03b8), then pick the top \u03b1 \u00d7 N samples with the highest confidence scores. In our experiments, \u03b1 is dynamically set to ensure the addressee prediction accuracy of the selected samples is over 80% in an annotated validation set."
+            ],
+            "publication_ref": [
+                "b17",
+                "b15"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Proof of Feasibility",
+            "text": [
+                "In a multi-party dialogue corpus without annotated addressee labels, a usual solution to train a response generation model is to maximize the marginal loglikelihood (or incomplete log-likelihood) over all possible addressees:",
+                "\u2113(c, r; \u03b8) = log p(r|c; \u03b8) = log i p(r, z i |c; \u03b8) (6)",
+                "However, this objective is hard to optimize since the distribution of z is hard to obtain. Here, we define an expected complete log-likelihood where our estimation of p(z t |c t , r t ; \u03b8) can come to rescue:",
+                "l(c, r; \u03b8) = q(z i ) i log p(r, z i |c; \u03b8) q(z) = p(z t |c t , r t ; \u03b8) (7)",
+                "Our new objective now becomes maximizing the expected complete log-likelihood. The relation between \u2113 and l can be derived as follows:",
+                "\u2113(c, r; \u03b8) = log i p(r, z i |c; \u03b8) = log i q(z i ) \u2022 p(r, z i |c; \u03b8) q(z i ) \u2265 i q(z i ) \u2022 log p(r, z i |c; \u03b8) q(z i ) = i q(z i ) \u2022 log p(r, z i |c; \u03b8) \u2212 i q(z i ) \u2022 log q(z i ) = l(c, r; \u03b8) + H q(z)(8)",
+                "where the third line is derived from the Jensen Inequality, and H q(z) is the entropy of the distribution of z. Since H q(z) \u2265 0, we can derive that l(c, r; \u03b8) \u2264 \u2113(c, r; \u03b8), which means l is the lower bound of \u2113. By maximizing the lower bound l, we can indirectly maximize \u2113, which is originally hard to optimize. Another important observation is hat l = \u2113 if and only if q(z) = p(z t |c t , r t ; \u03b8), which is exactly what we calculate during the E-steps in Eq. ( 7). Though the derivation of the posterior distribution of z is not exact since we assume uniform prior in Eq. ( 2), it is still much closer to the real distribution compared to random q(z).",
+                "It is worth noting that the global optimal point is not guaranteed to be reached by this algorithm, and it depends heavily on the initialization of model parameters or the training data for the first round of the maximization step. This explains the reason why we utilize a discourse parser to get a coarse initial training dataset instead of using the expectation step at the first iteration in Section 3.4."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": [
+                "In this section, we first introduce the datasets to pre-train and evaluate our model, then present the experimental results and comparisons with previous methods."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Datasets and Experimental Setups",
+            "text": [
+                "For pre-training, we adopt the second version of Ubuntu Dialogue Corpus (Lowe et al., 2015), which contains no annotated addressee labels. The original dataset contains 1M dialogues for training, and 0.5M dialogues for validation and testing, respectively. Dialogues that contain less than 4 turns, or have overlap with the dataset for the downstream task (the Ubuntu IRC benchmark, Hu et al. 2019), are excluded from the pre-training data. After filtering, we eventually get a pre-training dataset that contains 764,373 dialogues.",
+                "For fine-tuning, we follow previous works (Hu et al., 2019;Gu et al., 2022) to adopt the Ubuntu IRC benchmark, which is constructed by extracting all utterances with response addressees indicated by the \"@\" symbol in the Ubuntu Dialogue Corpus. In total, this dataset consists of 311,725 dialogues for training, and 5,000 dialogues for validation and testing, respectively. It is worth noting that this dataset contains addressee labels for every single utterance in the dialogue history, which are utilized by previous methods, yet not by ours.",
+                "For both pre-training and fine-tuning, BART (Lewis et al., 2020)  pre-training, we evaluate our model on the validation set of the Ubuntu IRC benchmark, and the best checkpoint is saved for the fine-tuning process."
+            ],
+            "publication_ref": [
+                "b13",
+                "b4",
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Baseline Models and Evaluation Metrics",
+            "text": [
+                "Table 1 shows the results of our method and previous models, where GPT-2, GSN, and HeterMPC (Radford et al., 2018;Hu et al., 2019;Gu et al., 2022) are introduced in section 2.1 and 2.2, respectively. BART is a sequence-to-sequence model with encoder-decoder Transformer architecture and is trained using denoising objectives. Following Hu et al. (2019), we also adopt BLEU-1 to BLEU-4, METEOR, and ROUGE-L as the automatic evaluation metrics, which can be calculated using the pycocoevalcap package. Besides automatic evaluation, human evaluation is also conducted and will be introduced in Section 4.4."
+            ],
+            "publication_ref": [
+                "b16",
+                "b4"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Automatic Evaluation Results",
+            "text": [
+                "Let's firstly focus on the upper and middle part of Table 1, where we present the results of previous models and our methods. able to achieve comparable results with the previous state-of-the-art (SOTA) models. It is surprising since the pre-training requires no annotated addressee labels, while previous models not merely utilize the addressee information of the response utterance, but also make use of the addressee labels of the dialogue history to form a response graph. Second, fine-tuning our model on the downstream dataset with the ground truth addressee labels yields better results compared with pre-training only. Since it uses the ground truth addressee labels of responses, the results of it can be regarded as an upper bound of what the EM training can achieve. Besides, FO outperforms the previous SOTA model by large margins with even simpler architecture and fewer annotations (without addressee labels in the dialogue history), demonstrating the effectiveness of our proposed addressee embeddings. Finally, by further fine-tuning the pre-trained checkpoint with the ground truth addressee labels, we achieve the best performance on all metrics, which shows the transferability of our pre-trained model."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Human Evaluation Results",
+            "text": [
+                "For human evaluation, we recruit a team with 8 members who have at least a Bachelor's degree in Computer Science and are familiar with Ubuntu and Linux. We randomly sample 100 examples from the testing set, then ask the team members to score each prediction and select the best one. The quality scores are considered in terms of three independent aspects: 1) relevance, 2) fluency and 3) informativeness. They are scored from 0-3 and the average values were reported. The evaluation results are shown in Table 2, where our model (Pre-training + Fine-tuning) constantly outperforms vanilla BART and the previous SOTA model HeterMPC BART . We also report the Fleiss's Kappa to indicate the agreement between annotators. Besides, the ratio of our predictions being the best response is the same as that of human responses, demonstrating the high quality of the generated responses of our model."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3"
+            ]
+        },
+        {
+            "heading": "Analysis",
+            "text": [
+                "In order to get more insights into the proposed EM pre-training method, we dive deeper into it by conducting extensive analyses."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ablation Study",
+            "text": [
+                "We conduct ablation studies to investigate the contribution of our different designs, whose results are tabulated in the lower part of Table 1. Firstly, let's focus on the first line of the lower part. To study whether other utterances that are not in the reply chain of the current addressee can help to generate a better response, we extract the reply train by traversing from the current leave utterance (the response) up to the root node (the first utterance), then train a model by inputting this chain only. We see a large performance drop on all metrics in this setting, demonstrating the significance of the side information provided by the whole context.",
+                "Second, let's pay attention to the second and third lines of the lower part. In order to study the effect of the EM pre-training process, which is the key contribution of our work, we remove this process and pre-train a model using only the addressee labels obtained from the discourse parser (i.e. the initial training data used in the first iteration of our EM approach). A sharp performance drop is observed compared with PO and PF with our proposed EM pre-training strategy, demonstrating the significance of our design. Without the iterative EM procedure, the noisy addressee labels obtained from the discourse parser can cause error propaga- tion, which makes the model learn noisy features to predict a response, and hurts the performance.",
+                "Finally, aiming at investigating whether the performance gains come from seeing more in-domain data in the pre-training process, we use the same pre-training data to train another model with the denoising objectives proposed in BART (Lewis et al., 2020), then also fine-tune it on the Ubuntu IRC benchmark. The last line of the lower part presents the results, where we observe nearly the same performance compared with FO. This observation indicates that simply performing domain adaptation using the general pre-training objectives is insufficient to benefit the MPDRG task."
+            ],
+            "publication_ref": [
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Response Generation vs. Addressee Prediction",
+            "text": [
+                "In Section 3.3, we prove that p(z|c, r) \u221d p(r|c, z).",
+                "To verify the correctness of this equation and also to investigate the training process of our EM strategy, we draw the line chart of the BLEU-4 score and addressee prediction accuracy of the top-30% confidence samples on the validation set with the increasing of pre-training iterations. The addressees are predicted using Eq. ( 4), where we take the z i with the highest conditional probability as the predicted addressee. Figure 4 illustrates the trending of the BLEU-4 score and addressee prediction accuracy. On the one hand, we see that the trending of both metrics is consistent, which means with a more powerful response generation model comes a higher addressee prediction accuracy. This observation verifies the correctness of Eq. ( 3). On the other hand, with the increasing of iterations, both metrics grow mutually, then reach their tops at around the 6 th iteration, demonstrating the effectiveness of the EM process.  "
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Case Studies",
+            "text": [
+                "To understand the effect of our method intuitively, we sample two cases from the testing set and present them in this section. Figure 5 illustrates an example whose addressee relations and dialogue history are shown in Figure 1. This conversation is about how to run the compiz or beryl in a comp with 256MB RAM. Speaker #2 points that it's the graphic card that is important, but Speaker #4 seems unsatisfied by saying that didn't tell me much. After that, Speaker #5 suggests using the rdesktop and Speaker #4 replies him/her. Our model is able to capture the key information rdesktop and terminal in the addressee utterance U 6 , and generate a proper response Well, how do I install rdesktop from the terminal, which is very close to the human answer and even better with more information from the terminal. On the contrary, the baseline model (BART) fails to capture the addressee information and just replies with a safe response I tried but it didn't work. This case shows the great significance of modeling the addressee information, and also demonstrates the effectiveness of our model design. Figure 6 presents another example sampled from the testing set, where we investigate how different addressee labels affect the generated responses. In the figure, different colors represent different utterances in the Dialogue History part, and different responses generated by giving the corresponding utterances as addressees in the Generated Responses part. This conversation is about discussing the file system in Ubuntu that can share on a network with windows machines. When the addressee is given as U 1 , our model suggests using samba, which is a solution to the question of U 1 . Responses to U 2 and U 3 are like safe responses, but they make sense in their contexts: the former expresses its confusion about a confusing utterance (U 2 ), and the latter expresses its gratitude to the suggestion in  U 3 . Response to U 4 states his/her understanding towards U 4 , and questions if his/her understanding is right. Response to U 5 acknowledges the solution gentoo in U 5 by saying using gentoo on my computer too. In general, this case demonstrates the ability of our model to generate diverse responses according to the specified addressees and contexts of the dialogue history."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4",
+                "fig_0",
+                "fig_5"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Response Parser: A Byproduct for Free",
+            "text": [
+                "Another contribution of our EM pre-training is that a response parser can be freely obtained. This byproduct comes from Eq. ( 4), where given a response generation model with addressee modeling, we can predict the addressee for each utterance in the dialogue. Previous literature has studied and proved that explicitly modeling the structural information is beneficial to understanding specific structured data. (Li et al., 2020(Li et al., , 2022a,b),b). In this context, the response parser can be used to infer the discourse structures, which contributes to boosting the performance of some multi-party dialogue comprehension tasks like response selection and question answering. (Jia et al., 2020;Li and Zhao, 2021;Ma et al., 2022) 6 Conclusion",
+                "Most multi-party dialogue corpora are not annotated with addressee labels, making them unable to support the pre-training of response generation models. To solve this problem, we design a simple yet effective way to model the addressee of a response as a latent variable and propose an EM pre-training approach that iteratively performs the expectation steps to generate addressee labels, and the maximization steps to optimize a response generation model. Mathematical derivation, experimental results on the Ubuntu IRC benchmark, and extensive analyses have justified the theoretical feasibility and actual effectiveness of our method."
+            ],
+            "publication_ref": [
+                "b9",
+                "b6",
+                "b11",
+                "b14"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "First, Due to the lack of datasets to evaluate the MP-DRG task, we perform our experiments only on the Ubuntu IRC benchmark and pre-train our model only on the domain of Ubuntu chats. However, the potential of our approach goes far beyond that since it is applicable to any open-domain multi-party dialogue dataset. In the future work, we will consider applying our method in more open-domain conversational datasets, such as the transcripts of TV series or movies. Additionally, the pre-training process solely relies on the addressee information of individual turns, disregarding the reply-to relations within the dialogue history. This oversight prevents the model from benefiting from valuable contextual cues necessary for a comprehensive understanding of the multi-party dialogue. In our future work, we will explore the integration of discourse-level reply-to relations into the pre-training process to further enrich the capabilities of the model."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "",
+            "text": [
+                "B2. Did you discuss the license or terms for use and / or distribution of any artifacts?",
+                "They are publicly available and can be found on github.",
+                "B3. Did you discuss if your use of existing artifact(s) was consistent with their intended use, provided that it was specified? For the artifacts you create, do you specify intended use and whether that is compatible with the original access conditions (in particular, derivatives of data accessed for research purposes should not be used outside of research contexts)? Not applicable. Left blank.",
+                "B4. Did you discuss the steps taken to check whether the data that was collected / used contains any information that names or uniquely identifies individual people or offensive content, and the steps taken to protect / anonymize it? Not applicable. Left blank.",
+                "B5. Did you provide documentation of the artifacts, e.g., coverage of domains, languages, and linguistic phenomena, demographic groups represented, etc.? Section 4. B6. Did you report relevant statistics like the number of examples, details of train / test / dev splits, etc. for the data that you used / created? Even for commonly-used benchmark datasets, include the number of examples in train / validation / test splits, as these provide necessary context for a reader to understand experimental results. For example, small differences in accuracy on large test sets may be significant, while on small test sets they may not be. Left blank."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Did you run computational experiments?",
+            "text": [
+                "Section 4.",
+                "C1. Did you report the number of parameters in the models used, the total computational budget (e.g., GPU hours), and computing infrastructure used? They can be found on our code.",
+                "The Responsible NLP Checklist used at ACL 2023 is adopted from NAACL 2022, with the addition of a question on AI writing assistance."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "PLATO: Pre-trained dialogue generation model with discrete latent variable",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Siqi Bao; Huang He; Fan Wang; Hua Wu; Haifeng Wang"
+        },
+        {
+            "ref_id": "b1",
+            "title": "DialogVED: A pre-trained latent variable encoder-decoder model for dialog response generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Wei Chen; Yeyun Gong; Song Wang; Bolun Yao; Weizhen Qi; Zhongyu Wei; Xiaowu Hu; Bartuer Zhou; Yi Mao; Weizhu Chen; Biao Cheng; Nan Duan"
+        },
+        {
+            "ref_id": "b2",
+            "title": "ELECTRA: pretraining text encoders as discriminators rather than generators",
+            "journal": "",
+            "year": "2020-04-26",
+            "authors": "Kevin Clark; Minh-Thang Luong; Quoc V Le; Christopher D Manning"
+        },
+        {
+            "ref_id": "b3",
+            "title": "BERT: Pre-training of deep bidirectional transformers for language understanding",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Jacob Devlin; Ming-Wei Chang; Kenton Lee; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b4",
+            "title": "HeterMPC: A heterogeneous graph neural network for response generation in multi-party conversations",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Jia-Chen Gu; Chao-Hong Tan; Chongyang Tao; Zhen-Hua Ling; Huang Hu; Xiubo Geng; Daxin Jiang"
+        },
+        {
+            "ref_id": "b5",
+            "title": "GSN: A graph-structured network for multi-party dialogues",
+            "journal": "",
+            "year": "2019-08-10",
+            "authors": "Wenpeng Hu; Zhangming Chan; Bing Liu; Dongyan Zhao; Jinwen Ma; Rui Yan"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Multi-turn response selection using dialogue dependency relations",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Qi Jia; Yizhu Liu; Siyu Ren; Kenny Zhu; Haifeng Tang"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Who is speaking to whom? learning to identify utterance addressee in multi-party conversations",
+            "journal": "",
+            "year": "2019",
+            "authors": "Ran Le; Wenpeng Hu; Mingyue Shang; Zhenjun You; Lidong Bing; Dongyan Zhao; Rui Yan"
+        },
+        {
+            "ref_id": "b8",
+            "title": "BART: Denoising sequence-to-sequence pre-training for natural language generation, translation, and comprehension",
+            "journal": "",
+            "year": "2020",
+            "authors": "Mike Lewis; Yinhan Liu; Naman Goyal; Marjan Ghazvininejad; Abdelrahman Mohamed; Omer Levy; Veselin Stoyanov; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Molweni: A challenge multiparty dialogues-based machine reading comprehension dataset with discourse structure",
+            "journal": "",
+            "year": "2020",
+            "authors": "Jiaqi Li; Ming Liu; Min-Yen Kan; Zihao Zheng; Zekun Wang; Wenqiang Lei; Ting Liu; Bing Qin"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Semantic-preserving adversarial code comprehension",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yiyang Li; Hongqiu Wu; Hai Zhao"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Self-and pseudo-selfsupervised prediction of speaker and key-utterance for multi-party dialogue reading comprehension",
+            "journal": "",
+            "year": "2021",
+            "authors": "Yiyang Li; Hai Zhao"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Back to the future: Bidirectional information decoupling network for multi-turn dialogue modeling",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yiyang Li; Hai Zhao; Zhuosheng Zhang"
+        },
+        {
+            "ref_id": "b13",
+            "title": "The Ubuntu dialogue corpus: A large dataset for research in unstructured multi-turn dialogue systems",
+            "journal": "Association for Computational Linguistics",
+            "year": "2015",
+            "authors": "Ryan Lowe; Nissan Pow; Iulian Serban; Joelle Pineau"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Structural characterization for dialogue disentanglement",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Xinbei Ma; Zhuosheng Zhang; Hai Zhao"
+        },
+        {
+            "ref_id": "b15",
+            "title": "A discrete hard EM approach for weakly supervised question answering",
+            "journal": "",
+            "year": "2019",
+            "authors": "Sewon Min; Danqi Chen; Hannaneh Hajishirzi; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Improving language understanding by generative pre-training",
+            "journal": "OpenAI Technical Report",
+            "year": "2018",
+            "authors": "Alec Radford; Karthik Narasimhan; Tim Salimans; Ilya Sutskever"
+        },
+        {
+            "ref_id": "b17",
+            "title": "The Thirty-First Innovative Applications of Artificial Intelligence Conference",
+            "journal": "AAAI Press",
+            "year": "2019-01-27",
+            "authors": "Zhouxing Shi; Minlie Huang"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Attention is all you need",
+            "journal": "",
+            "year": "2017-12-04",
+            "authors": "Ashish Vaswani; Noam Shazeer; Niki Parmar; Jakob Uszkoreit; Llion Jones; Aidan N Gomez; Lukasz Kaiser; Illia Polosukhin"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Response selection for multi-party conversations with dynamic topic tracking",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Weishi Wang; C H Steven; Shafiq Hoi;  Joty"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Addressee and response selection in multi-party conversations with speaker interaction rnns",
+            "journal": "AAAI Press",
+            "year": "2018-02-02",
+            "authors": "Rui Zhang; Honglak Lee; Lazaros Polymenakos; Dragomir R Radev"
+        },
+        {
+            "ref_id": "b21",
+            "title": "DIALOGPT : Large-scale generative pre-training for conversational response generation",
+            "journal": "",
+            "year": "2020",
+            "authors": "Yizhe Zhang; Siqi Sun; Michel Galley; Yen-Chun Chen; Chris Brockett; Xiang Gao; Jianfeng Gao; Jingjing Liu; Bill Dolan"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Did you discuss the experimental setup, including hyperparameter search and best-found hyperparameter values? Section 4",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b23",
+            "title": "error bars around results, summary statistics from sets of experiments), and is it transparent whether you are reporting the max, mean, etc",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b24",
+            "title": "If you used existing packages (e.g., for preprocessing, for normalization, or for evaluation), did you report the implementation, model, and parameter settings used",
+            "journal": "",
+            "year": "",
+            "authors": " Nltk;  Spacy;  Rouge"
+        },
+        {
+            "ref_id": "b25",
+            "title": "crowdworkers) or research with human participants? Section 4",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b26",
+            "title": "Did you report the full text of instructions given to participants, including e.g., screenshots, disclaimers of any risks to participants or annotators",
+            "journal": "",
+            "year": "",
+            "authors": " D1"
+        },
+        {
+            "ref_id": "b27",
+            "title": "crowdsourcing platform, students) and paid participants, and discuss if such payment is adequate given the participants' demographic",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b28",
+            "title": "Did you discuss whether and how consent was obtained from people whose data you're using/curating? For example, if you collected data via crowdsourcing, did your instructions to crowdworkers explain how the data would be used?",
+            "journal": "",
+            "year": "",
+            "authors": " D3"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Was the data collection protocol approved (or determined exempt) by an ethics review board? Not applicable",
+            "journal": "",
+            "year": "",
+            "authors": " D4"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Did you report the basic demographic and geographic characteristics of the annotator population that is the source of the data?",
+            "journal": "",
+            "year": "",
+            "authors": " D5"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: An example of multi-party dialogue response generation task, better view in color.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "33",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 3 Figure 3 :33Figure 3 illustrates the overview of our EM training process. During the E-steps, we compute the probability distribution of the latent variable (the addressee z). During the M-steps, we sample (c, r, z) triplets from this distribution and optimize the generative model by standard training algorithms.The ExpectationStep is to compute the conditional distribution of the latent variable z t , given the observed data (c t , r t ) and the current model",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 4 :4Figure 4: Line chart of the BLEU-4 score and addressee prediction accuracy with the increase of EM iterations.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "[Speaker #4: Well, how do I install rdesktop from the terminal?] Baseline Model: [Speaker #4: I tried but it didn't work.]",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 5 :5Figure 5: The first example of Case Studies, which shows the generated responses of our model and the baseline model.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 6 :6Figure 6: The second example of Case Studies, which illustrates the generated response of our model given different addressee labels. Better view in color.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "",
+            "figure_data": "Generative Pre-trained Language Models (BART)U tBayesian Networkc tz t\u2026 \u2026\u2026 \u2026\u2026\u2026r tFigure 2: The overview of our model architecture. The left part shows how we incorporate the addressee information into response generation by adding addressee embeddings. The right part illustrates a Bayesian Network of how a response is generated given the current dialogue history c t and the addressee z t .withexplicit addressee labels to construct the UbuntuIRC benchmark, where they propose a Graph Struc-tured Neural Network (GSN) for dialogue model-ing. Specifically, they first treat each utterance"
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "is used as the backbone model. Before pre-training, we initialize the pre-trained weights from BART-base. During the process of Results on the Ubuntu IRC benchmark, where the upper part presents models of previous works, the middle part shows our backbone model BART together with our method under different settings, and the lower part shows the ablation studies.",
+            "figure_data": "ModelBLEU-1 BLEU-2 BLEU-3 BLEU-4 METEOR ROUGE-LGPT-2 (Radford et al., 2018) GSN (Hu et al., 2019) HeterMPCBART (Gu et al., 2022)10.37 10.23 12.263.60 3.57 4.801.66 1.70 2.420.93 0.97 1.494.01 4.10 4.949.53 9.91 11.20BART (Lewis et al., 2020) Pre-training Only (PO) Fine-tuning Only (FO) Pre-training + Fine-tuning (PF)11.25 11.78 11.47 12.314.02 4.67 5.11 5.391.78 2.38 2.98 3.340.95 1.41 2.11 2.454.46 4.98 5.23 5.529.90 11.19 11.31 11.71FO + Reply-Chain PO w/o EM PF w/o EM Denoising + Fine-tuning9.11 10.03 11.39 11.493.52 3.90 5.04 5.081.99 2.03 3.02 3.021.35 1.18 2.15 2.134.32 4.56 5.27 5.259.36 9.66 11.20 11.28"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "Human evaluation results, where Score is the average score and Best means the ratio of each system being the best response.",
+            "figure_data": "Three settings of ourmethod based on BART are experimented with:pre-training only (PO), fine-tuning only (FO), andpre-training-fine-tuning (PF). Results of PO areobtained by directly using the pre-trained modelto generate the response for each dialogue. FOmeans the checkpoint of BART is directly fine-tuned on the Ubuntu IRC benchmark without pre-training. PF follows a pre-training-fine-tuningparadigm, where the best checkpoint of the pre-training process is further fine-tuned on the down-stream dataset.Three observations can be seen from the ta-ble. First of all, solely pre-training with our pro-posed EM method with unlabeled corpus is already"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "X = {S 1 : U 1 [SEP]S 2 : U 2 [SEP] . . . S t-1 : U t-1 [SEP]S t :},",
+            "formula_coordinates": [
+                3.0,
+                70.86,
+                720.35,
+                221.65,
+                34.06
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "p(c, z, r) = p(c) \u2022 p(z|c) \u2022 p(r|c, z)(1)",
+            "formula_coordinates": [
+                4.0,
+                103.59,
+                232.39,
+                186.27,
+                20.55
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "p(z|c, r) = p(c, z, r) p(c, r) = p(c) \u2022 p(z|c) \u2022 p(r|c, z) p(c) \u2022 p(r|c) = p(z|c) \u2022 p(r|c, z) p(r|c)(2)",
+            "formula_coordinates": [
+                4.0,
+                103.31,
+                307.13,
+                186.56,
+                85.29
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "p(z|c, r) \u221d p(r|c, z)(3)",
+            "formula_coordinates": [
+                4.0,
+                135.37,
+                494.94,
+                154.5,
+                20.55
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "p(z i |c, r) = p(r|c, z i ) t\u22121 j=1 p(r|c, z j )(4)",
+            "formula_coordinates": [
+                4.0,
+                116.02,
+                543.88,
+                173.84,
+                31.5
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "{(c k t , r k t , z k t )} N k=1",
+            "formula_coordinates": [
+                4.0,
+                306.14,
+                412.98,
+                75.39,
+                20.41
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "L G = \u2212 N k=1 n k i=1 log p w k i | w k <i , c k t , z k t ; \u03b8 (5)",
+            "formula_coordinates": [
+                4.0,
+                313.22,
+                465.42,
+                211.94,
+                35.4
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "r k t = {w k i } n i i=1",
+            "formula_coordinates": [
+                4.0,
+                342.79,
+                524.92,
+                62.73,
+                21.42
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": "\u2113(c, r; \u03b8) = log p(r|c; \u03b8) = log i p(r, z i |c; \u03b8) (6)",
+            "formula_coordinates": [
+                5.0,
+                76.42,
+                340.86,
+                213.44,
+                34.17
+            ]
+        },
+        {
+            "formula_id": "formula_9",
+            "formula_text": "l(c, r; \u03b8) = q(z i ) i log p(r, z i |c; \u03b8) q(z) = p(z t |c t , r t ; \u03b8) (7)",
+            "formula_coordinates": [
+                5.0,
+                99.41,
+                440.05,
+                190.46,
+                49.18
+            ]
+        },
+        {
+            "formula_id": "formula_10",
+            "formula_text": "\u2113(c, r; \u03b8) = log i p(r, z i |c; \u03b8) = log i q(z i ) \u2022 p(r, z i |c; \u03b8) q(z i ) \u2265 i q(z i ) \u2022 log p(r, z i |c; \u03b8) q(z i ) = i q(z i ) \u2022 log p(r, z i |c; \u03b8) \u2212 i q(z i ) \u2022 log q(z i ) = l(c, r; \u03b8) + H q(z)(8)",
+            "formula_coordinates": [
+                5.0,
+                95.01,
+                541.98,
+                194.85,
+                174.39
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/2020.acl-main.9"
+}

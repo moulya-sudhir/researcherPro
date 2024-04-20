@@ -1,0 +1,726 @@
+{
+    "title": "Span-Selective Linear Attention Transformers for Effective and Robust Schema-Guided Dialogue State Tracking",
+    "authors": "Bj\u00f6rn Bebensee; Haejun Lee",
+    "pub_date": "",
+    "abstract": "In schema-guided dialogue state tracking models estimate the current state of a conversation using natural language descriptions of the service schema for generalization to unseen services. Prior generative approaches which decode slot values sequentially do not generalize well to variations in schema, while discriminative approaches separately encode history and schema and fail to account for inter-slot and intent-slot dependencies. We introduce SPLAT, a novel architecture which achieves better generalization and efficiency than prior approaches by constraining outputs to a limited prediction space. At the same time, our model allows for rich attention among descriptions and history while keeping computation costs constrained by incorporating linear-time attention. We demonstrate the effectiveness of our model on the Schema-Guided Dialogue (SGD) and Mul-tiWOZ datasets. Our approach significantly improves upon existing models achieving 85.3 JGA on the SGD dataset. Further, we show increased robustness on the SGD-X benchmark: our model outperforms the more than 30\u00d7 larger D3ST-XXL model by 5.0 points.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Dialogue State Tracking (DST) refers to the task of estimating and tracking the dialogue state consisting of the user's current intent and set of slotvalue pairs throughout the dialogue (Williams et al., 2013). Traditional approaches to DST assume a fixed ontology and learn a classifier for each slot (Chao and Lane, 2019). However, in real-world applications services can be added or removed requiring the model to be re-trained each time the ontology changes. Recently more flexible schemaguided approaches which take as input natural language descriptions of all available intents and slots and thus can be applied zero-shot to new services have been gaining popularity (Rastogi et al., 2020;Feng et al., 2021;Zhao et al., 2022;Gupta et al., 2022). Discriminative DST models are based on machine reading comprehension (MRC) methods, meaning they extract and fill in non-categorical slot values directly from the user utterances (Chao and Lane, 2019;Ruan et al., 2020;Zhang et al., 2021). We use the terms discriminative and extractive interchangeably when referring to these methods. Generative DST models leverage seq2seq language models which conditioned on the dialog history and a prompt learn to sequentially generate the appropriate slot values. Prior generative methods do not generalize well to variations in schema (Lee et al., 2021(Lee et al., , 2022;;Zhao et al., 2022) whereas discriminative methods separately encode history and schema and fail to account for inter-slot and intent-slot dependencies.",
+                "In this work we introduce the SPan-Selective Linear Attention Transformer, short SPLAT, a novel architecture designed to achieve better generalization, robustness and efficiency in DST than existing approaches. SPLAT is fully extractive and, unlike prior generative approaches, constrains the output space to only those values contained in the input sequence. Figure 1 shows an example i and intent representations h [INTENT]   k . A span encoder computes span representations h SPAN mn for all spans x m , . . . , x n . The target span is selected by matching the slot query h [SLOT]   q to the target span h SPAN ij .",
+                "of the key idea behind our approach. We jointly encode the natural language schema and full dialogue history allowing for a more expressive contextualization. Spans in the input are represented by aggregating semantics of each individual span into a single representation vector. Then we take a contrastive query-based pointer network approach (Vinyals et al., 2015) to match special query tokens to the target slot value's learned span representation in a single pass.",
+                "Our main contributions are as follows:",
+                "\u2022 We propose novel span-selective prediction layers for DST which provide better generalization and efficiency by limiting the prediction space and inferring all predictions in parallel. We achieve state-of-the-art performance on the SGD-X benchmark outperforming the 30\u00d7 larger D3ST by 5.0 points.",
+                "\u2022 We adopt a Linear Attention Transformer which allows more expressive contextualization of the dialogue schema and dialogue history with constrained prediction time. We show our model already outperforms other models with similar parameter budgets even without other modules we propose in Table 1 and 5.",
+                "\u2022 We pre-train SPLAT for better span representations with a recurrent span selection objective yielding significant further span prediction performance gains of up to 1.5 points."
+            ],
+            "publication_ref": [
+                "b24",
+                "b2",
+                "b5",
+                "b2",
+                "b11",
+                "b22"
+            ],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Approach",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Task Formulation",
+            "text": [
+                "For a given dialog of T turns let U describe the set of utterances in the dialog history U = {u 1 , . . . , u T }. Each u i can represent either a user or a system utterance. The system is providing some service to the user defined by a service schema S. The service schema consists of a set of intents I = {i 1 , . . . , i K } and their intent descriptions D intent = {d intent 1 , . . . , d intent K } as well as a set of slots S = {s 1 , . . . , s L } and their slot descriptions D slot = {d slot 1 , . . . , d slot L }. In practice we prepend each u i with the speaker name (user or system) and a special utterance query token [UTT] which will serve as the encoding of the system-user utterance pair.",
+                "Each d slot i consists of the slot name, a natural language description of the semantics of the slot and for categorical values an enumeration of all possible values this slot can assume. We also append a special slot query embedding token [SLOT] which serves as the slot encoding. Some slot values are shared across all slots and their representation can be modeled jointly. Unless denoted otherwise these shared target values T are special tokens [NONE] and [DONTCARE] which correspond to the \"none\" and \"dontcare\" slot values in SGD and MultiWOZ."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Joint Encoding with Linear Attention",
+            "text": [
+                "Linear Attention Transformers. In order to better capture the semantics of the input and to al-low for a longer context as well as all the relevant schema descriptions to be encoded jointly we use a Transformer (Vaswani et al., 2017) with linear-time attention. Instead of computing the full attention matrix as the original Transformer does, its linear attention variants compute either an approximation of it (Choromanski et al., 2021) or only compute full attention for a fixed context window of size w around the current token and additional n global global tokens, thus lowering the complexity of the attention computation from O(n 2 ) for a sequence of length n to O(w + n global ) (Beltagy et al., 2020;Zaheer et al., 2020).",
+                "We focus on the windowed variant and incorporate it to DST. We denote the Linear Attention Transformer with selective global attention parametrized by \u03b8 with input sequence I and its subset of global input tokens G \u2286 I, i.e. inputs corresponding to tokens at positions that are attended using the global attention mechanism, as LAT(I; G; \u03b8). While we choose the Longformer (Beltagy et al., 2020) for our implementation, in practice any variants with windowed and global attention can be used instead.",
+                "Joint encoding. The full input sequence of length N is given as the concatenation of its components. We define the set of globally-attended tokens as the union of sets of tokens corresponding to the intent descriptions D intent , the slot descriptions D slot , and the shared target values T . Then, the joint encoding of N hidden states is obtained as the output of the last Transformer layer as",
+                "I = [CLS] U [SEP] T D intent D slot [SEP] G = T \u222a D intent \u222a D slot E = LAT(I; G; \u03b8).",
+                "(1)"
+            ],
+            "publication_ref": [
+                "b21",
+                "b3",
+                "b0",
+                "b28",
+                "b0"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Intent Classification",
+            "text": [
+                "Let x [UTT]   i denote the representation of the encoded [UTT] token corresponding to the i-th turn. Given the encoded sequence E, we obtain the final utterance representations by feeding x [UTT]   i into the utterance encoder. Similarly for each intent I = {i 1 , . . . , i t } and its respective [INTENT] token, we obtain final intent representations using the intent encoder:",
+                "h [UTT] i = LN(FFN(x [UTT] i )) h [INTENT] j = LN(FFN(x [INTENT] j ))(2)",
+                "Here LN refers to a LayerNorm and FFN to a feedforward network.",
+                "We maximize the dot product similarity between each utterance representation and the ground truth active intent's representation via cross-entropy:",
+                "score i\u2192j = sim(h [UTT] i , h [INTENT] j ) L intent = \u2212 1 T T i=1 log exp(score i\u2192j ) K k=1 exp(score i\u2192k ) \u2022 1 GT (3)",
+                "where K is the number of intents and 1 GT is an indicator function which equals 1 if and only if j is the ground truth matching i."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Span Pointer Module",
+            "text": [
+                "We introduce a novel Span Pointer Module which computes span representations via a span encoder and extracts slot values by matching slot queries via a similarity-based span pointing mechanism (Vinyals et al., 2015). First, for any given span of token representations x i , . . . , x j in the joint encoding E we obtain the span representation h SPAN ij by concatenating the span's first and last token representation and feeding them into a 2-layer feed-forward span encoder (Joshi et al., 2020):",
+                "y ij = [x i ; x j ] h SPAN ij = LN(FFN GeLU (y ij )) \u00d7 n_layers (4)",
+                "Similarly, for each slot token representation x [SLOT] in E we compute a slot query representation h [SLOT] with a 2-layer feed-forward slot encoder:",
+                "h [SLOT] = LN(FFN GeLU (x [SLOT] )) \u00d7 n_layers",
+                "(5) Given slots S = {s 1 , . . . , s L } and corresponding slot query representations h [SLOT]  1 , . . . , h [SLOT]   L we score candidate target spans by dot product similarity of the slot queries with their span representations. That is, for each slot query q with ground truth target span x i , . . . , x j we maximize sim(h [SLOT]   q , h SPAN ij ) by cross-entropy. The loss function is given by",
+                "score q\u2192ij = sim(h [SLOT] q , h SPAN ij ) L slot = \u2212 1 L L q=1 log exp(score q\u2192ij ) K k=1 exp(score q\u2192k ) \u2022 1 GT (6)",
+                "where L is the number of slots and K is the number of spans. sim(h [SLOT]   q , h SPAN ij ) denotes the similarity between the q-th slot query representation and the span representation of its ground truth slot value.",
+                "It is computationally too expensive to compute span representations for all possible spans. In practice however the length of slot values rarely exceeds some L ans . Thus, we limit the maximum span length to L ans and do not compute scores for spans longer than this threshold. This gives us a total number of N \u2022 L ans candidate spans.",
+                "Joint optimization. We optimize the intent and slot losses jointly via the following objective:",
+                "L = L slot + L intent 2 (7)"
+            ],
+            "publication_ref": [
+                "b22",
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Pre-Training via Recurrent Span Selection",
+            "text": [
+                "Since the span pointer module relies on span embedding similarity for slot classification we believe it is crucial to learn good and robust span representations. In order to improve span representations for down-stream applications to DST we pre-train SPLAT in a self-supervised manner using a modified recurrent span selection objective (Ram et al., 2021). Given an input text I let R = {R 1 , . . . , R a } be the clusters of identical spans that occur more than once. Following Ram et al. (2021) we randomly select a subset M \u2286 R of J recurring spans such that the number of their occurrences sums up to a maximum of 30 occurrences. Then, for each selected cluster of recurring spans M j we randomly replace all but one occurrence with the query token [SLOT].",
+                "The slot query tokens act as the queries while the respective unmasked span occurrences act as the targets. Unlike the original recurrent span selection objective we do not use separate start and end pointers for the target spans but instead use our Span Pointer Module to learn a single representation for each target span.",
+                "We pre-train SPLAT to maximize the dot product similarity between the query token and the unmasked target span representation. The loss for the j-th cluster of identical masked spans is given by Equation ( 6) and the total loss is given as the sum of losses of over all clusters.",
+                "Effectively each sentence containing a masked occurrence of the span acts as the span description while the target span acts as the span value. This can be seen as analogous to slot descriptions and slot values in DST."
+            ],
+            "publication_ref": [
+                "b17",
+                "b17"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental Setup",
+            "text": [
+                "We describe our experimental setup including datasets used for pre-training and evaluation, implementation details, baselines and evaluation metrics in detail below."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Benchmark Datasets",
+            "text": [
+                "We conduct experiments on the Schema-Guided Dialogue (SGD) (Rastogi et al., 2020), SGD-X (Lee et al., 2022) and MultiWOZ 2.2 (Zang et al., 2020) datasets.",
+                "Schema-Guided Dialogue. Unlike other taskoriented dialogue datasets which assume a single, fixed ontology at training and test time the SGD dataset includes new and unseen slots and services in the test set. This allows us to not only measure DST performance but also zero-shot generalization to unseen services. The dataset includes natural language descriptions for all intents and slots in its schema. We follow the standard evaluation setting and data split suggested by the authors. SGD-X. The SGD-X benchmark is an extension of the SGD dataset which provides five additional schema variants of different linguistic styles which increasingly diverge in style from the original schema with v 1 being most similar and v 5 least similar. We can evaluate our model's robustness to variations in schema descriptions by training our model on SGD and comparing evaluation results using the different included schema variants.",
+                "MultiWOZ. The MultiWOZ dataset is set of human-human dialogues collected in the Wizardof-OZ setup. Unlike in SGD the ontology is fixed and there are no unseen services at test time. There are multiple updated versions of the original Mul-tiWOZ dataset (Budzianowski et al., 2018): Mul-tiWOZ 2.1 (Eric et al., 2020) and MultiWOZ 2.2 (Zang et al., 2020) fix annotation errors of previous versions, MultiWOZ 2.3 (Han et al., 2021) is based on version 2.1 and adds co-reference annotations, MultiWOZ 2.4 (Ye et al., 2022) is also based on version 2.1 and includes test set corrections. However, MultiWOZ 2.2 is the only version of the dataset which includes a fully defined schema matching the ontology. We therefore choose the MultiWOZ 2.2 dataset for our experiments. We follow the standard evaluation setting and data split."
+            ],
+            "publication_ref": [
+                "b1",
+                "b4",
+                "b7",
+                "b27"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation Metrics",
+            "text": [
+                "In line with prior work (Rastogi et al., 2020) we evaluate our approach according to the following two metrics. Intent Accuracy: For intent detection the intent accuracy describes the fraction of turns for which the active intent has been correctly inferred. Joint Goal Accuracy (JGA): For slot prediction JGA describes the fraction of turns for which all slot values have been predicted correctly. Following the evaluation setting from each dataset we use a fuzzy matching score for slot values in SGD and exact match in MultiWOZ."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Implementation Details",
+            "text": [
+                "We base our implementation on the Longformer code included in the HuggingFace Transformers library (Wolf et al., 2020) and continue training from the base model (110M parameters) and large model (340M parameters) checkpoints. We keep the default Longformer hyperparameters in place, in particular we keep the attention window size set to 512. The maximum sequence length is 4096. During pre-training we train the base model for a total of 850k training steps and the large model for 800k training steps. During fine-tuning we train all models for a single run of 10 epochs and choose the model with the highest joint goal accuracy on the development set. We use the Adam optimizer (Kingma and Ba, 2014) with a maximum learning rate of 10 \u22125 which is warmed up for the first 10% of steps and subsequently decays linearly. We set the batch size to 32 for base models and to 16 for large models. We pre-train SPLAT on English Wikipedia. Specifically we use the KILT Wikipedia snapshot 1 from 2019 (Petroni et al., 2021) as provided by the HuggingFace Datasets library (Lhoest et al., 2021).",
+                "For both SGD and MultiWOZ we set the shared target values T as the [NONE] and [DONTCARE] tokens and include a special intent with the name \"NONE\" for each service which is used as the target intent when no other intent is active. We set the maximum answer length L ans to 30 tokens.",
+                "All experiments are conducted on a machine with eight A100 80GB GPUs. A single training run takes around 12 hours for the base model and 1.5 days for the large model.",
+                "1 https://huggingface.co/datasets/kilt_ wikipedia"
+            ],
+            "publication_ref": [
+                "b25",
+                "b16",
+                "b13"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation",
+            "text": [
+                "We evaluate the effectiveness of our model through a series of experiments designed to answer the following questions: 1) How effective is the proposed model architecture at DST in general? 2) Does the model generalize well to unseen services? 3) Is the model robust to changes in schema such as different slot names and descriptions? 4) Which parts of the model contribute most to its performance?"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Baselines",
+            "text": [
+                "We compare our model to various discriminative and generative baseline approaches. Note that not all of them are directly comparable due to differences in their experimental setups.",
+                "Extractive baselines. SGD baseline (Rastogi et al., 2020) is a simple extractive BERT-based model which encodes the schema and last utterance separately and uses the embeddings in downstream classifiers to predict relative slot updates for the current turn. SGP-DST (Ruan et al., 2020) and DS-DST (Zhang et al., 2020) are similar but jointly encode utterance and slot schema. Multi-Task BERT (Kapelonis et al., 2022) is also similar but uses system action annotations which include annotations of slots offered or requested by the system (e.g."
+            ],
+            "publication_ref": [
+                "b9"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "\"[ACTION] Offer [SLOT] location [VALUE]",
+            "text": [
+                "Fremont\"). paDST (Ma et al., 2019) combines an extractive component for non-categorical slots with a classifier that uses 83 hand-crafted features (including system action annotations) for categorical slots. Additionally it augments training data via back-translation achieving strong results but making a direct comparison difficult. LUNA (Wang et al., 2022) separately encodes dialogue history, slots and slot values and learns to first predict the correct utterance to condition the slot value prediction on.",
+                "Generative baselines. Seq2Seq-DU (Feng et al., 2021) first separately encodes utterance and schema and then conditions the decoder on the cross-attended utterance and schema embeddings. The decoder generates a state representation consisting of pointers to schema elements and utterance tokens. AG-DST (Tian et al., 2021) (Feng et al., 2021) BERT-base (110M) \u2713 90.9 54.4 LUNA (Wang et al., 2022) BERT-base (110M) \u2717 -56.1 AG-DST (Tian et al., 2021) GPT-2 (117M) \u2717 \u2021 -56.1 AG-DST (Tian et al., 2021) PLATO-2 (310M) \u2717 \u2021 -57.3 DaP (seq) (Lee et al., 2021) T5-base (220M) \u2713 -51.2 DaP (ind) (Lee et al., 2021) T5-base (220M) \u2717 -57.5 D3ST (Base) (Zhao et al., 2022) T5-base (220M) \u2713 -56.1 D3ST (Large) (Zhao et al., 2022) T5-large (770M) \u2713 -54.2 D3ST (XXL) (Zhao et al., 2022) T5-XXL (  (Zang et al., 2020). \u2021: AG-DST uses a fixed two-pass generation procedure.",
+                "itly so it is unclear how well AG-DST transfers to new services. DaP (Lee et al., 2021) comes in two variants which we denote as DaP (seq) and DaP (ind). DaP (ind) takes as input the entire dialogue history and an individual slot description and decodes the inferred slot value directly but requires one inference pass for each slot in the schema. DaP (seq) instead takes as input the dialogue history and the sequence of all slot descriptions and decodes all inferred slot values in a single pass. D3ST (Zhao et al., 2022) takes a similar approach and decodes the entire dialogue state including the active intent in a single pass. Categorical slot values are predicted via an index-picking mechanism."
+            ],
+            "publication_ref": [
+                "b15",
+                "b23",
+                "b5",
+                "b20",
+                "b5",
+                "b23",
+                "b20",
+                "b20",
+                "b11",
+                "b11",
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Main Results",
+            "text": [
+                "Schema-Guided Dialogue. more than 30\u00d7 larger D3ST XXL model. We note that although paDST achieves the best performance of all baseline models in terms of JGA, it is not directly comparable because it is trained with hand-crafted features and additional back-translation data for training which has been shown to significantly improve robustness and generalization to unseen descriptions in schema-guided DST (Lee et al., 2022). Similarly, although Multi-Task BERT achieves good performance this can mostly be attributed to the use of system action annotation as Kapelonis et al. (2022) themselves demonstrate. Without system action annotations its performance drops to 71.9 JGA.",
+                "In terms of intent accuracy SPLAT base slightly underperforms D3ST base and D3ST large by 0.5 and 0.4 JGA while SPLAT large achieves better performance and slightly improves upon the D3ST large performance. Overall, SPLAT achieves strong performance on SGD.",
+                "MultiWOZ. Table 2 shows results on the Multi-WOZ 2.2 test set. As the majority of papers does not report intent accuracy on MultiWOZ 2.2 we focus our analysis on JGA. We find that SPLAT base outperforms most similarly-sized models including D3ST base and large and that SPLAT large performs better than all models aside from the more than 30\u00d7 larger D3ST XXL. The notable exceptions to this are AG-DST and DaP (ind). AG-DST large achieves performance that is similar to SPLAT large using a generative approach but it performs two decoding passes, employs a negative sampling strategy to focus on more difficult examples and is trained for a fixed schema. DaP (ind) also achieves similar performance but needs one inference pass for every slot at every turn of the dialogue. This is much slower and simply not realistic in real-world scenarios with a large number of available services and slots. The sequential variant DaP (seq) which instead outputs the full state in a single pass performs much worse.",
+                "Comparison. While DaP (ind) shows strong performance that matches SPLAT on MultiWOZ, SPLAT fares much better than DaP (ind) on the SGD dataset. This can be seen to be indicative of a stronger generalization ability as MultiWOZ uses the same schema at training and test time whereas SGD includes new, unseen services at test time and thus requires the model to generalize and understand the natural language schema descriptions."
+            ],
+            "publication_ref": [
+                "b9"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Robustness",
+            "text": [
+                "DST models which take natural language descriptions of intents and slots as input naturally may be sensitive to changes in these descriptions. In order to evaluate the robustness of our model to such linguistic variations we perform experiments on the SGD-X benchmark. The SGD-X benchmark comes with five crowd-sourced schema variants v 1 to v 5 which increasingly diverge in style from the original schema. We train SPLAT on SGD and evaluate it on the test set using all five different schema variants.",
+                "As shown in baseline models. On average SPLAT base loses around 4.1 points and SPLAT large loses around 2.5 points joint goal accuracy when compared to the results on the original schema. When considering the mean performance across all unseen schema variants SPLAT large significantly outperforms the more than 30\u00d7 larger D3ST XXL by 5.0 points. These observations also hold for the base model: the 110M parameter SPLAT base even outperforms the 11B parameter D3ST XXL on the least similar schema variant v 5 further highlighting the superior robustness of our model."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Generalization to unseen domains",
+            "text": [
+                "In real-world scenarios virtual assistants cover a wide range of services that can change over time as new services get added or removed requiring dialogue models to be re-trained. One of our goals is to improve generalization to unseen services thus minimizing the need for expensive data collection and frequent re-training. As the MultiWOZ dataset does not include any new and unseen services in its test set our analysis primarily focuses on the SGD dataset. Table 4 shows results on SGD with a separate evaluation for dialogues in seen and unseen domains. We find that SPLAT achieves better generalization and improves upon the baselines with a particularly large margin on unseen domains where SPLAT base outperforms D3ST base by 8.8 points and SPLAT base outperforms D3ST large by 6.8 points."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "Ablation Study",
+            "text": [
+                "We conduct an ablation study to identify the contribution of the different components to model performance. Results can be seen in "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": [
+                "Extractive DST. Following the traditional extractive setting Chao and Lane (2019) propose a machine reading comprehension (MRC) approach which decodes slot values turn-by-turn using a different learned classifier for each slot. As a classifier has to be learned for each new slot this approach cannot easily be transferred to new slots. Schema-guided approaches address this by explicitly conditioning predictions on a variable schema which describes intents and slots in natural language (Rastogi et al., 2020). Both Ruan et al. (2020) and Zhang et al. (2021) introduce schema-guided models but predict slots independently from one another requiring multiple encoder passes for each turn and failing to model intent-slot and inter-slot dependencies. Ma et al. (2019) use MRC for non-categorical and handcrafted features for categorical slots.",
+                "Generative DST. In an attempt to address the lack of ability to generalize to new domains and ontologies, Wu et al. (2019) propose incorporating a generative component into DST. Based on the dialog history and a domain-slot pair a state generator decodes a value for each slot. However as each slot is decoded independently the approach cannot model slot interdependencies. Feng et al. (2021) instead generate the entire state as a single sequence of pointers to the dialogue history and input schema but separately encode history and schema. Zhao et al. (2021) model DST fully as a text-to-text problem and directly generate the entire current state as a string. Lin et al. (2021) transfer a language model fine-tuned for seq2seq question answering to DST zero-shot using the dialog history as context and simply asking the model for the slot values. By also including a natural language schema in the input, Zhao et al. (2022) show that full joint modeling and rich attention between history and schema lead to better results in DST. Furthermore, they demonstrate the flexibility of this fully language driven paradigm by leveraging strong pre-trained language models for cross-domain zero-shot transfer to unseen domains. Gupta et al. (2022) show the effectiveness of using demonstrations of slots being used in practice instead of a natural language descriptions in the prompt."
+            ],
+            "publication_ref": [
+                "b2",
+                "b15",
+                "b26",
+                "b5",
+                "b33"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "In this work we introduced SPLAT, a novel architecture for schema-guided dialogue state tracking which learns to infer slots by learning to select target spans based on natural language descriptions of slot semantics, and further showed how to pretrain SPLAT via a recurrent span selection objective for better span representations and a stronger slot prediction performance. We find that our proposed architecture yields significant improvements over existing models and achieving 85.3 JGA on the SGD dataset and 57.4 JGA on the MultiWOZ dataset. In schema-guided DST the ability to generalize to new schemas and robustness to changes in schema descriptions is of particular interest. We demonstrated that our model is much more robust to such changes in experiments on the SGD-X benchmark where SPLAT outperforms the more than 30\u00d7 larger D3ST-XXL model by 5.0 points."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "One trade-off of limiting the prediction space using an extractive pointer module is that it does not support prediction of multiple slot values which is necessary for some dialogues in the MultiWOZ 2.3 and 2.4 datasets. To keep the architecture simple we do not consider cases in which slots take multiple values in this work, but we can effectively adapt our model for this setting by introducing sequential query tokens for each slot. Another limitation is that the span representation requires a computation of O(N \u2022 L ans ) complexity where N and L ans represent the length of context and answer span, respectively. For very long answers this might occur significant computational costs compared to exist-ing span prediction approaches which have O(N ) complexity. However, this can be alleviated by adding a simple sampling and filtering step during training and prediction. We plan to further study and address these limitations in future work."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethics Statement",
+            "text": [
+                "We introduced a novel model architecture for schema-guided dialogue state tracking which leverages a natural language schema and a span pointer module to achieve higher accuracy in dialogue state tracking. All experiments were conducted on publicly available datasets which are commonly used in research on dialogue systems."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": " [INTENT] ",
+            "text": [
+                "Intent embedding h [SLOT]  Slot embedding h [UTT]  Utterance embedding h SPAN ij Span embedding from position i to j x i Token representation at position i \u03b8 Model parameters We discussed the limitations of our work in the unnumbered limitations section.",
+                "A2. Did you discuss any potential risks of your work?",
+                "We only used publically available datasets that are commonly used in research on dialogue systems. We believe there are no significant risks associated with our work.",
+                "A3. Do the abstract and introduction summarize the paper's main claims?",
+                "Abstract and section 1 A4. Have you used AI writing assistants when working on this paper?",
+                "Left blank.",
+                "B Did you use or create scientific artifacts?",
+                "Discussed in section 3.1 and 3.3 B1. Did you cite the creators of artifacts you used?",
+                "Section 3.1 and 3.3 B2. Did you discuss the license or terms for use and / or distribution of any artifacts?",
+                "We only used publically available data and adhere to the creator's license terms. The SGD dataset is freely available under the CC-BY-SA 4.0 and the MultiWOZ dataset is freely available under the MIT license.",
+                "B3. Did you discuss if your use of existing artifact(s) was consistent with their intended use, provided that it was specified? For the artifacts you create, do you specify intended use and whether that is compatible with the original access conditions (in particular, derivatives of data accessed for research purposes should not be used outside of research contexts)?",
+                "We only used publically available data and adhere to the creator's license terms and their intended use. The SGD dataset is freely available under the CC-BY-SA 4.0 and the MultiWOZ dataset is freely available under the MIT license.",
+                "B4. Did you discuss the steps taken to check whether the data that was collected / used contains any information that names or uniquely identifies individual people or offensive content, and the steps taken to protect / anonymize it?",
+                "We only used publically available data that is commonly used in dialogue systems research and which does not uniquely identify people and which does not contain any personal data or offensive content.",
+                "B5. Did you provide documentation of the artifacts, e.g., coverage of domains, languages, and linguistic phenomena, demographic groups represented, etc.?",
+                "We did not create artifacts. Documentation of the artifacts used is provided in section 3.1 and 3.3.",
+                "B6. Did you report relevant statistics like the number of examples, details of train / test / dev splits, etc. for the data that you used / created? Even for commonly-used benchmark datasets, include the number of examples in train / validation / test splits, as these provide necessary context for a reader to understand experimental results. For example, small differences in accuracy on large test sets may be significant, while on small test sets they may not be. Section 3.1",
+                "The Responsible NLP Checklist used at ACL 2023 is adopted from NAACL 2022, with the addition of a question on AI writing assistance."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Did you run computational experiments?",
+            "text": [
+                "Section 3 and Section 4",
+                "C1. Did you report the number of parameters in the models used, the total computational budget (e.g., GPU hours), and computing infrastructure used? D3. Did you discuss whether and how consent was obtained from people whose data you're using/curating? For example, if you collected data via crowdsourcing, did your instructions to crowdworkers explain how the data would be used? Not applicable. Left blank.",
+                "D4. Was the data collection protocol approved (or determined exempt) by an ethics review board? Not applicable. Left blank.",
+                "D5. Did you report the basic demographic and geographic characteristics of the annotator population that is the source of the data? Not applicable. Left blank."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Longformer: The long-document transformer",
+            "journal": "",
+            "year": "2020",
+            "authors": "Iz Beltagy; E Matthew; Arman Peters;  Cohan"
+        },
+        {
+            "ref_id": "b1",
+            "title": "MultiWOZ -a largescale multi-domain Wizard-of-Oz dataset for taskoriented dialogue modelling",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Pawe\u0142 Budzianowski; Tsung-Hsien Wen; Bo-Hsiang Tseng; I\u00f1igo Casanueva; Stefan Ultes; Milica Osman Ramadan;  Ga\u0161i\u0107"
+        },
+        {
+            "ref_id": "b2",
+            "title": "BERT-DST: Scalable End-to-End Dialogue State Tracking with Bidirectional Encoder Representations from Transformer",
+            "journal": "",
+            "year": "2019",
+            "authors": "Guan-Lin Chao; Ian Lane"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Rethinking attention with performers",
+            "journal": "",
+            "year": "2021",
+            "authors": "Valerii Krzysztof Marcin Choromanski; David Likhosherstov; Xingyou Dohan; Andreea Song; Tamas Gane; Peter Sarlos; Jared Quincy Hawkins; Afroz Davis; Lukasz Mohiuddin; David Benjamin Kaiser; Lucy J Belanger; Adrian Colwell;  Weller"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Mul-tiWOZ 2.1: A consolidated multi-domain dialogue dataset with state corrections and state tracking baselines",
+            "journal": "",
+            "year": "2020",
+            "authors": "Mihail Eric; Rahul Goel; Shachi Paul; Abhishek Sethi; Sanchit Agarwal; Shuyang Gao; Adarsh Kumar; Anuj Goyal; Peter Ku; Dilek Hakkani-Tur"
+        },
+        {
+            "ref_id": "b5",
+            "title": "A sequenceto-sequence approach to dialogue state tracking",
+            "journal": "Long Papers",
+            "year": "2021",
+            "authors": "Yue Feng; Yang Wang; Hang Li"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Show, don't tell: Demonstrations outperform descriptions for schema-guided task-oriented dialogue",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Raghav Gupta; Harrison Lee; Jeffrey Zhao; Yuan Cao; Abhinav Rastogi; Yonghui Wu"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Multiwoz 2.3: A multi-domain task-oriented dialogue dataset enhanced with annotation corrections and co-reference annotation",
+            "journal": "Springer",
+            "year": "2021",
+            "authors": "Ting Han; Ximing Liu; Ryuichi Takanabu; Yixin Lian; Chongxuan Huang; Dazhen Wan; Wei Peng; Minlie Huang"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Spanbert: Improving pre-training by representing and predicting spans",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Mandar Joshi; Danqi Chen; Yinhan Liu; S Daniel; Luke Weld; Omer Zettlemoyer;  Levy"
+        },
+        {
+            "ref_id": "b9",
+            "title": "A multi-task bert model for schema-guided dialogue state tracking",
+            "journal": "",
+            "year": "2022",
+            "authors": "Eleftherios Kapelonis; Efthymios Georgiou; Alexandros Potamianos"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Adam: A method for stochastic optimization",
+            "journal": "",
+            "year": "2014",
+            "authors": "P Diederik; Jimmy Kingma;  Ba"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Dialogue state tracking with a language model using schema-driven prompting",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Chia-Hsuan Lee; Hao Cheng; Mari Ostendorf"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Sgd-x: A benchmark for robust generalization in schemaguided dialogue systems",
+            "journal": "",
+            "year": "2022",
+            "authors": "Harrison Lee; Raghav Gupta; Abhinav Rastogi; Yuan Cao; Bin Zhang; Yonghui Wu"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Datasets: A community library for natural language processing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Quentin Lhoest; Albert Villanova Del Moral; Yacine Jernite; Abhishek Thakur; Suraj Patrick Von Platen; Julien Patil; Mariama Chaumond; Julien Drame; Lewis Plu; Joe Tunstall; Mario Davison; Gunjan \u0160a\u0161ko; Bhavitvya Chhablani; Simon Malik; Teven Le Brandeis; Victor Scao; Canwen Sanh; Nicolas Xu; Angelina Patry; Philipp Mcmillan-Major; Sylvain Schmid;  Gugger"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Zero-shot dialogue state tracking via cross-task transfer",
+            "journal": "",
+            "year": "2021",
+            "authors": "Zhaojiang Lin; Bing Liu; Andrea Madotto; Seungwhan Moon; Paul Crook; Zhenpeng Zhou; Zhiguang Wang; Zhou Yu; Eunjoon Cho; Rajen Subba"
+        },
+        {
+            "ref_id": "b15",
+            "title": "An end-to-end dialogue state tracking system with machine reading comprehension and wide & deep classification",
+            "journal": "",
+            "year": "2019",
+            "authors": "Yue Ma; Zengfeng Zeng; Dawei Zhu; Xuan Li; Yiying Yang; Xiaoyuan Yao; Kaijie Zhou; Jianping Shen"
+        },
+        {
+            "ref_id": "b16",
+            "title": "KILT: a benchmark for knowledge intensive language tasks",
+            "journal": "",
+            "year": "2021",
+            "authors": "Fabio Petroni; Aleksandra Piktus; Angela Fan; Patrick Lewis; Majid Yazdani; Nicola De Cao; James Thorne; Yacine Jernite; Vladimir Karpukhin; Jean Maillard; Vassilis Plachouras; Tim Rockt\u00e4schel; Sebastian Riedel"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Few-shot question answering by pretraining span selection",
+            "journal": "Long Papers",
+            "year": "2021",
+            "authors": "Ori Ram; Yuval Kirstain; Jonathan Berant; Amir Globerson; Omer Levy"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Towards scalable multi-domain conversational agents: The schema-guided dialogue dataset",
+            "journal": "",
+            "year": "2020",
+            "authors": "Abhinav Rastogi; Xiaoxue Zang; Srinivas Sunkara; Raghav Gupta; Pranav Khaitan"
+        },
+        {
+            "ref_id": "b19",
+            "title": "2020. Fine-tuning bert for schema-guided zero-shot dialogue state tracking",
+            "journal": "",
+            "year": "",
+            "authors": "Yu-Ping Ruan; Zhen-Hua Ling; Jia-Chen Gu; Quan Liu"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Amendable generation for dialogue state tracking",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Xin Tian; Liankai Huang; Yingzhan Lin; Siqi Bao; Huang He; Yunyi Yang; Hua Wu; Fan Wang; Shuqi Sun"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Attention is all you need",
+            "journal": "",
+            "year": "2017",
+            "authors": "Ashish Vaswani; Noam Shazeer; Niki Parmar; Jakob Uszkoreit; Llion Jones; Aidan N Gomez; \u0141ukasz Kaiser; Illia Polosukhin"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Pointer networks. Advances in neural information processing systems",
+            "journal": "",
+            "year": "2015",
+            "authors": "Oriol Vinyals; Meire Fortunato; Navdeep Jaitly"
+        },
+        {
+            "ref_id": "b23",
+            "title": "LUNA: Learning slot-turn alignment for dialogue state tracking",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yifan Wang; Jing Zhao; Junwei Bao; Chaoqun Duan; Youzheng Wu; Xiaodong He"
+        },
+        {
+            "ref_id": "b24",
+            "title": "The dialog state tracking challenge",
+            "journal": "Association for Computational Linguistics",
+            "year": "2013",
+            "authors": "Jason Williams; Antoine Raux; Deepak Ramachandran; Alan Black"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Transformers: State-of-the-art natural language processing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Thomas Wolf; Lysandre Debut; Victor Sanh; Julien Chaumond; Clement Delangue; Anthony Moi; Pierric Cistac; Tim Rault; R\u00e9mi Louf; Morgan Funtowicz; Joe Davison; Sam Shleifer; Clara Patrick Von Platen; Yacine Ma; Julien Jernite; Canwen Plu; Teven Le Xu; Sylvain Scao; Mariama Gugger; Quentin Drame; Alexander M Lhoest;  Rush"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Transferable multi-domain state generator for task-oriented dialogue systems",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Chien-Sheng Wu; Andrea Madotto; Ehsan Hosseini-Asl; Caiming Xiong; Richard Socher; Pascale Fung"
+        },
+        {
+            "ref_id": "b27",
+            "title": "MultiWOZ 2.4: A multi-domain task-oriented dialogue dataset with essential annotation corrections to improve state tracking evaluation",
+            "journal": "",
+            "year": "2022",
+            "authors": "Fanghua Ye; Jarana Manotumruksa; Emine Yilmaz"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Big bird: Transformers for longer sequences",
+            "journal": "Advances in Neural Information Processing Systems",
+            "year": "2020",
+            "authors": "Manzil Zaheer; Guru Guruganesh; Joshua Kumar Avinava Dubey; Chris Ainslie; Santiago Alberti; Philip Ontanon; Anirudh Pham; Qifan Ravula; Li Wang;  Yang"
+        },
+        {
+            "ref_id": "b29",
+            "title": "MultiWOZ 2.2 : A dialogue dataset with additional annotation corrections and state tracking baselines",
+            "journal": "",
+            "year": "2020",
+            "authors": "Xiaoxue Zang; Abhinav Rastogi; Srinivas Sunkara; Raghav Gupta; Jianguo Zhang; Jindong Chen"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Find or classify? dual strategy for slot-value predictions on multi-domain dialog state tracking",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Jianguo Zhang; Kazuma Hashimoto; Chien-Sheng Wu; Yao Wang; Philip Yu; Richard Socher; Caiming Xiong"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Sgd-qa: Fast schema-guided dialogue state tracking for unseen services",
+            "journal": "",
+            "year": "2021",
+            "authors": "Yang Zhang; Vahid Noroozi; Evelina Bakhturina; Boris Ginsburg"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Izhak Shafran, and Yonghui Wu. 2022. Descriptiondriven task-oriented dialog modeling",
+            "journal": "",
+            "year": "",
+            "authors": "Jeffrey Zhao; Raghav Gupta; Yuan Cao; Dian Yu; Mingqiu Wang; Harrison Lee; Abhinav Rastogi"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Effective sequence-tosequence dialogue state tracking",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Jeffrey Zhao; Mahdis Mahdieh; Ye Zhang; Yuan Cao; Yonghui Wu"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Span selection for schema-guided dialogue in practice. [SLOT] encodes the semantics of the natural language description of \"to_location\" and is matched with the span representation of \"Long Beach, CA\". Similarly [UTT] encodes the semantics of the current utterance and is matched with the target [INTENT] encoding.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure 2: An overview over the SPLAT model architecture. Intent scores are computed using the utterance representation h [UTT]",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "takes as input the previous state and the current turn and learns to generate the new state in a first pass and correcting mistakes in a second generation pass. AG-DST does not condition generation on the schema and slot semantics are learned implic-Results on the SGD test set.",
+            "figure_data": "ModelPretrained ModelSingle-Pass Intent JGAWith system action annotationsMT-BERT (Kapelonis et al., 2022)BERT-base (110M)\u271794.7 82.7paDST (Ma et al., 2019)XLNet-large (340M)\u271794.8 86.5No additional dataSGD baseline (Rastogi et al., 2020)BERT-base (110M)\u271790.6 25.4MT-BERT (Kapelonis et al., 2022)BERT-base (110M)\u2717-71.9DaP (ind) (Lee et al., 2021)T5-base (220M)\u271790.2 71.8SGP-DST (Ruan et al., 2020)T5-base (220M)\u271791.8 72.2D3ST (Base) (Zhao et al., 2022)T5-base (220M)\u271397.2 72.9D3ST (Large) (Zhao et al., 2022)T5-large (770M)\u271397.1 80.0D3ST (XXL) (Zhao et al., 2022)T5-XXL (11B)\u271398.8 86.4SPLAT (Base)Longformer-base (110M)\u271396.7 80.1SPLAT (Large)Longformer-large (340M)\u271397.6 85.3ModelPretrained ModelSingle-Pass Intent JGADS-DST  \u2020 (Zhang et al., 2020) Seq2Seq-DUBERT-base (110M)\u2717-51.7"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Results on the MultiWOZ 2.2 test set. Results denoted by \u2020 were reported in the original MultiWOZ 2.2 paper",
+            "figure_data": "11B)\u2713-58.7"
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "",
+            "figure_data": "shows re-"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "Joint goal accuracy on the five different SGD-X schema variants. Results denoted by * are based on a reimplementation in the SGD-X paper which could not reproduce the original results.",
+            "figure_data": "ModelParams. Seen Unseen OverallSGP-DST 1220M88.067.072.2D3ST (Base) 2220M92.566.472.9D3ST (Large) 2770M93.875.480.0D3ST (XXL) 211B95.883.386.4SPLAT (Base)110M94.575.280.1SPLAT (Large) 340M94.682.285.3"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Joint goal accuracy on the SGD test set on seen and unseen services. Baseline results are reported by 1 Ruan et al. (2020) and 2 Zhao et al. (2022) respectively.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Table 3, our model is considerably more robust to linguistic variations than all of the Ablation results on the SGD and MultiWOZ test sets. Longformer (extr.) refers to an extractive model with no span representations and simple start and end pointers for answer prediction, SPM refers to the Span Pointer Module and RSS-PT to pre-training with the Recurrent Span Selection objective.",
+            "figure_data": "SGDMultiWOZModelParams. Intent JGA Intent JGALongformer (extr.) 110M + SPM 110M + SPM + RSS-PT 110M95.9 78.5 91.4 55.5 97.0 79.0 91.4 56.1 96.7 80.1 91.4 56.6Longformer (extr.) 340M97.5 83.5 91.4 56.3+ SPM + SPM + RSS-PT340M 340M98.2 83.8 91.4 57.8 97.6 85.3 91.5 57.4"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "We compare a variant of our model which does not use span representations (referred to as \"Longformer (extractive)\") but instead has two pointers [SLOT] and [/SLOT] which are used to select the start and end of the answer span. We find that using the Span Pointer Module to directly select the span improves performance across both model sizes and datasets.",
+            "figure_data": "Furthermore, we find pre-training our model forbetter span representations via the recurrent spanselection task to be crucial giving further signifi-cant performance gains for all sizes and datasets ex-cept the 340M parameter model on the MultiWOZdataset where JGA slightly deteriorates. Acrossboth model sizes gains from RSS pre-training arelarger on the SGD dataset. We hypothesize thatthis may be attributed to better span representa-tions learned through RSS pre-training which inturn generalize better to unseen domains."
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "I = [CLS] U [SEP] T D intent D slot [SEP] G = T \u222a D intent \u222a D slot E = LAT(I; G; \u03b8).",
+            "formula_coordinates": [
+                3.0,
+                86.35,
+                517.83,
+                187.28,
+                56.84
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "h [UTT] i = LN(FFN(x [UTT] i )) h [INTENT] j = LN(FFN(x [INTENT] j ))(2)",
+            "formula_coordinates": [
+                3.0,
+                106.35,
+                707.48,
+                183.52,
+                34.17
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "score i\u2192j = sim(h [UTT] i , h [INTENT] j ) L intent = \u2212 1 T T i=1 log exp(score i\u2192j ) K k=1 exp(score i\u2192k ) \u2022 1 GT (3)",
+            "formula_coordinates": [
+                3.0,
+                306.59,
+                120.63,
+                218.57,
+                67.81
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "y ij = [x i ; x j ] h SPAN ij = LN(FFN GeLU (y ij )) \u00d7 n_layers (4)",
+            "formula_coordinates": [
+                3.0,
+                316.59,
+                424.14,
+                208.56,
+                36.23
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "h [SLOT] = LN(FFN GeLU (x [SLOT] )) \u00d7 n_layers",
+            "formula_coordinates": [
+                3.0,
+                309.85,
+                525.16,
+                210.86,
+                21.63
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "score q\u2192ij = sim(h [SLOT] q , h SPAN ij ) L slot = \u2212 1 L L q=1 log exp(score q\u2192ij ) K k=1 exp(score q\u2192k ) \u2022 1 GT (6)",
+            "formula_coordinates": [
+                3.0,
+                309.55,
+                669.99,
+                215.61,
+                68.71
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "L = L slot + L intent 2 (7)",
+            "formula_coordinates": [
+                4.0,
+                138.24,
+                251.97,
+                151.63,
+                26.31
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/D18-1547"
+}

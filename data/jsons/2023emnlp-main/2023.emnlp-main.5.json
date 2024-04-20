@@ -1,0 +1,684 @@
+{
+    "title": "Fine-grained Conversational Decoding via Isotropic and Proximal Search",
+    "authors": "Yuxuan Yao; Han Wu; Qiling Xu; Linqi Song",
+    "pub_date": "",
+    "abstract": "General-purpose text decoding approaches are usually adopted for dialogue response generation. Although the quality of the generated responses can be improved with dialogue-specific encoding methods, conversational decoding methods are still under-explored. Inspired by Wu et al. ( 2023) that a good dialogue feature space should follow the rules of locality and isotropy, we present a fine-grained conversational decoding method, termed isotropic and proximal search (IPS). Our method is designed to generate the semantic-concentrated response, while still maintaining informativeness and discrimination against the context. Experiments show that our approach outperforms existing decoding strategies in the dialogue field across both automatic and human evaluation metrics. More in-depth analyses further confirm the effectiveness of our approach.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Dialogue response generation (Li et al., 2017;Wang et al., 2020) aims to generate the utterance that forms a coherent and fluent continuation given a dialogue context. Generic text decoding strategies (Rieser et al., 2014;Ritter et al., 2011;Chen et al., 2017) are usually adopted to produce grammatical and contextual responses. As an independent technique, decoding strategy can also enhance the generation quality of large language models.",
+                "Existing text decoding methods have been explored in various generic text generation tasks, but lack tailoring for dialogue generation, e.g., capturing dialogue-specific features and generating an informative and discriminative dialogue response (Su et al., 2021;Wu et al., 2023). Early maximizationbased methods, e.g., greedy search (Li et al., 2016b) and beam search (Wiseman et al., 2017), may lead to dullness and degeneration (Fan et al., 2018;Holtzman et al., 2018). Later sampling-based improvements are proposed to tackle these problems, including top-k sampling (Fan et al., 2018) and nucleus search (Holtzman et al., 2018). While alleviating degeneration, these sampling methods introduce critical semantic inconsistency and are not aligned with human-written prefix (Basu et al., 2021). Specifically, a bunch of studies (Ethayarajh, 2019;Su and Collier, 2023) have asserted that the problem of anisotropy, i.e., a distribution pattern in the latent space with features occupying a narrow cone in the space, leads to inconsistency and degradation of the generation. Although contrastive search (Su et al., 2022) has been proposed correspondingly to mitigate the issue, as a generalized text decoding strategy, it still ignores dialoguespecific features, such as utterance dependencies and conversational structure information. Therefore, research on conversational decoding methods is warmly needed.",
+                "In this work, we propose a fine-grained conversational decoding method, namely isotropic and proximal search (IPS). Different from traditional approaches, we consider the previous tokens and contexts separately from a granular perspective. Acknowledging that locality and isotropy are two important properties for refining the dialogue feature space, we design our IPS following these rules: (i) the generated output should be selected from the most probable candidate set predicted by the dialogue model; (ii) the generated tokens in the same utterance should be proximal to each other for expressing a concentrated idea; and (iii) the newly generated utterance should be discriminative enough with respect to the context utterances. In this way, our method encourages informativeness and discrimination among different utterances as well as maintains a concentrated idea within an utterance. We evaluate our approach on two commonly-used dialogue datasets, DailyDialog (Li et al., 2017) in English and LCCC (Wang et al., 2020) in Chinese. Both human and automatic evaluation results, i.e., indicators based on GPT3.5, consistently show that IPS can generate more fluent, coherent, and human-like responses than existing decoding methods."
+            ],
+            "publication_ref": [
+                "b9",
+                "b19",
+                "b14",
+                "b15",
+                "b1",
+                "b18",
+                "b21",
+                "b8",
+                "b20",
+                "b3",
+                "b4",
+                "b3",
+                "b4",
+                "b0",
+                "b2",
+                "b16",
+                "b17",
+                "b9",
+                "b19"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Methodology",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Preliminary",
+            "text": [
+                "Dialogue response generation Given a dialogue context D = {u 1 , u 2 , ..., u N } composed of N utterances, where u i = x i,1 , x i,2 , ..., x i,|u i | is a sequence of consecutive words, the task of dialogue response generation is to produce the continuation utterance u r = {w 1 , w 2 , ..., w |ur| }, (r = N + 1).",
+                "There are generally two key steps to finish the task, including context encoding and response decoding. For the first step, we obtain the context representations H from the language model by concatenating the utterances into a sequence.",
+                "H = PrLM(u 1 [EOU] u 2 [EOU] ... u N [EOU]),",
+                "where [EOU] is the special token inserted as the last token of each utterance.",
+                "For the decoding step, the response is generally produced in an auto-regressive manner as follows",
+                "p(w 1:|ur| ) = |ur| i=1 p(w i |w <i , D)(1)",
+                "Dialogue modeling Wu et al. (2023) has demonstrated that locality and isotropy are two key properties for building a good conversational feature space. Specifically, locality encourages the model to aggregate the representations of tokens within an utterance while isotropy pushes away the representations of distinct utterances."
+            ],
+            "publication_ref": [
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Isotropic and Proximal Search",
+            "text": [
+                "We present a fine-grained conversational decoding method, i.e., isotropic and proximal search (IPS). Specifically, we expect the generated response to satisfy two requirements: 1) representations of the response tokens are nearby to convey a concentrated idea, saying proximity; 2) the response representation is discriminative to the context utterance representations, saying isotropy. During the decoding stage, for proximal search, we try to select the candidate token having the shortest average distance to the existing generated tokens. For isotropic search, we try to choose the token that enables the response representation most discriminative to representations of context utterances. As the response representation cannot be determined during the decoding stage, we calculate it in an approximate way, i.e., averaging the representations of the already generated tokens, as follows:",
+                "h RT = 1 T T i=1 h w i (2)",
+                "where h RT is the response representation which will be dynamically updated along with the generation process, and T is the number of already generated tokens.",
+                "Up to now, the problem changes to how to generate the first token for starting the isotropic and proximal search since the method is heavily dependent on the previous tokens. To address this problem, we attempt to finish the first n-steps generation by traditional decoding methods, such as beam search, top-k sampling or nucleus sampling. On the other hand, as IPS is essentially a deterministic decoding strategy, this solution also enables it to produce diverse responses by using different decoding strategies in the first n steps. Therefore, in each step t after the first sampling stage, we calculate the proximal and isotropic values as follows:",
+                "p_value t = 1 t \u2212 1 t\u22121 i=1 s(h wt , h w i ) (3) i_value t = 1 N N i=1 s(h RT , h u i ) (4",
+                ")",
+                "where s is the cosine similarity. h u i are the utterance representations obtained from the special token [EOU]. The proximal value measures the average distance between the candidate token and the already generated tokens while the isotropic value stands for the average similarity between the undergoing response representation and all utterance representations. Next, the selection of the candidate token w t is formulated as,",
+                "w t = argmax wt\u2208V (m) {\u03b1 \u00d7 p(w t | w <t , D) model confidence + (1 \u2212 \u03b1) \u00d7 (p_value t \u2212 i_value t )",
+                "isotropic and proximal penalty",
+                "} (5)",
+                "where V (m) is the set of top-m predictions from the model's probability distribution p(w t | w <t , D) and m, is typically set as 4 \u223c 8. In Eq. ( 5), the first term, model confidence, is the probability of the candidate w t predicted by the model. The second term, isotropic and proximal penalty, aims to maximize the discrimination between the undergoing response and previous utterances and minimize the  (Zhang* et al., 2020), MV represents MAUVE (Pillutla et al., 2021), and GE represents G-Eval (Liu et al., 2023).",
+                "token difference within the response. The hyperparameter \u03b1 \u2208 [0, 1] regulates the importance of these two components. When \u03b1 = 1, our method degenerates to the greedy search method. We claim our method is fine-grained because the generic auto-regressive generation predicts the next token by jointly considering the already generated tokens w <t and the context D, formulated as p(w t |w <t , D) while IPS splits these two factors. Specifically, proximity value only focuses on the effects of the already generated tokens, i.e., p_value t \u223c p(w t |w <t ), and isotropy value pays more attention to the context, i.e., i_value t \u223c p(w t |D, (w <t )) wherein w <t is just used to obtain the undergoing response representation h RT ."
+            ],
+            "publication_ref": [
+                "b22",
+                "b13",
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": [
+                "Dataset We evaluate our method on two commonly-used datasets, DailyDialog (Li et al., 2017) in English and LCCC (Wang et al., 2020) in Chinese. Both of them are open-domain multi-turn dialogue datasets, collected from social media. For LCCC, owing to the academic-level computing resource, we follow previous work (Su et al., 2022), and sample a subset of the dataset, consisting of 100,000 dialogue examples.",
+                "Baselines Following Wu et al. (2023), we use BART (Lewis et al., 2020) as our backbone. We evaluate the performance of decoding strategies with different models, including vanilla BART, BART with SimCTG (Su et al., 2022), and BART with SimDRC (Wu et al., 2023). We compare IPS to greedy search, beam search, top-k sampling (Fan et al., 2018), nucleus sampling (Holtzman et al., 2018) and contrastive search (Su et al., 2022). MAUVE (Pillutla et al., 2021), Distinct2/4 (Li et al., 2016a), and G-Eval, an automatic evaluation metric based on GPT3.5 (Liu et al., 2023).",
+                "We also conduct a human evaluation with the help of recruited proficient English/Chinese speakers. We randomly sample 100 dialogue examples from DailyDialog and LCCC test sets. For each dialogue context, we generate responses using the aforementioned backbone models (BART, BART+SimCTG, BART+SimDRC) with six different inference strategies. Five annotators are hired independently to measure these samples. Annotators are instructed to give a score ranging from 1 to 5 over the following aspects, including fluency, informativeness, coherence, and semantic coverage 1 ."
+            ],
+            "publication_ref": [
+                "b9",
+                "b19",
+                "b17",
+                "b21",
+                "b6",
+                "b17",
+                "b21",
+                "b3",
+                "b4",
+                "b17",
+                "b13",
+                "b7",
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results and Discussion",
+            "text": [
+                "Table 1 lists the automatic evaluation results of the different methods with different decoding strategies. Similar results can be also found in human evaluation, as shown in Table 2. We can see that the models, collaborating with IPS, can produce more semantically consistent(high BERTScores and MAUVE scores) and human-like (high G-Eval scores) responses. Although contrastive search can generate more novel and diverse tokens (high Distinct scores), it usually suffers from the problem of prediction deviation, i.e., the predicted token being weakly related to the main idea of the response. This is also in line with the worse performance of contrastive search on other metrics, such as BERTScore, and G-Eval, indicating that the diverse responses produced by contrastive search are not accurate and human-like enough. Different from contrastive search, IPS tries to concentrate on the core meaning of the response and express it clearly, thus a slightly lower Distinct score is acceptable and expected. Note that IPS still has better distinct scores than other traditional decoding methods since it encourages discrimination and isotropy among utterances.",
+                "1 Details of human evaluation are in Appendix A.1.",
+                "Although IPS can be directly used with different models and achieve good performance, the models trained with SimDRC are the best testbed for IPS. We can see that SimDRC+IPS can mostly achieve the best performance across the board on both automatic and human evaluation. This is reasonable because the training process of SimDRC is greatly consistent with the search criterion of IPS, and they both push away the inter-utterance features and pull close the intra-utterance features.",
+                "Ablation Study Figure 1 shows the ablation studies on different components of the method, including the first n steps, the sampling strategy for the first n-step decoding, and the weight \u03b1. As shown in Figure 1(a), our method consistently outperforms the contrastive search no matter the number of first steps. We find some performance drops with the increase of the first-stage sampling steps. We think this is because more generic tokens are selected by traditional search methods, thus weakening the proximity and isotropy of the response. For strategies in the first n steps, we attempt beam search, top-k sampling, and nucleus sampling. We finally select top-k sampling as our first stage's strategy owing to its better performance in the comparisons. Figure 1(b) shows the results of different k values adopted in top-k sampling. We can see that our method exceeds the baseline by a large margin when k > 5. The effect of weight \u03b1 is also studied, as shown in Figure 1(c). Our method consistently outperforms the baseline with the different weights, suggesting the robustness of our method.",
+                "Hyperparameter Analysis To explore the effects of isotropy and proximity, in our experiments, we introduced a hyperparameter \u03b2 to balance the p_value and i_value as:",
+                "(1 \u2212 \u03b2) \u00d7 p_value \u2212 \u03b2 \u00d7 i_value (6)",
+                "We tried the effects of \u03b2 ranging from 0.2 to 0.8. We surprisingly found that the balance of proximal value and isotropy value leads to the best performance, saying \u03b2 equals 0.5. This finding is a bit different from the observations in SimDRC (Wu et al., 2023) which suggests that larger isotropy loss weight is needed to balance the two properties in the training stage. We think this is because our method is a decoding strategy, rather than the training optimization process. The sparse isotropy values would not cause the model bias in the decoding stage. So, the harmonious balance of proximity and isotropy can be simply achieved by giving a moderate value of \u03b2."
+            ],
+            "publication_ref": [
+                "b21"
+            ],
+            "figure_ref": [
+                "fig_0",
+                "fig_0",
+                "fig_0",
+                "fig_0"
+            ],
+            "table_ref": [
+                "tab_0",
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "In this work, we present a fine-grained conversational decoding strategy, namely isotropic and proximal search (IPS) to encourage the generation of isotropic and conversational tokens. Superior to existing decoding methods, IPS decouples the previous tokens and the context. Experiments show that our method achieves impressive performance on both automatic and human evaluation."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ackonwledgements",
+            "text": [
+                "This work was supported in part by the InnoHK initiative, the Government of the HKSAR, Laboratory for AI-Powered Financial Technologies."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "During the experiments, we found that for a single piece of data in the DailyDialog test set, traditional text decoding methods such as beam search, top-k sampling and beam search take less than 1 second, the contrastive search takes about 5.07s, and the decoding time required by our proposed IPS is about 2.16s. Although our approach takes longer than the traditional text decoding method, our calculation speed is obviously faster than contrastive search. How to further improve the computing speed is still the direction we need to work on."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethics Statement",
+            "text": [
+                "In this work, we use publicly released datasets to auxiliary our dialogue response generation. Generally, these previous works have considered ethical issues when creating the datasets. We have manually checked some samples for the datasets we used in this work, and do not find any obvious ethical concerns, such as violent or offensive content. We will also release the source decoding code with friendly instructions to support its correct use. However, we still need to emphasize that text generation is not as controllable as we think. It still would generate some novel or unexpected words occasionally. We may take actions to decrease generation diversity to alleviate this problem.",
+                "\u2022 2: The text has major errors in both grammar and spelling. The errors make the text hard to read.",
+                "\u2022 1: The text does not make sense and it is unreadable."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1.2 Informativeness",
+            "text": [
+                "This measures whether the generated text has diverse, informative, novel, or logically related content. The definitions of different scores are:",
+                "\u2022 5: The text contains very diverse, informative, and novel content. It is enjoyable to read the text.",
+                "\u2022 4: The text contains many informative and novel contents. (Choose this score when you hesitate between 3 and 5.)",
+                "\u2022 3: The text contains some new information but also contains a few repetitions of the context.",
+                "\u2022 2: The text only contains a few informative and new terms. (Choose this score when you hesitate between 1 and 3.)",
+                "\u2022 1: The text is dull, repetitive, and has no new information. All contents are from the dialogue context."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1.3 Coherence",
+            "text": [
+                "This measures whether the generated text is semantically and factually consistent with the dialogue context. The definitions of different scores are:",
+                "\u2022 5: The text is semantically, factually, and topically consistent with the dialogue context. All contents of the text are related to the source text or can be inferred from the source.",
+                "\u2022 4: The text is very related to the context but has minor inconsistencies or contradictions that do not affect its overall relevance.",
+                "\u2022 3: The text is related to the context but has some obvious inconsistencies and contradictions.",
+                "\u2022 2: The text is slightly consistent with the context. Many inconsistencies and contradictions in the context can be found.",
+                "\u2022 1: The text is totally inconsistent with the context. It semantically or factually contradicted the context."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1.4 Semantic Coverage",
+            "text": [
+                "This measures how many semantic content units from the target response are covered by the generated text. The definitions of different scores are:",
+                "\u2022 5: All semantic content units of the target text can be found in the generated text. They are semantically consistent.",
+                "\u2022 4: Most of the content units of the target text can be found from the generated text while a few missing units do not affect the overall coverage.",
+                "\u2022 3: Some semantic content units can be found in the generated text but also miss some important units.",
+                "\u2022 2: Most of the semantic content units are not covered. Only a few insignificant units can be found in the generated text.",
+                "\u2022 1: The text does not have any overlapping semantic content units with the target text.",
+                "We recruit five human workers to annotate 3,600 samples. To make sure the workers are fairly paid, we pay 0.1 dollars for each sample. Therefore, the total amount spent on participant compensation is 360 dollars. The annotators take 24 hours to finish the task, suggesting the hourly wage for each worker is 15 dollars."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.2 More Details of the Task",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.2.1 Evaluation of G-EVAL Score",
+            "text": [
+                "The API we used to test G-EVAl is gpt-3.5-turbo, and the following is the prompt (Liu et al., 2023):",
+                "You will be given a conversation between two individuals. You will then be given one potential response for the next turn in the conversation. Your task is to give a final score for utterance. Please make sure you read and understand these instructions carefully.",
+                "The evaluation aspects are:",
+                "1. Engagingness: Is the response dull or interesting?",
+                "3. Informativeness: This measures whether the generated text has diverse, informative, novel, or logically related content.",
+                "4. Coherence: This measures whether the generated text is semantically and factually consistent with the dialogue context.",
+                "The evaluation steps are:",
+                "1. Read the conversation, the corresponding label, and the response carefully.",
+                "2. Considering the above evaluation aspects, return a comprehensive final score ranging from 1 to 5 for each conversation.",
+                "3. Please only return 1 overall score, without any extra text descriptions. The return format should be like Score:1. Now please read the following conversation, and return the score."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.2.2 More Experimental Results",
+            "text": [
+                "Table 2 lists the results of human evaluation."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "A.3 Surface-level Analysis",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.3.1 Score Distribution According to the Length of the Previous Context",
+            "text": [
+                "Table 3 and Table 4 illustrate the relations between the context length and the human evaluation metrics while using the IPS (the above one) and beam search (the below one) decoding strategies. Observing the table, when the context length is particularly short (<10), we speculate that the context may consist of simple greetings or introductions, resulting in lower difficulty of generation and thus higher scores. When the context length varies in the range of approximately 10 to 40, due to differences in the complexity of context content and semantics, the scores exhibit a fluctuating trend. As the length continues to increase, the information provided by the previous context becomes richer, leading to improved effectiveness of both decoding methods. We also note that when faced with exceptionally long contexts, the generation quality of IPS is superior to the baselines."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.3.2 Utterance Length Analysis",
+            "text": [
+                "Table 5 shows that both IPS and contrastive search tend to produce shorter sentences than traditional methods. We explain in the main text that by incorporating isotropy, achieved through contrastive search and IPS, redundancy is minimized, resulting in more concise generated text compared to previous methods. Considering the nature of the conversation, our IPS strategy expects proximity and does not enlarge the token distance in the same utterance, thus responses of IPS are slightly longer than that of contrastive search.",
+                "A.4 Qualitative Analysis"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3"
+            ]
+        },
+        {
+            "heading": "A.4.1 Instances Illustration",
+            "text": [
+                "Some examples are presented to illustrate the effect of our IPS search.",
+                "In summation, according to Table 6 and Table 7, some qualitative observations are as follows:",
+                "\u2022 Replies generated by IPS are more natural and accurate.",
+                "\u2022 IPS tends to generate relatively concise responses.",
+                "\u2022 With more complex previous contexts, we observed that IPS does not prioritize shortening the length of response. IPS can generate responses that are more in line with the situation based on the characteristics of the conversation."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "A.5 Cosine Similarity Heatmap",
+            "text": [
+                "To ensure utterances generated by our IPS are isotropic and proximal, and observe the representations produced by different decoding methods, we showcase the cosine similarity matrix of token representations correspondingly.",
+                "The larger color difference between different sentences represents greater isotropy, indicating discrimination among utterances; while the darker the color within the same sentence, the greater the proximity, conveying a more concentrated thought.",
+                "Choosing SimDRC as the backbone model, cosine similarity heatmaps of different inference methods are shown as follows. Tokens generated by IPS exhibit brighter colors in the heatmap, indicating increased proximity within the same sentence, while tokens from IPS showcase darker colors for different sentences, signifying greater isotropy. Contrastingly, traditional methods like beam search showed anisotropy(i.e. features occupy a narrow cone in the vector space, thus leading to the problem of degeneration.) in the figures.   Table 3: Relations between the context length and the human evaluation metrics while using the IPS."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.6 Examples of Generated Texts",
+            "text": [
+                "For non-native Chinese speakers, translations of Table 9 are presented in Table 10. The quality of the LCCC dataset still requires optimization, as it contains numerous colloquial and slang expressions. We are not professional translators, and in our attempts, we noticed that the translated meanings sometimes diverged from the original Chinese. We apologize for the inconvenience.    "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7",
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "",
+            "text": "Settings We fine-tune the models on DailyDialog and LCCC datasets for 6k steps and 7k steps, respectively. We use a batch size of 64 and truncate the training samples to a maximum length of 256. The parameters of the models are initialized from HuggingFace libraries and updated by Adam optimizer (Kingma and Ba, 2017) with a learning rate of 3e-5. We adopt the margin values of SimCTG and SimDRC suggested in their work, i.e., \u03c1 = 0.5 for SimCTG and \u03b4 = 0.7, \u03b1 = 0.3 for SimDRC. We conduct the isotropic and proximal search with the first n = 2 steps adopting top-k sampling (k = 7). The weight \u03b1 is 0.6. We run all experiments with five different seeds and report the average score.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Appendix",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1 Human Evaluation Instructions",
+            "text": [
+                "Please rate the quality of the generated response based on the given dialogue context and the target response over the following aspects: (1) Fluency;",
+                "(2) Informativeness; (3) Coherence; (4) Semantic Coverage. We provide some instructions for your rating."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1.1 Fluency",
+            "text": [
+                "This measures whether the generated text has no formatting problems, capitalization errors, or obviously ungrammatical sentences (e.g., fragments, missing components) that make the text difficult to read. The definitions of different scores are:",
+                "\u2022 5: The text is fluent, grammatically correct, and has no errors. It is easy to read.",
+                "\u2022 4: The text is grammatically correct but has a few spelling or capitalization errors, which does not affect your understanding.",
+                "\u2022 3: The text has minor errors in both grammar and spelling. The errors slightly affect your understanding.  "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Mirostat: A neural text decoding algorithm that directly controls perplexity",
+            "journal": "",
+            "year": "2021",
+            "authors": "Sourya Basu; Govardana Sachitanandam Ramachandran; Nitish Shirish Keskar; Lav R Varshney"
+        },
+        {
+            "ref_id": "b1",
+            "title": "A survey on dialogue systems",
+            "journal": "ACM SIGKDD Explorations Newsletter",
+            "year": "2017",
+            "authors": "Hongshen Chen; Xiaorui Liu; Dawei Yin; Jiliang Tang"
+        },
+        {
+            "ref_id": "b2",
+            "title": "How contextual are contextualized word representations? Comparing the geometry of BERT, ELMo, and GPT-2 embeddings",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Kawin Ethayarajh"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Hierarchical neural story generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Angela Fan; Mike Lewis; Yann Dauphin"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Learning to write with cooperative discriminators",
+            "journal": "Long Papers",
+            "year": "2018",
+            "authors": "Ari Holtzman; Jan Buys; Maxwell Forbes; Antoine Bosselut; David Golub; Yejin Choi"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Adam: A method for stochastic optimization",
+            "journal": "",
+            "year": "2017",
+            "authors": "P Diederik; Jimmy Kingma;  Ba"
+        },
+        {
+            "ref_id": "b6",
+            "title": "BART: Denoising sequence-to-sequence pre-training for natural language generation, translation, and comprehension",
+            "journal": "",
+            "year": "2020",
+            "authors": "Mike Lewis; Yinhan Liu; Naman Goyal; Marjan Ghazvininejad; Abdelrahman Mohamed; Omer Levy; Veselin Stoyanov; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b7",
+            "title": "A diversity-promoting objective function for neural conversation models",
+            "journal": "Association for Computational Linguistics",
+            "year": "2016",
+            "authors": "Jiwei Li; Michel Galley; Chris Brockett; Jianfeng Gao; Bill Dolan"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Deep reinforcement learning for dialogue generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2016",
+            "authors": "Jiwei Li; Will Monroe; Alan Ritter; Dan Jurafsky; Michel Galley; Jianfeng Gao"
+        },
+        {
+            "ref_id": "b9",
+            "title": "DailyDialog: A manually labelled multi-turn dialogue dataset",
+            "journal": "Long Papers",
+            "year": "2017",
+            "authors": "Yanran Li; Hui Su; Xiaoyu Shen; Wenjie Li; Ziqiang Cao; Shuzi Niu"
+        },
+        {
+            "ref_id": "b10",
+            "title": "ROUGE: A package for automatic evaluation of summaries",
+            "journal": "Association for Computational Linguistics",
+            "year": "2004",
+            "authors": "Chin-Yew Lin"
+        },
+        {
+            "ref_id": "b11",
+            "title": "G-eval: Nlg evaluation using gpt-4 with better human alignment",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yang Liu; Dan Iter; Yichong Xu; Shuohang Wang; Ruochen Xu; Chenguang Zhu"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Bleu: a method for automatic evaluation of machine translation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2002",
+            "authors": "Kishore Papineni; Salim Roukos; Todd Ward; Wei-Jing Zhu"
+        },
+        {
+            "ref_id": "b13",
+            "title": "MAUVE: Measuring the gap between neural text and human text using divergence frontiers",
+            "journal": "",
+            "year": "2021",
+            "authors": "Krishna Pillutla; Swabha Swayamdipta; Rowan Zellers; John Thickstun; Sean Welleck; Yejin Choi; Zaid Harchaoui"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Natural language generation as incremental planning under uncertainty: Adaptive information presentation for statistical dialogue systems",
+            "journal": "IEEE/ACM Trans. Audio, Speech and Lang. Proc",
+            "year": "2014",
+            "authors": "Verena Rieser; Oliver Lemon; Simon Keizer"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Data-driven response generation in social media",
+            "journal": "",
+            "year": "2011",
+            "authors": "Alan Ritter; Colin Cherry; William B Dolan"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Contrastive search is what you need for neural text generation. Transactions on Machine Learning Research",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yixuan Su; Nigel Collier"
+        },
+        {
+            "ref_id": "b17",
+            "title": "A contrastive framework for neural text generation",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yixuan Su; Tian Lan; Yan Wang; Dani Yogatama; Lingpeng Kong; Nigel Collier"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Prototype-tostyle: Dialogue generation with style-aware editing on retrieval memory",
+            "journal": "IEEE/ACM Transactions on Audio, Speech, and Language Processing",
+            "year": "2021",
+            "authors": "Yixuan Su; Yan Wang; Deng Cai; Simon Baker; Anna Korhonen; Nigel Collier"
+        },
+        {
+            "ref_id": "b19",
+            "title": "A large-scale chinese short-text conversation dataset",
+            "journal": "Springer-Verlag",
+            "year": "1418",
+            "authors": "Yida Wang; Pei Ke; Yinhe Zheng; Kaili Huang; Yong Jiang; Xiaoyan Zhu; Minlie Huang"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Challenges in data-to-document generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2017",
+            "authors": "Sam Wiseman; Stuart Shieber; Alexander Rush"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Learning locality and isotropy in dialogue modeling",
+            "journal": "",
+            "year": "2023",
+            "authors": "Han Wu; Haochen Tan; Mingjie Zhan; Gangming Zhao; Shaoqing Lu; Ding Liang; Linqi Song"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Bertscore: Evaluating text generation with bert",
+            "journal": "",
+            "year": "2020",
+            "authors": "Tianyi Zhang; * ; Varsha Kishore; * ; Felix Wu; * ; Kilian Q Weinberger; Yoav Artzi"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Table 4: Relations between the context length and the human evaluation metrics while using the beam search. Sentence_Len dd-drc dd-ctg dd-bart lccc-drc lccc-ctg lccc-bart Greedy",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Ablation study on the DailyDialog dataset.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure 2: An image of a cosine similarity heatmap",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Automatic evaluation results on DailyDialog and LCCC, where BS means F1 value of BERTScore",
+            "figure_data": "DailyDialogLCCCModelStrategy greedyBS \u2191 0.1275 0.569 MV \u2191 GE \u2191 2.17Distinct Dis2 \u2191 Dis4 \u2191 0.344 0.776BS \u2191 0.0636 0.062 MV \u2191 GE \u2191 1.88Distinct Dis2 \u2191 Dis4 \u2191 0.126 0.437beam0.1317 0.5992.290.3410.7550.0639 0.1451.910.1550.466BARTtop-k nucleus0.1312 0.623 0.1298 0.6422.20 2.340.350 0.3520.780 0.7910.0648 0.154 0.0626 0.1781.94 1.910.152 0.1560.487 0.534contrastive 0.1147 0.6222.070.3960.8100.0538 0.2051.900.1900.583IPS0.1335 0.6472.430.3550.7980.0653 0.2121.980.1760.540greedy0.1099 0.4472.210.3060.7090.0678 0.0881.820.1370.470beam0.1196 0.5562.270.3140.7130.0692 0.2062.020.1790.539SimCTGtop-k0.1169 0.5442.060.3220.7330.0695 0.1952.110.1680.534(\u03c1 = 0.5)nucleus0.1169 0.5712.320.3270.7530.0680 0.2232.100.1690.575contrastive 0.1123 0.6082.170.3950.8070.0607 0.2781.980.1970.618IPS0.1293 0.6282.360.3590.7870.0704 0.2942.310.1960.580greedy0.1255 0.5602.060.3450.7740.0699 0.0902.210.1360.471SimDRC (\u03b4 = 0.7, \u03b1 = 0.3)beam top-k nucleus contrastive 0.1174 0.653 0.1315 0.632 0.1068 0.648 0.1284 0.6322.18 2.20 2.16 2.160.338 0.345 0.353 0.3970.745 0.773 0.793 0.8190.0715 0.196 0.0720 0.203 0.0697 0.226 0.0613 0.2712.11 2.19 1.88 2.210.180 0.166 0.166 0.1970.543 0.540 0.569 0.614IPS0.1336 0.6652.460.3660.8000.0722 0.2722.320.1920.569"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Results of human evaluation on DailyDialog and LCCC datasets, where SC means the semantic coverage, info. means informativeness.",
+            "figure_data": "Length Fluency Informativeness Coherence Semantic Coverage num[0,10)4.944.564.673.069[10,20)4.933.53.622.7713[20,30)4.73443.0911[30,40)4.753.5642.6712[40,50)4.853.673.562.289[50,75)4.953.523.612.4517[75,100)4.83.523.792.8415over 1004.933.794.212.9614"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "Sentence-level Analysis",
+            "figure_data": "label\"Damn it! I'm injured here. We could wait all day for the police.\"greedy\"Alright. I'll go get it.\"beam/top-p/top-k \"I don't feel like making a police report. I need to get to the hospital.\"contrastive\"Alright. I'll call the police.\"IPS\"Oh, I don't think I can afford to wait for the police. I need to get to the hospital.\""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Qualitative Instance A",
+            "figure_data": "A: Good afternoon! Did you call for a plumber?contextB: Yes, yes I did. Please come in! I'm so glad you came! This old house is falling apart!Come on into the bathroom. See, here, there's water leaking everywhere!greedy\"Well, it's leaking because of the leaking faucet in the shower.\"beam/top-p \"Well, it's leaking because of the leaking faucet in the shower.\"top-k\"I'm sorry, madam, but I don't think that water is leaking. I'm going to have to check it out.\""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Qualitative Instance B content A: I didn't receive an unemployment check this week and need to know why. B: Did you mail us your last Continued Claim Form? A: I am afraid that I forgot to send it in. B: We cannot pay you unless you turn that form in every two weeks. A: Is it too late to mail the Continued Claim Form in now? greedy I will mail it in right now. beam search It's too late to mail it in now. You will receive your check this week. top-k sampling I will mail it in right now if you can't wait. nucleus search It's too late to mail it in now. You will receive your check this week. contrastive search Yes, you can do it now. IPS Yes, it is. content A: Hello, this is Mike, Kara. B: Mike! Good to hear from you. How are you? A: Everything is fine, and how are you? B: Things are going well with me. A: Kara, I had fun the other night at the movies and was wondering if you would like to go out again this Friday. greedy I was thinking of it, but I am not feeling too well. I have to go to the hospital for a couple of days. beam search That sounds great. I would love to go out with you top-k sampling I would love to, but I have to work late on Friday. nucleus search That sounds great. I would love to go out with you. contrastive search Mike, I was thinking of it. IPS That sounds great. I would love to. content A: What do you think I should do, doctor? greedy I think you should have a good rest for three days. beam search I think you'd better have a good rest for three days top-k sampling I think you should go to see the head of the family. nucleus search I think you'd better have a good rest for three days. contrastive search Well, it's hard to say. You look a little pale, don't you? IPS Well, you should have a good rest for three days. Then you'll feel better.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "Results of generation texts of DailyDialog.",
+            "figure_data": "A: \u59d0\u505a\u7684\u597d\u559dcontentB: \u8fd9\u53e5\u59d0\u559c\u6b22 A: \u5982\u679c\u505a\u7ed9\u4ffa\u559d\uff0c\u90a3\u7edd\u5bf9\u662f\u7f8e\u5473\u554a\uff0c\u4eba\u95f4\u6781\u54c1\uff0c\u4f73\u80b4\u4e2d\u6ef4\u4f73\u80b4B:\u5bb6\u91cc\u6709\u8543\u8304\u4f46\u73b0\u5728\u59d0\u4e0d\u60f3\u505a\u54e9greedy\u6211\u4e5f\u559c\u6b22\u559d\uff0c\u4f46\u662f\u6211\u4e0d\u4f1a\u505a\u7ed9\u4f60\u559dbeam search\u6211\u4e5f\u4e0d\u60f3\u505a\uff0c\u6211\u559c\u6b22\u5403\u756a\u8304top-k sampling\u6211\u4e5f\u559c\u6b22\u5403\u8fd9\u79cd\u7f8e\u5473nucleus search\u6211\u4e5f\u4e0d\u60f3\u505a\u4e86\uff0c\u5c31\u662f\u559c\u6b22\u5403\"contrastive search \u6211\u4e5f\u4e0d\u60f3\u505a\uff0c\u5c31\u662f\u559c\u6b22\u5403\u8fd9\u79cd\u4e1c\u897f\u800c\u5df2IPS\u6211\u4e5f\u4e0d\u60f3\u505a\uff0c\u4f46\u662f\u6211\u559c\u6b22\u5403contentA: \u9b54\u90fd\u90fd\u4e0d\u51b7\u4e86\uff1f B: \u8fd9\u4e24\u5929\u6709\u70b9\u53cd\u5e38\u5427\u2026\u4f30\u8ba1\u8fc7\u4e24\u5929\u4f1a\u51b7\u4e0b\u53bb\u2026greedy\u6211\u4eec\u8fd9\u91cc\u4e5f\u662fbeam search\u6211\u4eec\u8fd9\u91cc\u4e5f\u662f\u8fd9\u6837\u7684\u5929\u6c14top-k sampling\u6211\u4eec\u8fd9\u91cc\u4e5f\u662f\u8fd9\u6837\u7684\u5929\u6c14nucleus search\u8fd9\u4e24\u5929\u6709\u70b9\u51b7\uff0c\u4f46\u662f\u4e5f\u4e0d\u662f\u7279\u522b\u51b7contrastive search \u8fd9\u4e24\u5929\u597d\u51b7\u554a\uff0c\u4f30\u8ba1\u660e\u5929\u5f00\u59cb\u5c31\u51b7IPS\u8fd9\u4e24\u5929\u5929\u6c14\u4e0d\u9519\uff0c\u4e0d\u8fc7\u4eca\u5929\u6709\u70b9\u51b7contentA: \u6211\u997f\u4e86\u3002greedy\u6211\u4e5f\u997f\u4e86\u3002beam search\u6211\u4e5f\u60f3\u5403\uff0c\u4f46\u662f\u6ca1\u6709\u65f6\u95f4\u3002top-k sampling\u6211\u997f\u4e86\uff0c\u6211\u8981\u53bb\u5403\u996d\u4e86\u3002nucleus search\u4f60\u600e\u4e48\u8fd9\u4e48\u65e9\u5c31\u7761\u4e86\u3002contrastive search \u6211\u4e5f\u997f\u4e86\u3002IPS\u6211\u4e5f\u997f\u4e86\uff0c\u4f60\u5403\u4e86\u5417\uff1f"
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "Results of generation texts of LCCC.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "H = PrLM(u 1 [EOU] u 2 [EOU] ... u N [EOU]),",
+            "formula_coordinates": [
+                2.0,
+                73.63,
+                324.8,
+                212.72,
+                13.76
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "p(w 1:|ur| ) = |ur| i=1 p(w i |w <i , D)(1)",
+            "formula_coordinates": [
+                2.0,
+                106.31,
+                416.36,
+                183.55,
+                24.98
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "h RT = 1 T T i=1 h w i (2)",
+            "formula_coordinates": [
+                2.0,
+                367.72,
+                123.24,
+                157.44,
+                25.77
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "p_value t = 1 t \u2212 1 t\u22121 i=1 s(h wt , h w i ) (3) i_value t = 1 N N i=1 s(h RT , h u i ) (4",
+            "formula_coordinates": [
+                2.0,
+                334.08,
+                393.63,
+                191.07,
+                62.19
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": ")",
+            "formula_coordinates": [
+                2.0,
+                520.91,
+                435.53,
+                4.24,
+                13.15
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "w t = argmax wt\u2208V (m) {\u03b1 \u00d7 p(w t | w <t , D) model confidence + (1 \u2212 \u03b1) \u00d7 (p_value t \u2212 i_value t )",
+            "formula_coordinates": [
+                2.0,
+                321.76,
+                592.95,
+                168.66,
+                50.81
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "} (5)",
+            "formula_coordinates": [
+                2.0,
+                491.72,
+                615.34,
+                33.43,
+                28.41
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "(1 \u2212 \u03b2) \u00d7 p_value \u2212 \u03b2 \u00d7 i_value (6)",
+            "formula_coordinates": [
+                4.0,
+                338.74,
+                726.32,
+                186.41,
+                20.55
+            ]
+        }
+    ],
+    "doi": "10.1145/3166054.3166058"
+}

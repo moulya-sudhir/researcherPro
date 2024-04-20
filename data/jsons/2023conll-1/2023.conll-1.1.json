@@ -1,0 +1,915 @@
+{
+    "title": "Can Language Models Be Tricked by Language Illusions? Easier with Syntax, Harder with Semantics",
+    "authors": "Yuhan Zhang; Edward Gibson; Forrest Davis",
+    "pub_date": "",
+    "abstract": "Language models (LMs) have been argued to overlap substantially with human beings in grammaticality judgment tasks. But when humans systematically make errors in language processing, should we expect LMs to behave like cognitive models of language and mimic human behavior? We answer this question by investigating LMs' more subtle judgments associated with \"language illusions\" -sentences that are vague in meaning, implausible, or ungrammatical but receive unexpectedly high acceptability judgments by humans. We looked at three illusions: the comparative illusion (e.g. \"More people have been to Russia than I have\"), the depth-charge illusion (e.g. \"No head injury is too trivial to be ignored\"), and the negative polarity item (NPI) illusion (e.g. \"The hunter who no villager believed to be trustworthy will ever shoot a bear\"). We found that probabilities represented by LMs were more likely to align with human judgments of being \"tricked\" by the NPI illusion which examines a structural dependency, compared to the comparative and the depth-charge illusions which require sophisticated semantic understanding. No single LM or metric yielded results that are entirely consistent with human behavior. Ultimately, we show that LMs are limited both in their construal as cognitive models of human language processing and in their capacity to recognize nuanced but critical information in complicated language materials.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Linguistic evaluations of language models use human language processing data (e.g. human norming data (Nair et al., 2020;Zhang et al., 2022), acceptability judgments (Linzen et al., 2016;Marvin and Linzen, 2018), behavioral or neural measures of language processing (Schrimpf et al., 2021;Kauf et al., 2022)) as benchmarks to investigate whether LMs possess knowledge of language. This assumes that human-produced data correctly instantiates abstract rules of a language and that humans fully utilize their linguistic knowledge in laboratories and everyday life. However, this assumption is an oversimplification. Humans make consistent errors during language processing (Gross, 1983). Under these circumstances, should we expect language models to behave the same as humans? Or should they circumvent human limitations and achieve error-free performance?",
+                "Consider, for example, the well-studied case of subject-verb agreement. While we expect an LM of Standard American English to prefer \"the key to the cabinets is on the shelf\" to \"the key to the cabinets are on the shelf\" (as discussed in Linzen et al., 2016), a wealth of psycholinguistic research has systematically documented that humans can ignore errors and accept globally ungrammatical strings (stemming from Bock and Miller, 1991). Should LMs follow the ideal grammar or mimic human's (sometimes) errorful behavior? 1  We add to this discussion by investigating three language illusions. Basic examples of each are given in (1): the comparative illusion (1-a), the depth-charge illusion (1-b), and the negativepolarity item (NPI) illusion (1-c). All three in (1) are literally unnatural English sentences, despite the fact that humans often find them surprisingly acceptable.",
+                "(1) a. More people have been to Russia than I have. b. No head injury is too trivial to be ignored. c. The hunter who no villager believed to be trustworthy will ever shoot a bear.",
+                "In this paper, we relied on minimally different strings springing out from the basic illusion sentences that are either (a) considered fully acceptable by human participants, (b) considered fully unacceptable by human participants, or (c) rated surprisingly acceptable by humans (i.e. instances of the relevant illusion). We explored whether language models capture the basic contrast between acceptable and unacceptable strings, whether they rate illusion sentences as better than their unacceptable counterparts, and finally, whether models capture nuanced linguistic manipulations that influence human judgments of the illusion material. Further, we compared two ways of measuring models' preferences, one over the whole sentence (perplexity) and another of a privileged position in the sentence (surprisal).",
+                "If LMs pattern like human comprehension behavior that involves errors, we expect to derive measures that similarly rate illusion sentences as more acceptable than typical unacceptable sentences. If, on the other hand, LMs align with ideal grammatical judgments, illusion sentences should be rated as unacceptable. Our findings indicate that none of the language models we investigated consistently exhibited illusion effects or demonstrated overall human-like judgment behaviors. Nor do they possess the necessary linguistic knowledge for errorfree, literal sentence processing. These findings add more insights into the discussion of LMs' emulation of human behavior and their construal as cognitive models of human language processing."
+            ],
+            "publication_ref": [
+                "b31",
+                "b60",
+                "b25",
+                "b28",
+                "b41",
+                "b20",
+                "b13",
+                "b25",
+                "b1"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related work",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "LMs' linguistic abilities",
+            "text": [
+                "We draw insights from evaluation work relying on acceptability tasks. The construction of minimal pairs has been used to evaluate models for a variety of linguistic processes, including subject-verb agreement (e.g. Linzen et al., 2016), filler-gap dependency (e.g. Wilcox et al., 2018), control (e.g. Stengel-Eskin and Van Durme, 2022), and binding (e.g. Davis, 2022). This basic template has been expanded into a variety of benchmarks, both for investigations of English (e.g. Warstadt et al., 2020), but also, other languages (e.g. Chinese (Song et al., 2022); Russian (Mikhailov et al., 2022); Japanese (Someya and Oseki, 2023)). While aggregated results suggest that models overlap with human acceptability judgments in a variety of cases (e.g. Hu et al., 2020), LMs can behave in distinctly nonhuman-like ways in capturing the intricacies of grammatical phenomenon (e.g. Lee and Schuster, 2022), the interaction between linguistic processes (e.g. Davis and van Schijndel, 2020), and in gen-eralizing knowledge to infrequent items (e.g. Wei et al., 2021).",
+                "In our experiments, we are interested in cases where human interpretations and behaviors differ from what is expected given the literal content of the entire string. Garden path sentences are a classic example of this basic phenomenon. Strings like \"The horse raced past the barn fell\" are often difficult for humans on first reading because the word raced is misparsed as a main verb (e.g. the horse raced past) rather than a reduced relative clause (e.g. the horse that was raced past the barn fell). LMs have been shown to similarly misprocess these sentences (van Schijndel and Linzen, 2021), though they fall short of capturing the magnitude of the processing cost (Arehalli et al., 2022). Here we expand these investigations to language illusions that similarly trigger errorful acceptable judgments in humans while being unnatural and unacceptable. We find that LMs do not pattern like humans in all cases."
+            ],
+            "publication_ref": [
+                "b25",
+                "b57",
+                "b4",
+                "b52",
+                "b45",
+                "b29",
+                "b44",
+                "b15",
+                "b23",
+                "b5",
+                "b54",
+                "b0"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Language illusions",
+            "text": [
+                "Language illusions refer to ungrammatical, semantically vague, or pragmatically implausible sentences that receive higher than expected acceptability by humans (Phillips et al., 2011). We study three language illusions in particular: comparative illusion (Montalbetti, 1984) (Section 4), depthcharge illusion (Wason and Reich, 1979) (Section 5), and NPI illusion (Xiang et al., 2009) (Section 6). Existing human research has found that the illusion effects for both the comparative and the depth-charge illusion are robust and overwhelming but the NPI illusion effect only appears during speeded judgment tasks or word-by-word online paradigms (Parker and Phillips, 2016;Wellwood et al., 2018;Paape et al., 2020;Orth et al., 2021).",
+                "For human sentence processing, it has been suggested that language illusions provide evidence for rational inference of error-prone strings which integrates heuristics and available context information during processing (Ferreira et al., 2002;Levy, 2008;Gibson et al., 2013;Futrell et al., 2020;Hahn et al., 2022;Zhang et al., 2023a). These phenomena raise fundamental questions like what is the role of our grammatical knowledge in comparison to other cognitive resources when it comes to assigning a specific interpretation to a linguistic string, and how we can model their interactions to make better predictions about human sentence processing.",
+                "Studying LMs' processing of language illusions provides a way to explore whether they can be viewed as cognitive models of human sentence processing. As large language models like ChatGPT improve at generating grammatically appropriate strings, it becomes ever more important to investigate whether they are comparable to human language processing behavior at all (see Mahowald et al., 2023, for a review). From there, we can reason about what characteristics in the training of LMs, the architecture of LMs, and the \"abilities\" of LMs enable them to carry out either literal interpretations and detect the anomaly, or to fall into the illusion rabbit hole."
+            ],
+            "publication_ref": [
+                "b38",
+                "b30",
+                "b37",
+                "b56",
+                "b35",
+                "b33",
+                "b8",
+                "b24",
+                "b12",
+                "b9",
+                "b14"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Methods",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Models and Measures",
+            "text": [
+                "We analyzed four models, two masked language models, and two autoregressive models: BERT (Devlin et al., 2019), RoBERTa (Liu et al., 2019), GPT-2 (Radford et al., 2019), GPT-3 (Brown et al., 2020). BERT, RoBERTa, and GPT-2 were accessed via HuggingFace (Wolf et al., 2020), and GPT-3 via OpenAI's API. 2 We used two measures, sentence level perplexity and surprisal of specific target words. For autoregressive models, the surprisal of a specific word 3 is given by the following equation:",
+                "Surp(w i ) = \u2212log Prob(w i |w 1 ...w i\u22121 ) (1)",
+                "Perplexity for a sentence of N words is:",
+                "2 1 N N i=1 Surp(w i )(2)",
+                "For bidirectional models, we calculated the surprisal of a word in a context by using the masking technique in Kauf and Ivanova (2023), which corrects for words that are subworded. 4 Further, we used this masking technique to calculate the pseudo-perplexity of a sentence (Salazar et al., 2020). 2 We used 'bert-base-cased', 'roberta-base', 'gpt2', and 'text-davinci-003'. Code for replicating the results, statistical tests, and figures can be found at https://github.com/ forrestdavis/LanguageIllusions.git .",
+                "3 For words that are subworded, the joint probability was calculated.",
+                "4 For example, consider the word 'souvenir'. This is subworded by BERT into 'so', '##uven', and 'ir'. Rather than MASK each subpart, one at a time, (e.g. 'so' [MASK] 'ir'), the right context of the target subword is always masked (e.g. 'so' [MASK] [MASK])."
+            ],
+            "publication_ref": [
+                "b6",
+                "b26",
+                "b39",
+                "b58",
+                "b19",
+                "b40"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation procedure",
+            "text": [
+                "We treated LMs as psycholinguistic research subjects to generate both whole-sentence perplexity and surprisals at critical words for carefully controlled minimal pairs for each illusion (following, Futrell et al., 2019). Assuming these two scores are correlated to human acceptability judgments (Lau et al., 2017), we constructed mix-effects linear regression models from the R package lme4 to test whether LMs were also sensitive to reported manipulations that affect human judgments. For each scoring metric, we took it as the dependent variable and coded the manipulation condition representing a certain hypothesis into the independent variable. We read the estimated coefficient(s) of the tested condition variable(s) to infer whether LMs show sensitivity to the effect of that condition manipulation on the scoring metric. We evaluated language models in three broad aspects: acceptability differentiation, illusion effect, and sensitivity to manipulations.",
+                "\u2022 Acceptability differentiation We first asked whether language models could distinguish acceptable sentences from unacceptable sentences that humans have no trouble dealing with. 5 Models with relevant knowledge should assign lower perplexity/surprisal to acceptable sentences versus unacceptable ones.",
+                "\u2022 Illusion effect We took the results from the acceptability differentiation task as the foundation to test the illusion sentences. Here, we hypothesized that language models should either (i) align with humans' illusionary judgments, reflected by models' generating a lower perplexity/surprisal for illusion sentences than the unacceptable controls, or (ii) deviate from human behavior and show hints of being a literal processor, reflected by models' generating a higher or similar perplexity/surprisal score compared to the unacceptable condition.",
+                "If models behave like humans, then we expected (i) to be the models' consistent behavior. If models conform to (ii), we take this as evidence of non-human-like behavior.",
+                "\u2022 Sensitivity to manipulations Lastly, we assessed whether language models were sensi- "
+            ],
+            "publication_ref": [
+                "b10",
+                "b22"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Comparative illusion",
+            "text": [
+                "A canonical comparative illusion surfaces in sentences like \"More people have been to Russia than I have\". People accept it at first glance but have trouble pinning down the exact meaning (Montalbetti, 1984) one of which could be that the number of the group of people who've been to Russia is greater than the number of \"me\". Potential rational nonliteral inference could be \"people have been to Russia more times than I have\" or \"people have been to Russia but I haven't\" (O'Connor, 2015;Christensen, 2016). Psycholinguistic research has found that various factors modulate the strength of the illusion, including the repeatability of the event described by the verb phrase, the subject form of the than-clause subject (e.g. \"... than the student has\" vs. \"...I have\"), as well as the number of that subject (e.g. \"I have\" vs. \"we have\") (Wellwood et al., 2018). There is also a claim arguing that the processing mechanism follows the noisy-channel predictions under an information-theoretic account (Zhang et al., 2023b).",
+                "We adapted the experimental materials with 32 items from Zhang et al. (2023b). 6 An example is in (2) where (2-a) is the canonical comparative illusion, (2-b) is the acceptable control, and (2-c) is the unacceptable one. 7 6 See Table 3 in the Appendix for the full paradigm. 7 The repeatability of the verb phrase is responsible for this "
+            ],
+            "publication_ref": [
+                "b30",
+                "b32",
+                "b3",
+                "b56"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acceptability differentiation",
+            "text": [
+                "We first ensured that LMs distinguish acceptable neighbors (2-b) of the illusion sentence from unacceptable ones (2-c). We ran statistical mixedeffects linear regression models on whole-sentence perplexity and the surprisal at the word have for the four language models. Either the perplexity or the surprisal was taken as the dependent variable with the condition \"acceptability\" as the fixed effect (reference level = the unacceptable condition, with a nonrepeatable verb phrase vs. the acceptable condition, with a repeatable verb phrase) and the random intercept of each item as the random effect. 8  Table 1 shows the estimated coefficient for the main effect of each mixed-effect model for each LM and each illusion phenomenon. A significant negative estimated coefficient suggests that acceptable sentences received lower perplexity/surprisal compared to the unacceptable ones, indicating that LMs distinguish sentences based on acceptability. Except for surprisal values from BERT and GPT-2, the other six statistical models indicate that the LMs capture the acceptability difference of baseline sentences for the comparative illusion."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Illusion effect",
+            "text": [
+                "This task investigated whether language models pattern with humans in demonstrating illusion effects contrast, as it is more natural to say \"use Tiktok more often or frequent\" compared with \"install Tiktok more often\" when the action typically takes place once (in a while). 8 The model syntax in R was PPL/SURP \u223c acceptability + (1|item).",
+                "Figure 1: The y axis shows the coefficient estimates which represent the increase in perplexity/surprisal when the sentence is unacceptable compared to the illusion case, crossing three language illusions and four LMs. \"+\" marks a human-like behavior, in this case, an illusion effect where the unacceptable condition receives significantly higher perplexity/surprisal values than the illusion condition. \"*\" means that the estimated coefficient is significant.",
+                "with the basic comparative illusion construction. The contrast involves the illusion condition (2-a) with existing control conditions ((2-b) and (2-c)). The standardized metrics of the four LMs are displayed in Figure 6 in the Appendix. To evaluate whether LMs capture an illusion effect, we constructed another suite of statistical models across the four LMs and two metrics where the main effect has three levels -the illusion condition (reference), the acceptable condition, and the unacceptable condition -and the random effect included a random intercept for items. 9  We analyzed the coefficient estimates of the main effect of the unacceptable condition compared with the illusion condition. 10 An illusion effect would appear with higher perplexity/surprisal for the unacceptable condition compared to the illusion case. In other words, the estimated coefficients for the unacceptable condition should be significantly positive.",
+                "Figure 1 and Table 2 (in Appendix) display the estimated coefficients for the unacceptable condition compared with the illusion condition. For the comparative illusion, only BERT and RoBERTa measured by perplexity show a human-like illusion effect. Other LM-metric combinations indicate that the illusion condition was rated either the same or worse than the unacceptable condition (contrary to humans). 9 The model syntax in R was PPL/SURP \u223c condition + (1|item) where condition had three levels. 10 The coefficients for the acceptable condition generate similar conclusions. Further, no illusion sentences were rated better than acceptable ones.",
+                "Figure 2: Estimated coefficients for critical linguistic manipulations in comparative illusion. The y axis shows the estimated coefficients for the increase in perplexity/surprisal with respect to singular vs. plural thanclause subjects, or nonrepeatable vs. repeatable verb phrases, respectively. \"*\" means statistically significant contrasts; \"+\" means human-like results."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Sensitivity to manipulations",
+            "text": [
+                "In this step, we evaluated whether language models were sensitive to sentence manipulations that affect human judgments. Three factors were investigated:",
+                "(1) than-clause subject structure (pronoun vs. NP), (2) subject number (singular vs. plural), and (3) verb repeatability (repeatable vs. nonrepeatable). For humans, plural than-clause subjects are more acceptable than singular ones only in the NP case. Overall, repeatable verbs are more acceptable than nonrepeatable ones (O'Connor, 2015;Wellwood et al., 2018;Zhang et al., 2023b).",
+                "Figure 2 displays the estimated coefficients for the main effects from the statistical models. 11  As for the subject number, when the than-clause subject was a pronoun, only BERT and GPT-2 (with perplexity) aligned with human-like behavior: there is no difference between singular and plural than-clause subjects. When it comes to NP subjects, all four LMs with both metrics showed human-like behavior where the singular NP subject was more unacceptable than the plural NP subject. As for repeatability, all four LMs captured this distinction in the pronoun condition but in the NP condition, only RoBERTa and GPT-3 achieved human-like results with perplexity.",
+                "In general, we only found partial overlap between LMs and humans. This indicates that even though LMs show some knowledge of acceptability for comparative structures, they might operate differently from humans when processing more subtle differences. None of the language models fully captured all the manipulations."
+            ],
+            "publication_ref": [
+                "b32",
+                "b56"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Depth-charge illusion",
+            "text": [
+                "Consider the most famous depth-charge sentence No head injury is too trivial to be ignored (Wason and Reich, 1979). People overwhelmingly interpret it as meaning \"no matter how trivial head injuries are, we should not ignore them\", while the literal meaning is the opposite as \"we should ignore them\".",
+                "To understand the depth-charge sentence requires knowing meaning composition rules, multiple negation processing (Wason and Reich, 1979), adequate world knowledge reasoning (Paape et al., 2020), and the neighboring constructions of too...to such as so...that, so...as to and enough to... (Zhang et al., 2023a). Since existing research already shows that language models are quite limited in processing negation (e.g. Kassner and Sch\u00fctze, 2019;Ettinger, 2020), we speculate that LMs might encounter difficulty in the more complicated case of depth-charge sentences.",
+                "The evaluation materials were adapted from Zhang et al. (2023a) with 32 items. An example is (3) where we take the surprisal of the sentence-final word for comparison.",
+                "(3) a. (?) No head injury is too trivial to be ignored. (depth-charge sentence) b. Some head injury is too severe to be ignored. (plausible, acceptable) c. (#) Some head injury is too trivial to be ignored. (implausible, unacceptable)"
+            ],
+            "publication_ref": [
+                "b53",
+                "b53",
+                "b35",
+                "b18",
+                "b7"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acceptability differentiation",
+            "text": [
+                "Utilizing the same methodology as the comparative illusion, we found, as depicted in Table 1, that all combinations of LMs and metrics, except GPT-2 (perplexity), captured the acceptability difference between ((3-b)) and ((3-c)) with a significantly lower perplexity/surprisal for the acceptable sentences like (3-b)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Illusion effect",
+            "text": [
+                "Next, we studied if LMs \"experience\" the illusion effect by assigning lower perplexity/surprisal scores to the depth-charge sentence (3-a) compared to the unacceptable one (3-c).",
+                "Our statistical results show, in Figure 1 and Table 2 (Appendix), that only RoBERTa and GPT-3 demonstrated an illusion effect (for surprisal) by assigning a significantly higher score to the unacceptable control sentences. This means that it is not easy to \"trick\" LMs with the depth-charge illusion. Similar results have led concurrent work to suggest that LMs are better at deriving the literal meaning of a sentence, which is in sharp contrast with the overwhelming illusion effect from humans (Paape, 2023, a.o.)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Sensitivity to manipulations",
+            "text": [
+                "This task tested LMs' sensitivity to the plausibility contrast of three near-neighbor pairs of the depthcharge sentence. These pairs differ by the degree quantifier construction (too...to vs. so...as to vs. too...to not). 12 Competent language models should differentiate plausible sentences from implausible ones.",
+                "Figure 3 displays estimated coefficients of statistical models' main effect. We expect implausible sentences to receive higher perplexities/surprisals when the illusion occurs. 13 We find that LMs captured some of the distinctions in the too...to condition and the so...as to condition. However, im- 12 The full suite of paradigms is shown in Table 4 in the Appendix. 13 Iterating over sentence pairs, LMs, and metrics, we ran mixed-effects linear regression models on scores over the plausibility contrast (reference = plausible).",
+                "Figure 3: Estimated coefficients for the plausibility contrast (reference = plausible) in depth-charge illusions. The y axis shows the increase in perplexity/surprisal when the sentence is implausible vs. plausible. \"*\" means statistically significant contrasts; \"+\" means human-like behavior. While we see differences among LMs and metrics in the \"no...so...as to\" and the \"no...too...to\" conditions, the condition of \"no...too...to not\" yielded completely opposite results to humans.",
+                "plausible sentences with too...to not were rated as more acceptable than their plausible counterparts, which flouts what linguistic rules predict. 14 The fact that \"No head injury is too trivial to be treated\" and \"No head injury is too trivial to not be ignored\" generate opposite results while having the same meaning suggests LMs still struggled with negation, antonyms, and meaning composition (Kim and Linzen, 2020;She et al., 2023;Truong et al., 2023)."
+            ],
+            "publication_ref": [
+                "b21",
+                "b42",
+                "b48"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "NPI illusion",
+            "text": [
+                "Negative polarity items and their licensing conditions have been investigated in prior work with language models. For a canonical NPI (e.g. ever, any) to be acceptable, it has to be in the scope of negation. 15 Existing computational research has shown that the syntactic dependency between the licensor and the NPI is captured by language models (Jumelet and Hupkes, 2018;Jumelet et al., 2021;Shin et al., 2023) but with more difficulty as compared to subject-verb agreement or other syntactic dependencies (Marvin and Linzen, 2018;Warstadt et al., 2019Warstadt et al., , 2020)). In this task, we expanded the suite of LMs and metrics and explored sensitivities to four types of licensors.",
+                "Our materials came from Orth et al. ( 2021) with 32 items. The essential triad is (4) where the illusion condition has the NPI ever not in the scope of the negation word no.",
+                "(4) a. (?) The hunter who no villager believed to be trustworthy will ever shoot a bear. (NPI illusion) b. No hunter who the villager believed to be trustworthy will ever shoot a bear.",
+                "(Matrix No, acceptable) c. (*) The hunter who the villager believed to be trustworthy will ever shoot a bear. (Licensor Absent, unacceptable)"
+            ],
+            "publication_ref": [
+                "b17",
+                "b16",
+                "b43",
+                "b28",
+                "b52"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acceptability differentiation",
+            "text": [
+                "Table 1 shows that all the four LMs could capture the acceptability difference of control sentences (4-b) and (4-c) (with both metrics)."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Illusion effect",
+            "text": [
+                "Figure 1 and Table 2 show that only in the case of surprisal did we see an illusion effect where the unacceptable sentences (e.g. (4-c)) received significantly higher surprisals than the illusion sentence (e.g., (4-a)). This finding replicates Shin et al. (2023) in that, for the illusion condition ((4-a)) where no linearly precedes ever but is in an unlicensing position, ever incurs higher surprisal. It is interesting to see the sharp discrepancy between surprisal and perplexity, which we leave to Section 7.4 for discussion."
+            ],
+            "publication_ref": [
+                "b43"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Sensitivity to variations",
+            "text": [
+                "The linguistic manipulations we explored concern the illusion effect in the illusion condition with different NPI licensors. Among the ones we tested, didn't, did not, and never, 16 human research shows that none of these triggers illusion effects (Orth et al., 2021;cf. Vasishth et al., 2008). Iterating over licensors, LMs, and metrics, we ran statistical models with the same structure in Section 6.2. We plotted the estimated coefficients of the unacceptable main effect in Figure 4 and predicted that a significantly positive coefficient indicates an illusion effect. Contrary to human-like behavior, for all three licensors there were some LM-metric combinations that indicate an illusion The y axis shows the increase in perplexity/surprisal when the sentence is ungrammatical vs. is in the illusion condition. \"+\" marks an illusion effect while none of the three licensors should trigger an illusion effect according to human behavior; \"*\" means a significant contrast.",
+                "effect: for the licensor did not, RoBERTa (perplexity) and GPT-2 (perplexity) show an illusion effect; for didn't, all four LMs with perplexity show an illusion effect; for never, all four LMs with surprisal, plus RoBERTa with perplexity, show an illusion effect. This pattern shows that with NPI illusions, LMs are more easily tricked than humans."
+            ],
+            "publication_ref": [
+                "b33"
+            ],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Discussion",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Illusion effect",
+            "text": [
+                "Successful language processing requires a dynamic integration of lexical knowledge, grammatical knowledge, logical reasoning, and world knowledge, among other cognitive abilities and sources of knowledge. An illusion effect in humans where unacceptable sentences receive unexpectedly high acceptability presents a unique case where the comprehender might prioritize different processing mechanisms or linguistic constraints for meaning inference over those employed for common processing. Studying how language models process language illusions helps us understand (1) from a superficial level, whether LMs appear to be humanlike -circumventing some grammatical facts and reaching a good-enough sentence representation, and (2) from a deeper level, whether LMs employ the same set of resources and abilities to process a sentence (i.e. whether they can serve as cognitive models).",
+                "In this research, we aim for the first level of un-derstanding. By studying four language models' acceptability judgments of three language illusions, we found that LMs were good at the basic acceptability differentiation task and yet no LMs showed consistent human-like illusion effects among three illusion phenomena by any metric (Figure 5). We conclude from this result that LMs might not be a good cognitive model of human language processing. With this said, we do observe a divergence between the comparative/depth-charge illusion and the NPI illusion -it seems more likely for LMs to be tricked by the NPI illusion compared to the former two. Since the NPI illusion is more relevant to the hierarchical structure of language whereas both the comparative illusion and depth-charge illusion emphasize semantic nuances, we tentatively conclude that LMs are more easily tricked by syntactic illusion rather than semantic illusions."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Human-like behaviors & Potential processing mechanisms",
+            "text": [
+                "For both the comparative illusion and depth-charge illusion, the illusion effect test did not show humanlike behavior. This could either mean that LMs strictly abide by linguistic rules to compose the language literally or that LMs have trouble understanding this complicated set of sentences overall.",
+                "For the comparative illusion, the sensitivity task (Section 4.3) suggests that they might have some capacity to process comparative structures. For the depth-charge illusion, that LMs seem to have trouble understanding the literal contrast between plausible/implausible pairs (Section 5.3) suggests sentences involving multiple negations could pose a challenge to LMs. The two cases indicate we still need to develop more robust evaluations to gauge LMs' semantic capabilities in various semantic domains.",
+                "For the NPI illusion, the interpretation could be more complicated. On one hand, the illusion test for the licensor no yields human-like results (with surprisal) but other licensors also elicit non-humanlike illusion effect (cf. Orth et al., 2021). On the other hand, the discrepancy between sentence perplexity and surprisal makes it difficult to conclude to what degree LMs and humans overlap (cf. Shin et al., 2023).",
+                "Ultimately, we want to address whether LMs are like humans that utilize not only grammatical rules but also contexts, frequencies, and semantic priors to rationally process language, or LMs are like grammarians that interpret string inputs in a strict compositional manner. Our investigation does not yield consistent results given the three language illusions but the behavioral inconsistency suggests that language models are far from being a cognitive model of human language."
+            ],
+            "publication_ref": [
+                "b33",
+                "b43"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Language models' performance in general",
+            "text": [
+                "All four language models performed on par with each other. If we tallied the number of tests where LMs reported expected results from Figure 5 and averaged between perplexity and surprisal, we have a ranking order from RoBERTa (N=10) and GPT-3 (N=9), to BERT (N=8.5) and GPT-2 (N=8). The successors of both the masked language model and the autoregressive model perform better than their predecessors."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Perplexity & Surprisal",
+            "text": [
+                "It is surprising to see that the two widely used probability-based metrics can generate different results for a given hypothesis and a given language model. Future work should (i) investigate both mathematically and practically why the difference could occur and (ii) check if better definitions for the critical regions exist to capture surprisals. Future evaluation work that utilizes one metric should be mindful of the intrinsic limitations of that metric."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "Considering the research methodology, acceptability judgment tasks (even with carefully controlled minimal pairs) are indirect measures of language comprehension and it is hard to infer the exact interpretation based on probability-based measures. Further studies should work on direct comprehension measures (e.g. generating paraphrases) that reveal LMs' hidden knowledge."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "We tested four language models' ability to process three language illusions and asked (1) whether they judge unacceptable illusion sentences to be more acceptable as humans (termed an illusion effect) and (2) whether they are sensitive to linguistic manipulations that modulate human judgments. Our results are based on whole-sentence perplexity and critical word surprisal. We show that none of the LMs demonstrated consistent illusion effects or exhibited overall human-like judgment behaviors. We conclude that given the case of language illusions, language models neither behave like humans with full sets of cognitive abilities and error-prone behavior nor possess the necessary linguistic knowledge for error-free, literal sentence processing. Language models cannot be viewed as cognitive models of language processing, which makes understanding them even more intriguing."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgements",
+            "text": [
+                "We thank the three anonymous reviewers for their helpful feedback. We thank Ankana Saha, Carina Kauf and Hayley Ross for the helpful discussion about the project."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Illusion type",
+            "text": [
+                "BERT RoBERTa GPT-2 GPT-3 PPL Surp PPL Surp PPL Surp PPL Surp Comparative 0.43 -0.07 0.45 -0.22 -0.33 -0.08 0.15 -0.04 Depth-charge -0.61 -0.01 -0.20 0.28 -0.41 -0.01 0.12 0.90 NPI -0.87 0.27 -0.21 0.54 -0.79 0.48 -0.70 0.41",
+                "Illusion sentences are more acceptable than unacceptable sentences.",
+                "The unacceptable sentences are more acceptable than illusion sentences. No significant difference between the two conditions.  No head injury is too trivial to not be ignored. too...to not implausible No head injury is too trivial to not be treated. so...as to plausible No head injury is so trivial as to be ignored. so...as to implausible No head injury is so trivial as to be treated. No hunter who the villager believed to be trustworthy will ever shoot a bear. Licensor Absent The hunter who the villager believed to be trustworthy will ever shoot a bear."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Relative No",
+            "text": [
+                "The hunter who no villager believed to be trustworthy will ever shoot a bear. Relative Didn't",
+                "The hunter who didn't believe the villager to be trustworthy will ever shoot a bear. Relative Did not The hunter who did not believe the villager to be trustworthy will ever shoot a bear."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Relative Never",
+            "text": [
+                "The hunter who never believed the villager to be trustworthy will ever shoot a bear.  "
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Syntactic Surprisal From Neural Models Predicts, But Underestimates, Human Processing Difficulty From Syntactic Ambiguities",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Suhas Arehalli; Brian Dillon; Tal Linzen"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Broken agreement",
+            "journal": "Cognitive psychology",
+            "year": "1991",
+            "authors": "Kathryn Bock;  Miller"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Language models are fewshot learners",
+            "journal": "",
+            "year": "2020",
+            "authors": "Tom Brown; Benjamin Mann; Nick Ryder; Melanie Subbiah; Jared D Kaplan; Prafulla Dhariwal; Arvind Neelakantan; Pranav Shyam; Girish Sastry; Amanda Askell"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Let us have articles betwixt us-Papers in Historical and Comparative Linguistics in Honour",
+            "journal": "",
+            "year": "2016",
+            "authors": "Ken Ramsh\u00f8j Christensen"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Incremental Processing of Principle B: Mismatches Between Neural Models and Humans",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Forrest Davis"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Discourse structure interacts with reference but not syntax in neural language models",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Forrest Davis; Marten Van Schijndel"
+        },
+        {
+            "ref_id": "b6",
+            "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+            "journal": "",
+            "year": "2019",
+            "authors": "Jacob Devlin; Ming-Wei Chang; Kenton Lee; Kristina Toutanova"
+        },
+        {
+            "ref_id": "b7",
+            "title": "What BERT Is Not: Lessons from a New Suite of Psycholinguistic Diagnostics for Language Models. Transactions of the Association for Computational Linguistics",
+            "journal": "MIT Press",
+            "year": "2020",
+            "authors": "Allyson Ettinger; ; Cambridge; M A Publisher"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Good-Enough Representations in Language Comprehension",
+            "journal": "Current Directions in Psychological Science",
+            "year": "2002",
+            "authors": "Fernanda Ferreira; G D Karl; Vittoria Bailey;  Ferraro"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Lossy-Context Surprisal: An Information-Theoretic Model of Memory Effects in Sentence Processing",
+            "journal": "Cognitive Science",
+            "year": "2020",
+            "authors": "Richard Futrell; Edward Gibson; Roger P Levy"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Neural language models as psycholinguistic subjects: Representations of syntactic state",
+            "journal": "",
+            "year": "2019",
+            "authors": "Richard Futrell; Ethan Wilcox; Takashi Morita; Peng Qian; Miguel Ballesteros; Roger Levy"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Negative and positive polarity items. Semantics-Sentence and information structure",
+            "journal": "",
+            "year": "2019",
+            "authors": "Anastasia Giannakidou; Claudia Klaus Von Heusinger; Paul Maienborn;  Portner"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Rational integration of noisy evidence and prior semantic expectations in sentence interpretation",
+            "journal": "Proceedings of the National Academy of Sciences",
+            "year": "2013",
+            "authors": "Edward Gibson; Leon Bergen; Steven T Piantadosi"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Errors in Linguistic Performance: Slips of the Tongue, Ear, Pen, and Hand. The journal of nervous and mental disease",
+            "journal": "",
+            "year": "1983",
+            "authors": "Herbert S Gross"
+        },
+        {
+            "ref_id": "b14",
+            "title": "A resource-rational model of human processing of recursive linguistic structure",
+            "journal": "",
+            "year": "2022",
+            "authors": "Michael Hahn; Richard Futrell; Roger Levy; Edward Gibson"
+        },
+        {
+            "ref_id": "b15",
+            "title": "A systematic assessment of syntactic generalization in neural language models",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Jennifer Hu; Jon Gauthier; Peng Qian; Ethan Wilcox; Roger Levy"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Language Models Use Monotonicity to Assess NPI Licensing",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Jaap Jumelet; Milica Denic; Jakub Szymanik; Dieuwke Hupkes; Shane Steinert-Threlkeld"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Do Language Models Understand Anything? On the Ability of LSTMs to Understand Negative Polarity Items",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Jaap Jumelet; Dieuwke Hupkes"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Negated LAMA: birds cannot fly",
+            "journal": "",
+            "year": "2019",
+            "authors": "Nora Kassner; Hinrich Sch\u00fctze"
+        },
+        {
+            "ref_id": "b19",
+            "title": "A Better Way to Do Masked Language Model Scoring",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Carina Kauf; Anna Ivanova"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Event knowledge in large language models: the gap between the impossible and the unlikely",
+            "journal": "",
+            "year": "2022",
+            "authors": "Carina Kauf; Anna A Ivanova; Giulia Rambelli; Emmanuele Chersoni; S Jingyuan; Zawad She; Evelina Chowdhury; Alessandro Fedorenko;  Lenci"
+        },
+        {
+            "ref_id": "b21",
+            "title": "COGS: A compositional generalization challenge based on semantic interpretation",
+            "journal": "",
+            "year": "2020",
+            "authors": "Najoung Kim; Tal Linzen"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Grammaticality, Acceptability, and Probability: A Probabilistic View of Linguistic Knowledge",
+            "journal": "Cognitive Science",
+            "year": "2017",
+            "authors": "Alexander Jey Han Lau; Shalom Clark;  Lappin"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Can language models capture syntactic associations without surface cues? a case study of reflexive anaphor licensing in English control constructions",
+            "journal": "",
+            "year": "2022",
+            "authors": "Sebastian Soo-Hwan Lee;  Schuster"
+        },
+        {
+            "ref_id": "b24",
+            "title": "A noisy-channel model of rational human sentence comprehension under uncertain input",
+            "journal": "Association for Computational Linguistics",
+            "year": "2008",
+            "authors": "Roger Levy"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Assessing the Ability of LSTMs to Learn Syntax-Sensitive Dependencies",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2016",
+            "authors": "Tal Linzen; Emmanuel Dupoux; Yoav Goldberg"
+        },
+        {
+            "ref_id": "b26",
+            "title": "",
+            "journal": "RoBERTa: A Robustly Optimized BERT Pretraining Approach",
+            "year": "2019",
+            "authors": "Yinhan Liu; Myle Ott; Naman Goyal; Jingfei Du; Mandar Joshi; Danqi Chen; Omer Levy; Mike Lewis; Luke Zettlemoyer; Veselin Stoyanov"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Dissociating language and thought in large language models: a cognitive perspective",
+            "journal": "",
+            "year": "2023",
+            "authors": "Kyle Mahowald; Anna A Ivanova; A Idan; Nancy Blank; Joshua B Kanwisher; Evelina Tenenbaum;  Fedorenko"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Targeted syntactic evaluation of language models",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Rebecca Marvin; Tal Linzen"
+        },
+        {
+            "ref_id": "b29",
+            "title": "RuCoLA: Russian corpus of linguistic acceptability",
+            "journal": "",
+            "year": "2022",
+            "authors": "Vladislav Mikhailov; Tatiana Shamardina; Max Ryabinin; Alena Pestova; Ivan Smurov; Ekaterina Artemova"
+        },
+        {
+            "ref_id": "b30",
+            "title": "After binding: On the interpretation of pronouns",
+            "journal": "",
+            "year": "1984",
+            "authors": "Mario M Montalbetti"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Contextualized Word Embeddings Encode Aspects of Human-Like Word Sense Knowledge",
+            "journal": "",
+            "year": "2020",
+            "authors": "Sathvik Nair; Mahesh Srinivasan; Stephan Meylan"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Comparative illusions at the syntax-semantics interface",
+            "journal": "",
+            "year": "2015",
+            "authors": "O' Ellen;  Connor"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Negative polarity item (NPI) illusion is a quantification phenomenon",
+            "journal": "Journal of Experimental Psychology: Learning, Memory, and Cognition",
+            "year": "2021",
+            "authors": "Wesley Orth; Masaya Yoshida; Shayne Sloggett"
+        },
+        {
+            "ref_id": "b34",
+            "title": "When Transformer models are more compositional than humans: The case of the depth charge illusion. Experiments in Linguistic Meaning",
+            "journal": "",
+            "year": "2023",
+            "authors": "Dario Paape"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Quadruplex negatio invertit? The on-line processing of depth charge sentences",
+            "journal": "Journal of Semantics",
+            "year": "2020",
+            "authors": "Dario Paape"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Recurrent babbling: Evaluating the acquisition of grammar from limited input data",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Ludovica Pannitto; Aur\u00e9lie Herbelot"
+        },
+        {
+            "ref_id": "b37",
+            "title": "Negative polarity illusions and the format of hierarchical encodings in memory",
+            "journal": "Cognition",
+            "year": "2016",
+            "authors": "Dan Parker; Colin Phillips"
+        },
+        {
+            "ref_id": "b38",
+            "title": "Grammatical illusions and selective fallibility in real-time language comprehension",
+            "journal": "Experiments at the Interfaces",
+            "year": "2011",
+            "authors": "Colin Phillips; Matthew W Wagers; Ellen F Lau"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Language models are unsupervised multitask learners",
+            "journal": "OpenAI blog",
+            "year": "2019",
+            "authors": "Alec Radford; Jeffrey Wu; Rewon Child; David Luan; Dario Amodei; Ilya Sutskever"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Masked language model scoring",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Julian Salazar; Davis Liang; Toan Q Nguyen; Katrin Kirchhoff"
+        },
+        {
+            "ref_id": "b41",
+            "title": "The neural architecture of language: Integrative modeling converges on predictive processing",
+            "journal": "Proceedings of the National Academy of Sciences",
+            "year": "2021",
+            "authors": "Martin Schrimpf; Asher Idan; Greta Blank; Carina Tuckute;  Kauf; A Eghbal; Nancy Hosseini; Joshua B Kanwisher; Evelina Tenenbaum;  Fedorenko"
+        },
+        {
+            "ref_id": "b42",
+            "title": "Scone: Benchmarking negation reasoning in language models with fine-tuning and in-context learning",
+            "journal": "",
+            "year": "2023",
+            "authors": "Jingyuan Selena She; Christopher Potts; R Samuel; Atticus Bowman;  Geiger"
+        },
+        {
+            "ref_id": "b43",
+            "title": "Investigating a neural language model's replicability of psycholinguistic experiments: A case study of NPI licensing",
+            "journal": "Frontiers in Psychology",
+            "year": "2023",
+            "authors": "Unsub Shin; Eunkyung Yi; Sanghoun Song"
+        },
+        {
+            "ref_id": "b44",
+            "title": "JBLiMP: Japanese benchmark of linguistic minimal pairs",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Taiga Someya; Yohei Oseki"
+        },
+        {
+            "ref_id": "b45",
+            "title": "SLING: Sino linguistic evaluation of large language models",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yixiao Song; Kalpesh Krishna; Rajesh Bhatt; Mohit Iyyer"
+        },
+        {
+            "ref_id": "b46",
+            "title": "The curious case of control",
+            "journal": "",
+            "year": "2022",
+            "authors": "Elias Stengel-Eskin; Benjamin Van Durme"
+        },
+        {
+            "ref_id": "b47",
+            "title": "Empirical evidence in research on meaning",
+            "journal": "",
+            "year": "2015",
+            "authors": "Judith Tonhauser; Lisa Matthewson"
+        },
+        {
+            "ref_id": "b48",
+            "title": "Language models are not naysayers: An analysis of language models on negation benchmarks",
+            "journal": "",
+            "year": "2023",
+            "authors": "Hung Thinh; Timothy Truong; Karin Baldwin; Trevor Verspoor;  Cohn"
+        },
+        {
+            "ref_id": "b49",
+            "title": "Single-Stage Prediction Models Do Not Explain the Magnitude of Syntactic Disambiguation Difficulty",
+            "journal": "",
+            "year": "2021",
+            "authors": "Marten Van Schijndel; Tal Linzen"
+        },
+        {
+            "ref_id": "b50",
+            "title": "Processing polarity: How the ungrammatical intrudes on the grammatical",
+            "journal": "Cognitive Science",
+            "year": "2008",
+            "authors": "Shravan Vasishth; Sven Br\u00fcssow; Richard L Lewis; Heiner Drenhaus"
+        },
+        {
+            "ref_id": "b51",
+            "title": "Jereti\u010d, and Samuel R. Bowman. 2019. Investigating BERT's Knowledge of Language: Five Analysis Methods with NPIs",
+            "journal": "",
+            "year": "",
+            "authors": "Alex Warstadt; Yu Cao; Ioana Grosu; Wei Peng; Hagen Blix; Yining Nie; Anna Alsop; Shikha Bordia; Haokun Liu; Alicia Parrish; Sheng-Fu Wang"
+        },
+        {
+            "ref_id": "b52",
+            "title": "BLiMP: The Benchmark of Linguistic Minimal Pairs for English",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Alex Warstadt; Alicia Parrish; Haokun Liu; Anhad Mohananey; Wei Peng; Sheng-Fu Wang; Samuel R Bowman"
+        },
+        {
+            "ref_id": "b53",
+            "title": "A Verbal Illusion",
+            "journal": "Quarterly Journal of Experimental Psychology",
+            "year": "1979",
+            "authors": "C Peter; Shuli S Wason;  Reich"
+        },
+        {
+            "ref_id": "b54",
+            "title": "Frequency Effects on Syntactic Rule Learning in Transformers",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Jason Wei; Dan Garrette; Tal Linzen; Ellie Pavlick"
+        },
+        {
+            "ref_id": "b55",
+            "title": "Construction grammar provides unique insight into neural language models",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Leonie Weissweiler; Taiqi He; Naoki Otani; David R Mortensen; Lori Levin; Hinrich Sch\u00fctze"
+        },
+        {
+            "ref_id": "b56",
+            "title": "The Anatomy of a Comparative Illusion",
+            "journal": "Journal of Semantics",
+            "year": "2018",
+            "authors": "Alexis Wellwood; Roumyana Pancheva; Valentine Hacquard; Colin Phillips"
+        },
+        {
+            "ref_id": "b57",
+            "title": "What do RNN Language Models Learn about Filler-Gap Dependencies?",
+            "journal": "",
+            "year": "2018",
+            "authors": "Ethan Wilcox; Roger Levy; Takashi Morita; Richard Futrell"
+        },
+        {
+            "ref_id": "b58",
+            "title": "Transformers: State-of-the-Art Natural Language Processing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Thomas Wolf; Lysandre Debut; Victor Sanh; Julien Chaumond; Clement Delangue; Anthony Moi; Pierric Cistac; Tim Rault; Remi Louf; Morgan Funtowicz; Joe Davison; Sam Shleifer; Clara Patrick Von Platen; Yacine Ma; Julien Jernite; Canwen Plu; Teven Le Xu; Sylvain Scao; Mariama Gugger; Quentin Drame; Alexander Lhoest;  Rush"
+        },
+        {
+            "ref_id": "b59",
+            "title": "Illusory licensing effects across dependency types: ERP evidence",
+            "journal": "Brain and Language",
+            "year": "2009",
+            "authors": "M Xiang; C Dillon;  Phillips"
+        },
+        {
+            "ref_id": "b60",
+            "title": "Representing affect information in word embeddings",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yuhan Zhang; Wenqi Chen; Ruihan Zhang; Xiajie Zhang"
+        },
+        {
+            "ref_id": "b61",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Yuhan Zhang; Carina Kauf; Edward Gibson"
+        },
+        {
+            "ref_id": "b62",
+            "title": "2023b. a noisy-channel explanation of the comparative illusion. Architectures and Mechanisms for Language Processing",
+            "journal": "",
+            "year": "",
+            "authors": "Yuhan Zhang; Carina Kauf; Edward Gibson"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "teenagers have used Tiktok than I have. (illusion) b. Many teenagers have used Tiktok more than I have. (acceptable) c. (#) Many teenagers have installed Tiktok more than I have. (unacceptable)",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 4 :4Figure 4: Estimated coefficients for the illusion effect (unacceptable vs. illusion = reference) in NPI illusions.The y axis shows the increase in perplexity/surprisal when the sentence is ungrammatical vs. is in the illusion condition. \"+\" marks an illusion effect while none of the three licensors should trigger an illusion effect according to human behavior; \"*\" means a significant contrast.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 5 :5Figure 5: Language models' performance on all three illusions. \u2713means LMs show human-like behavior.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "",
+            "figure_caption": "",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "",
+            "figure_caption": "",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Estimated coefficients of the main effect (acceptable sentence condition vs. unacceptable condition (reference)) for each statistical model. If LMs rate acceptable sentences as more acceptable, the coefficients for perplexity or surprisal should be significantly negative. Cells color-coded in blue represent statistical significance level (p < .05) in the expected direction. White cells represent an insignificant main effect. In other words, blue cells indicate the statistical model output supports LMs' ability to distinguish sentences based on linguistic acceptability.",
+            "figure_data": "Illusion typeitemBERTRoBERTaGPT-2GPT-3PPLSurpPPLSurpPPLSurpPPLSurpComparative32-0.36 -0.001-0.56-0.09-0.22 -0.05-0.30-0.25Depth-charge32-0.37-0.15-0.61-0.45-0.12-0.41 -0.37-0.98NPI32-0.26-2.46-0.71-2.60-0.21-1.73 -0.29-2.55tive to illusion-specific linguistic manipula-tions that affect human judgments. A greaterdegree of sensitivity indicates that the cor-responding linguistic knowledge and howthe knowledge affects sentence acceptabilitycould be encoded in or learned by LMs. Thisallowed us to draw a fine-grained comparisonbetween humans and LMs. If language mod-els are insensitive, that indicates a differencebetween humans and LMs."
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "Surp(w i ) = \u2212log Prob(w i |w 1 ...w i\u22121 ) (1)",
+            "formula_coordinates": [
+                3.0,
+                96.7,
+                488.0,
+                193.16,
+                11.86
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "2 1 N N i=1 Surp(w i )(2)",
+            "formula_coordinates": [
+                3.0,
+                141.42,
+                536.15,
+                148.45,
+                14.46
+            ]
+        }
+    ],
+    "doi": "10.1016/0010-0285(91)90003-7"
+}

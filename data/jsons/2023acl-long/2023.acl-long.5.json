@@ -1,0 +1,855 @@
+{
+    "title": "Binary and Ternary Natural Language Generation",
+    "authors": "Zechun Liu; Barlas Oguz; Meta Ai; Aasish Pappu; Yangyang Shi; Raghuraman Krishnamoorthi",
+    "pub_date": "",
+    "abstract": "Ternary and binary neural networks enable multiplication-free computation and promise multiple orders of magnitude efficiency gains over full-precision networks if implemented on specialized hardware. However, since both the parameter and the output space are highly discretized, such networks have proven very difficult to optimize. The difficulties are compounded for the class of transformer text generation models due to the sensitivity of the attention operation to quantization and the noise-compounding effects of autoregressive decoding in the high-cardinality output space. We approach the problem with a mix of statistics-based quantization for the weights and elastic quantization of the activations and demonstrate the first ternary and binary transformer models on the downstream tasks of summarization and machine translation. Our ternary BART base achieves an R1 score of 41 on the CNN/DailyMail benchmark, which is merely 3.9 points behind the full model while being 16x more efficient. Our binary model, while less accurate, achieves a highly nontrivial score of 35.6. For machine translation, we achieved BLEU scores of 21.7 and 17.6 on the WMT16 En-Ro benchmark, compared with a full precision mBART model score of 26.8. We also compare our approach in the 8-bit activation setting, where our ternary and even binary weight models can match or outperform the best existing 8-bit weight models in the literature. Our code and models are available at: https://github.com/facebookresearch/ Ternary_Binary_Transformer.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": [
+                "Generative pre-trained transformers (Brown et al., 2020;Lewis et al., 2020;Radford et al., 2018) have emerged as powerful and generic tools, driving breakthroughs not only in language understanding but the field of AI in general. These models owe * Equal contribution their success mainly to their seemingly infinite ability to scale to ever-larger data and model sizes. Unfortunately, such scaling comes at the cost of large computational requirements, putting extensively large generative transformers out of reach of all but the most resource-rich institutions. Even moderately sized pre-trained transformers have limited applications due to their size and computational cost. Making generative transformers more efficient is imperative for widening their use to more devices and practical applications.",
+                "In this work, we explore making generative pretrained transformers more efficient via the quantization of their weights and activations. Quantizing the weights of a neural network is useful for compression and allows the model to be stored more efficiently. However, compression alone does not reduce computation costs since the network's activations need to be computed in full precision. Quantizing both weights and activations allows computation to be performed with lower precision, potentially leading to significant efficiency gains depending on the quantization level and hardware implementation. Quantizing neural networks have a long history, and multiple works have attempted to quantize pre-trained transformers at various quantization levels (Shen et al., 2020;Zhang et al., 2020;Liu et al., 2022;Qin et al., 2021). Most of this work focuses on encoder-only models (mainly BERT) for sentence and token classification tasks. Quantizing text generation models has generally been regarded as a more difficult task (Behnke et al., 2021;Tao et al., 2022) due to the large output vocabulary and sequential decoding. Recent work has tackled this problem, though only for mild quantization levels (down to 8-bit activations) and with mixed success.",
+                "In contrast, we are interested in very low-bit quantization, down to ternary and even binary weights and activations. In order to achieve this, we combine and unify best practices for weight and activation quantization and present a frame-work that uses gradient-matching quantization for weights and elastic quantization for activations. We apply our method to natural language generation tasks and, for the first time, demonstrate low-bit generative transformers of competitive accuracy. Our ternary (weight and activation) model lags a full-precision BART (Lewis et al., 2020) model by only 4 points in ROUGE on the XSUM summarization dataset. In contrast, our model with ternary weights and 8-bit activations comes within 1 point and even outperforms comparable state-of-the-art models with 8-bit weights. We also demonstrate a fully binary (weights and activations) model. While not as competitive, it is able to achieve a highly non-trivial ROUGE-1 score of 31.7.",
+                "Our results also extend to machine translation models. On the WMT16 En-Ro benchmark, we quantize an mBART model to extend the ternaryweight 8-bit activation SoTA by 1.2 points while demonstrating fully ternary and fully binary translation models for the first time.",
+                "We summarize our contributions as follows: \u2022 We propose a novel combination of statisticsbased weight quantization with learning-based activation quantization, which enables stably training transformer encoder-decoder models to converge in the fully ternary/binary settings, which was not previously possible.",
+                "\u2022 We significantly improve the state-of-the-art text generation models in the 8-bit activation and ternary/binary weight settings while setting the first non-trivial baselines for the fully ternary and fully binary settings."
+            ],
+            "publication_ref": [
+                "b11",
+                "b20",
+                "b31",
+                "b33",
+                "b37",
+                "b2",
+                "b1",
+                "b7",
+                "b20"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Method",
+            "text": [
+                "In this section, we first introduce the previous practices in binarization and ternarization. Then, we introduce a unified statistic-based weight binarization / ternarization method that can alleviate the gradient mismatch issue and enhance the quantized weights entropy. Lastly, we analyze the difference between weight quantization and activation quantization and propose an elastic ternarization method for activations. We abbreviate our method as TBT, short for \"Ternary / Binary Transformer\"."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Preliminary",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ternarization",
+            "text": [
+                "Ternary neural networks, where real values are quantized to three levels, are first introduced in (Li et al., 2016). Thus, these values can be repre-sented in 2 bits, leading to a 16\u00d7 reduction in size and computation. Moreover, the computations can be calculated multiplication-free, leading to even further computation gains on suitable hardware. The recent work integrates the ternarization algorithm in natural language models for quantizing the weights and activations in classification tasks (Zhang et al., 2020) and ternarizing the weight (8bit activations are used) in generative models (Li et al., 2022;Tao et al., 2022). The general formula (Li et al., 2016) for ternarization is as follows:",
+                "X i T = \uf8f1 \uf8f4 \uf8f2 \uf8f4 \uf8f3 \u2212\u03b1 T , if X i R < \u2212\u2206 0, if \u2212 \u2206 \u2a7d X i R \u2a7d \u2206 +\u03b1 T , if X i R > \u2206 (1) \u2206 = 0.7 \u2022 ||X R || l1 n X R (2) \u03b1 T = i X i R \u2022 1 |X i R |>\u2206 i 1 |X i R |>\u2206(3)",
+                "Here X T denotes the ternary weights/activations, and X R represents their real-valued counterparts. n X R denotes the total number of elements in the tensor. \u2206 is the ternary threshold, and \u03b1 T is the scaling factor that minimizes l2-loss between X T and X R ."
+            ],
+            "publication_ref": [
+                "b21",
+                "b37",
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Binarization",
+            "text": [
+                "The neural network binarization denotes representing the weights and/or activation with bi-level values. It is first proposed in BNN (Courbariaux et al., 2016) and has evolved in the follow-up works (Rastegari et al., 2016;Liu et al., 2018). Rastegari et al. (2016) formulates binarization as:",
+                "X i B = \u03b1 B \u2022Sign(X i R ) = \u2212\u03b1 B , if X i R < 0 +\u03b1 B , if X i R \u2a7e 0 (4) \u03b1 B = ||X R || l1 n X R(5)",
+                "Here X B can represent binary weights or binary activations. \u03b1 B denotes the scaling-factor that minimize the l2 loss between X R and \u03b1 B \u2022Sign(X R ).",
+                "The acceleration and compression effect of ternary/binary neural networks is significant. By representing the weights and activations with {\u22121, 0, 1}, the network enjoys \u223c16\u00d7 memory saving compared to its 32-bit floating-point counterpart. When further binarize the weights and activations to only 1-bit (i.e., {\u22121, 1}), up to 32\u00d7 model-size reduction and 58\u00d7 speedup on CPUs have been achieved (Rastegari et al., 2016), where the matrix multiplication operations are replaced with light-weighted bitwise XNOR operations.",
+                "Despite its appealing characteristics, naively binarizing or ternarizing the transformer model for natural language generation results in several accuracy drops or even a total failure in training. It has been observed that the attention layers of the transformer network are difficult to quantize to low bits. Also, the auto-regressive decoding tends to accumulate errors due to quantization. Given the nature of generative language networks that require highprecision output, quantizing both the activations and weights in these models to extreme bit values is non-trivial and has not been explored before."
+            ],
+            "publication_ref": [
+                "b12",
+                "b32",
+                "b26",
+                "b32",
+                "b32"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Stats-based max-entropy isometric weight quantization",
+            "text": [
+                "We propose a statistics-based method for weight binarization/ternarization. Particularly, this novel quantization method considers maximizing the entropy of the quantized weights and reducing the gradient mismatch in the backward pass. Previous works (Courbariaux et al., 2016;Bai et al., 2021b;Zhang et al., 2020) are mainly focused on minimizing the l2 loss between the quantized weights and the real-valued weights to find the optimal quantization scheme,",
+                "\u03b1 * = arg min ||\u03b1 \u0174Q \u2212 W R || l2(6)",
+                "where \u0174Q denotes binary/ternary weights and \u03b1 * denotes the optimal scaling factor calculated. Despite the broad application and great success of the classic quantization scheme, we found that merely minimizing the l2 loss neglects several critical but intractable issues in ultra-low-bit weight quantization: (1) The information entropy of the quantized weights is not considered. Eq. 1 and Eq. 4 calculate the quantized weights to minimize the distance to the real-valued weights, which could lead to imbalanced quantized weight distribution and harm the quantized weights representation capacity.",
+                "(2) The quantization function Eq. 1 and Eq. 4 are not isometric, meaning that it does not consider the magnitude consistency between the quantized weights and real-valued weights, while we find that magnitude consistency contributes significantly to accurate gradient estimation.",
+                "Considering the above two limitations in previous solutions, we are motivated to design a novel quantization function that enhances information entropy and reduces gradient mismatch. To boost the weights representation capability, in information theory, more information is preserved when the quantized weights contain higher entropy:",
+                "max p i H = \u2212p i log(p i ), s.t. N i=1 p i = 1 (7)",
+                "with p i denoting the proportion of real-valued weights being quantized to i th quantization level in total N levels. Eq. 7 can be easily solved with a Lagrange multiplier, and the optimal p * i = 1 N , i \u2208 {1, 2, . . . , N }, suggesting the best quantization scheme to preserve maximum information entropy is to distribute the real-valued weights in all quantization levels as evenly as possible.",
+                "For reducing the gradient mismatch, as suggested by the previous binarization work (Liu et al., 2020b), the magnitude difference between the quantized weight and the real-valued weight will greatly influence the gradient scale and a mismatch in magnitude will be amplified in back-propagation and cause gradient vanishing or explosion during training. Thus it is important to ensure the magnitude of real-valued weights and quantized weights are consistent.",
+                "Combining two requirements discussed above, we proposed max-entropy isometric weight quantization. In ternarization, it is formulated as",
+                "W i T = \u03b1 T \u230aClip( W i R \u2212 \u00b5 T \u03b1 T , \u22121, 1)\u2309 where \u00b5 T = W R , \u03b1 T = 4 3 \u2022 ||W R \u2212 \u00b5 T || l1 n W R(8)",
+                "Where W T and W R refer to the ternary weights and real-valued weights, respectively. The rounding function \u230a\u2022\u2309 and Clip(\u2022) function quantize weights to {\u22121, 0, 1}. \u00b5 T is the mean of realvalued weights and n W R denotes the number of weights in the weight matrix. Scaling factor \u03b1 is calculated from the weight statistics and follows the entropy rule to scale the real-valued weight W R to be evenly distributed in quantization levels. In the ternary case, the weights are quantized to {\u2212\u03b1 T , 0, \u03b1 T }. When the real-valued weights are initialized as uniformly and symmetrically distributed (He et al., 2015;Glorot and Bengio, 2010), the scaling factor \u03b1 T will distribute 5, 1.5], such that the output ternary weights We propose a statistic-based quantization method for weights ternarization/binarization and adopt a learning-based asymmetric quantization method for activation in ReLU/Softmax output (X \u2208 R n + ) and learning-based asymmetric quantization method for activations that contain both positive and negative values in other layers (X \u2208 R n ).",
+                "W i R \u03b1 T to [\u22121.",
+                "will have near uniform distribution in three ternary levels. Meanwhile, Eq. 8 is an isometric mapping where the real-valued weights are scaled by 1 \u03b1 T to near [-1, 1] and time \u03b1 T to scale back after quantization. In this way, the magnitude is preserved.",
+                "Correspondingly, in the binary case we have,",
+                "W i B = \u03b1 B \u2022 Sign( W i R \u2212 \u00b5 B \u03b1 B )",
+                "where",
+                "\u00b5 B = W R , \u03b1 B = ||W R \u2212 \u00b5 B || l1 n W R(9)",
+                "Here W B denotes the binary weights, where substracting the average \u00b5 B makes the realvalued weight zero-centered before binarization and thus encourages an even distribution in binarized weights. Then the scaling factor \u03b1 B matches the magnitude between real-valued and binary weights. Particularly, in Eq. 9,",
+                "W i B = \u03b1 B \u2022 Sign( W i R \u2212\u00b5 B \u03b1 B ) = \u03b1 B \u2022 Sign(W i R \u2212 \u00b5 B )",
+                ", we explicitly include the \u03b1 B in the denominator to keep the binarization function isometric and the gradients w.r.t. weights can be calculated straight-forwardly as:",
+                "\u2202W i B \u2202W i R ST E \u2248 1 | W i R \u2212\u00b5 B \u03b1 B |<1 (10)",
+                "STE is abbreviated for straight-through estimator (Bengio et al., 2013), which replaces the nondifferentiable Sign function with Clip function in the backward pass. We show that the proposed maxentropy isometric weight quantization improves the accuracy of weight binarization / ternarization by 6.0 / 11.53 RougeL scores on the CNN/DailyMail benchmark, respectively. More details can be found in Sec. 3.2."
+            ],
+            "publication_ref": [
+                "b12",
+                "b6",
+                "b37",
+                "b24",
+                "b16",
+                "b15",
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Learning-based activation quantization",
+            "text": [
+                "In contrast to neural network weights that are stored on the disk, activations are calculated on-the-fly. The distribution of activations in a particular layer depends on the network weights as well as the corresponding input sequence, and thus varies from batch to batch. In order to have the quantization function better capture the underlying activation distribution, we propose learning-based activation quantization.",
+                "Inspired by BiT (Liu et al., 2022), we divide the activation layers into two categories: the activation layers with non-negative values (X R \u2208 R + ), i.e., Softmax/ReLU layer outputs and the rest of the layers with both positive and negative activations (X R \u2208 R). We binarize / ternarize the first activation category (X R \u2208 R + ) to {0, \u03b1} / {0, \u03b1, 2\u03b1}, and symmetrically quantize the later activation category (X R \u2208 R) to {\u2212\u03b1, \u03b1} and {\u2212\u03b1, 0, \u03b1} in binary and ternary cases respectively. In this way, the activation distribution matches the original fullprecision activations and thus reduces the quantization error. Further, we learn to scale the real-valued activations to better fit quantization thresholds, and this learnable scaling factor can be updated endto-end with the gradients from the network loss to better account for overall network optimization.",
+                "In the ternary case, we propose the elastic ternarization function formulated as,",
+                "X i T = \u03b1 T Xi T = \uf8f1 \uf8f2 \uf8f3 \u03b1 T \u230aClip( X i R \u03b1 T , 0, 2)\u2309, if X R \u2208 R + \u03b1 T \u230aClip( X \u2032i R \u03b1 T , \u22121, 1)\u2309, if X R \u2208 R(11)",
+                "where X R and X T denote real-valued and ternary activations, respectively. To keep the formula concise, we set X \u2032 R = X R \u2212 X R , denoting the zeromean real-valued activations. \u03b1 T is the scaling factor. Different from the weight quantization, the scaling factor in Eq. 11 is learned with the gradient update. We follow the practice in (Zhou et al., 2016;Esser et al., 2019) to calculate the gradients with straight-through estimation (STE) bypassing the non-differentiable rounding function:",
+                "\u2202X i T \u2202\u03b1 T ST E \u2248 \uf8f1 \uf8f2 \uf8f3 Xi T \u2212 X i R \u03b1 T \u20221 0\u2a7dX i R \u2a7d2\u03b1 T , if X R \u2208 R + Xi T \u2212 X \u2032i R \u03b1 T \u20221 |X \u2032i R |\u2a7d\u03b1 T , if X R \u2208 R(12)",
+                "The learnable scaling factor can dynamically adapt to different activation distributions and improve the ternarization accuracy. In the binary case, it is formulated as.",
+                "X i B = \u03b1 B Xi B = \uf8f1 \uf8f4 \uf8f2 \uf8f4 \uf8f3 \u03b1 B \u230aClip( X i R \u03b1 B , 0, 1)\u2309, if X R \u2208 R + \u03b1 B \u2022 Sign( X \u2032i R \u03b1 B ), if X R \u2208 R(13)",
+                "Here X B denotes the binary activations.",
+                "Correspondingly, the gradients w.r.t. the scaling factor \u03b1 can be easily calculated as",
+                "\u2202X i B \u2202\u03b1 B ST E \u2248 \uf8f1 \uf8f2 \uf8f3 Xi B \u2212 X i R \u03b1 B \u20221 0\u2a7dX i R \u2a7d\u03b1 B , if X R \u2208 R + Sign(X \u2032i R ), if X R \u2208 R(14)",
+                "We demonstrate that with the learning-based activation quantization method and statistics-based weight quantization scheme, the proposed TBT for the first time is able to quantize the BART model for natural language generation tasks to ternary and even binary weights and activations, and achieve reasonable accuracy on summarization and translation benchmarks."
+            ],
+            "publication_ref": [
+                "b2",
+                "b13"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": [
+                "In this section, we evaluate the effectiveness of our low-bit quantization scheme for natural language generative model on text summarization benchmarks: CNN/DailyMail (Nallapati et al., 2016) and XSUM (Narayan et al., 2018). We additionally experiment on the machine translation task with mBART on WMT16 English-Romanian (En-Ro) dataset (Bojar et al., 2016a)."
+            ],
+            "publication_ref": [
+                "b27",
+                "b28",
+                "b9"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental settings",
+            "text": [
+                "We follow recent work (Li et al., 2022) in training the quantized network with initialization and knowledge distillation from a full-precision pretrained model. Specifically, we use the BARTbase (Lewis et al., 2019) as our full-precision baseline for summarization tasks and mBARTlarge (Liu et al., 2020a) for the translation task. We train the quantized models for 20 epochs on 8 GPUs with a batch size of 128 and a learning rate of 2.5e-4 for 8-bit activation models and 5e-4 for binary and ternary activation models."
+            ],
+            "publication_ref": [
+                "b19",
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Summarization",
+            "text": [
+                "For the summarization task, we adopt the following benchmarks:",
+                "The XSUM dataset (Narayan et al., 2018) consists of 226k documents sampled from the online news website of BBC, together with short, one sentence summaries. Since the summaries are very short, abstractive methods tend to do better on this dataset. CNN/DailyMail (Nallapati et al., 2016) is another news summarization benchmark, with longer documents (~30 sentences) and longer, multisentence summaries. The dataset contains close to 300k document-summary pairs.",
+                "We use BART-base model (Lewis et al., 2019), which is an English-only encoder-decoder transformer with 140 million parameters. We compare using the standard ROUGE-{1,2,l} metrics for this task.",
+                "For the ternary weights and 8-bit activations setting, we compare with two state-of-the-art methods QuantBart (Tao et al., 2022) and DQ-BART (Li et al., 2022). For the fully ternary setting, and the binary quantization experiments, there is no prior art. Therefore we provide a naive quantization baseline, using popular implementations from previous work (Li et al., 2016;Courbariaux et al., 2016), and adapt the binary and ternary methods proposed for the BERT models (Bai et al., 2021b;Qin et al., 2021;Zhang et al., 2020) to BART.",
+                "Our main results are summarized in Table 1. In the ternary weights and 8-bit activations setting, TBT improves previous SoTA by up to 2.3 points in ROUGE score on XSUM, and up to 0.5 points on CNN/DailyMail. Both improvements are significant.",
+                "Further quantizing weights to binary, while keeping activations at 8-bit, we are still able to achieve a ROUGE-L score of 33.3 on XSUM, which is 0.8 points higher than the previous ternary SoTA (DQ-BART), and comparable on CNN/DailyMail. This is the first demonstration of a binary-weight generative transformer model of competitive accuracy to our knowledge. Additionally, TBT binary weight BART model achieves 1.2 points higher ROUGE score on CNN compared with the SoTA pruning method with the same compressed model size.",
+                "Moving on to ternary and binary activations, there is no prior art, and previous implementations fail to produce meaningful results. Our method, on the other hand, achieves ROUGE-L scores of 29.1 and 38.3 on XSUM and CNN/DailyMail in the fully ternary setting, which are 6.6 and 3.8 points behind the full-precision baseline respectively. Our fully binary (weights and activations) model has a wider gap at 10.4 and 8.9 points, however still manages to produce highly non-trivial output at ROUGE-L scores of 25.3 and 33.2 points for XSUM and CNN/DailyMail."
+            ],
+            "publication_ref": [
+                "b28",
+                "b27",
+                "b19",
+                "b21",
+                "b12",
+                "b6",
+                "b1",
+                "b37"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Machine translation",
+            "text": [
+                "We also evaluate our model on machine translation. We adopt the En-Ro benchmark from the  WMT'16 shared task (Bojar et al., 2016b) to be compatible with previous work. Our base model is an mBART-large model (Liu et al., 2020a), a 680 million parameter multi-lingual encoder-decoder transformer pre-trained on 25 languages. Table 2 shows our results. In the ternary weight setting with 8-bit activations, we improve the previous SoTA by 1.2 points, achieving 24.63 BLEU. Remarkably our binary weight model also outperforms the previous ternary weight SoTA by almost a full point. It scores 24.3 BLEU -only 1.5 points behind a full mBART model while being 16\u00d7 smaller.",
+                "In the fully ternary and binary settings, where previous methods failed to converge, TBT models are able to reach practical levels of performance, with ternary TBT mBART achieving 21.7 BLEU, and TBT binary mBART at 17.59."
+            ],
+            "publication_ref": [
+                "b10",
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Ablations",
+            "text": [
+                "As stated earlier, our main proposed modeling improvement is a combination of two methods: statistics-based quantization for the weights, and learning-based quantization for the activations.",
+                "We ablate the contribution of these methods and present the results in Table 3.",
+                "The results clearly show that while each method can give moderate gains by itself over the baseline, these improvements are not sufficient by themselves to produce meaningful results. None of the ablated models can achieve an R2 score above 1.5. It's only the combination of the two, which together stabilize the training and result in good convergence for fully ternary and binary models."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Sequence length analysis",
+            "text": [
+                "In language generation tasks, the error compounding issue in the recursive decoder generation process will largely amplify the quantization error or even lead to divergent results, and thus is an harsh factor to test the robustness of a quantization method. The average generated sequence length indicates whether the quantized model can overcome the compounding error and generate reasonable length of text.",
+                "In Table 4 we compare the generated sequence length between the proposed method and the baseline method (i.e., TWN (Li et al., 2016) for ternary, BWN (Courbariaux et al., 2016) for binary). Our method successfully produces summarizations with comparable length as the full-precision model on XSUM benchmark, even when both weights and activations are binarized.",
+                "Compared to XSUM dataset, for which the document are summarized to only one sentence, CNN/DailyMail is more challenging because it allows longer summary. We can clearly see that, the text generate with our 8-bit activation models can maintain near the similar average length as the full-precision BART model, while the binary and ternary activation models deviate moderately. In contrast, the baseline method is only able to derive"
+            ],
+            "publication_ref": [
+                "b21",
+                "b12"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3"
+            ]
+        },
+        {
+            "heading": "Weights Activations",
+            "text": [
+                "Ternary weights (! ! ) reasonable summarization with 2-bit weight 8-bit activations and fails at lower bit-width, showing the difficult natural of the language generation tasks.",
+                "! ! in 1 \"# row Real-valued activations (# $ ) (f) (e) (h) (g)"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Visualization",
+            "text": [
+                "To further understand the effectiveness of the proposed method, we visualize weight and activation histograms in the BART model ternarized with the baseline method and the proposed method in Fig. 2. Both the baseline method and our method use per-row weight ternarization, and thus a tensor tensor will have #row of scaling factors. As we can see in Fig. 2 (b) and (g), the proposed method allows the weights to be more evenly distributed in three ternarization levels, which can allow higher information entropy in quantized weights, as discussed in Sec. 2.2. Additionally, we calculate the quantized weight distribution entropy (i.e., Eq. 7) in 96 fully-connected layers in the BART-base model and found that the proposed TBT method achieves consistently higher entropy in quantized weights than the baseline method in all the layers. Further, an interesting phenomenon we can see in Fig. 2 (a) (e) is that ternary weights in a baseline model are very close to the Gaussian distribution, in contrast, weights ternarized with TBT are capturing a more sophisticated distribution. This phenomenon implies that the proposed method helps the weights learn more informative patterns and thus better satisfy the high demand for language generation tasks.",
+                "For activation quantization, it is evident that the attention layer and the SoftMax output only contain the positive activations (X R \u2208 R + ). If simply ternarized to {\u2212\u03b1, 0, \u03b1}, the ternary activations will waste one representative level (Fig. 2(d)) and therefore lead to lower accuracy. Instead, the proposed method uses a two-set ternarization method that ternarizes the non-negative activation layer (X R \u2208 R + ) to {0, \u03b1, 2\u03b1}, and learns the scaling factor \u03b1 to better fit the underlying real-valued distribution. This ternarization method greatly reduces information loss and enhances the final accuracy.",
+                "8-bit activation quantization) and evaluated on language modeling and summarization. However, our method outperforms these works substantially, while also demonstrating accurate generative transformers with both weights and activations quantized to 2-bit and even 1-bit for the first time."
+            ],
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_1",
+                "fig_1",
+                "fig_1",
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": [
+                "We have demonstrated high accuracy ternary and binary natural language generation models based on a pre-trained transformer encoder-decoder backbone. Quantizing both the weights and the activations of the network allow these models to run on special-purpose hardware using binary and ternary arithmetic, which doesn't require multiplication modules. Therefore our results promise multiple orders of magnitude gains in efficiency while running these models, and can drastically expand the use cases of such models beyond just high end gpu servers. We are especially excited about the implications of our results for larger text generation models such as GPT-3 (Brown et al., 2020). These models have both demonstrated impressive capabilities, while also presenting enormous scaling and computational challenges. Low-bit quantization is a promising approach to mitigate some of these issues. Whether our approach will scale to these models is an open problem and an exciting future research direction."
+            ],
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": [
+                "We conduct experiments on public datasets of finite sentence length, while generalizability to extremely long sequences or even streaming data has not been verified. Furthermore, the generalizability of the proposed quantization method to other tasks, including computer vision or speech recognition, remains to be tested. In addition, binarization and ternarization require bit-packing to have actual memory savings and dedicated hardware support for real-time acceleration, which is more of a hardware implementation aspect and not studied in this paper."
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethics Statement",
+            "text": [
+                "We affirm that we contribute to society, avoid harm, and are honest and trustworthy. We respect previous work and appropriately cite the methods and datasets we are using. All data we use is public and no private data is involved. There is some potential risk if the translation technique is maliciously used by a third party and thus we are committed to maintaining the compression techniques we have developed and the general summarization/machine translation techniques used correctly without incurring any form of discrimination. B3. Did you discuss if your use of existing artifact(s) was consistent with their intended use, provided that it was specified? For the artifacts you create, do you specify intended use and whether that is compatible with the original access conditions (in particular, derivatives of data accessed for research purposes should not be used outside of research contexts)? section 4",
+                "B4. Did you discuss the steps taken to check whether the data that was collected / used contains any information that names or uniquely identifies individual people or offensive content, and the steps taken to protect / anonymize it? section 3",
+                "B5. Did you provide documentation of the artifacts, e.g., coverage of domains, languages, and linguistic phenomena, demographic groups represented, etc.? section 3",
+                "B6. Did you report relevant statistics like the number of examples, details of train / test / dev splits, etc. for the data that you used / created? Even for commonly-used benchmark datasets, include the number of examples in train / validation / test splits, as these provide necessary context for a reader to understand experimental results. For example, small differences in accuracy on large test sets may be significant, while on small test sets they may not be. section 3",
+                "C Did you run computational experiments? section 3",
+                "C1. Did you report the number of parameters in the models used, the total computational budget (e.g., GPU hours), and computing infrastructure used? section 3"
+            ],
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "",
+            "journal": "",
+            "year": "2019",
+            "authors": " Zafrir"
+        },
+        {
+            "ref_id": "b1",
+            "title": "",
+            "journal": "",
+            "year": "2021",
+            "authors": " Qin"
+        },
+        {
+            "ref_id": "b2",
+            "title": "generative setting",
+            "journal": "",
+            "year": "2019",
+            "authors": " Liu"
+        },
+        {
+            "ref_id": "b3",
+            "title": "2021) demonstrate quantized models for machine translation, and",
+            "journal": "",
+            "year": "2020",
+            "authors": " Behnke"
+        },
+        {
+            "ref_id": "b4",
+            "title": "for language modeling, though only for moderate quantization levels (4-8 bits). Most recently",
+            "journal": "",
+            "year": "2021",
+            "authors": " Bai"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Towards efficient posttraining quantization of pre-trained language models",
+            "journal": "",
+            "year": "2021",
+            "authors": "Haoli Bai; Lu Hou; Lifeng Shang; Xin Jiang; Irwin King; Michael R Lyu"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Binarybert: Pushing the limit of bert quantization",
+            "journal": "",
+            "year": "2021",
+            "authors": "Haoli Bai; Wei Zhang; Lu Hou; Lifeng Shang; Jin Jin; Xin Jiang; Qun Liu; Irwin Michael R Lyu;  King"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Efficient machine translation with model pruning and quantization",
+            "journal": "",
+            "year": "2021",
+            "authors": "Maximiliana Behnke; Nikolay Bogoychev; Alham Fikri Aji; Kenneth Heafield; Graeme Nail; Qianqian Zhu; Svetlana Tchistiakova; Jelmer Van Der Linde; Pinzhen Chen; Sidharth Kashyap"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Estimating or propagating gradients through stochastic neurons for conditional computation",
+            "journal": "",
+            "year": "2013",
+            "authors": "Yoshua Bengio; Nicholas L\u00e9onard; Aaron Courville"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Findings of the 2016 conference on machine translation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2016",
+            "authors": "Ond\u0159ej Bojar; Rajen Chatterjee; Christian Federmann; Yvette Graham; Barry Haddow; Matthias Huck; Antonio Jimeno Yepes; Philipp Koehn; Varvara Logacheva; Christof Monz; Matteo Negri; Aur\u00e9lie N\u00e9v\u00e9ol; Mariana Neves; Martin Popel; Matt Post; Raphael Rubino; Carolina Scarton; Lucia Specia; Marco Turchi; Karin Verspoor; Marcos Zampieri"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Results of the wmt16 metrics shared task",
+            "journal": "",
+            "year": "2016",
+            "authors": "Ond\u0159ej Bojar; Yvette Graham; Amir Kamran; Milo\u0161 Stanojevi\u0107"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Language models are few-shot learners",
+            "journal": "",
+            "year": "2020",
+            "authors": "Tom Brown; Benjamin Mann; Nick Ryder; Melanie Subbiah; Jared D Kaplan; Prafulla Dhariwal; Arvind Neelakantan; Pranav Shyam; Girish Sastry; Amanda Askell"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Ran El-Yaniv, and Yoshua Bengio",
+            "journal": "",
+            "year": "2016",
+            "authors": "Matthieu Courbariaux; Itay Hubara; Daniel Soudry"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Learned step size quantization",
+            "journal": "",
+            "year": "2019",
+            "authors": "K Steven; Jeffrey L Esser; Deepika Mckinstry; Rathinakumar Bablani; Dharmendra S Appuswamy;  Modha"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Training with quantization noise for extreme model compression",
+            "journal": "",
+            "year": "2020",
+            "authors": "Angela Fan; Pierre Stock; Benjamin Graham; Edouard Grave; R\u00e9mi Gribonval; Herve Jegou; Armand Joulin"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Understanding the difficulty of training deep feedforward neural networks",
+            "journal": "",
+            "year": "2010",
+            "authors": "Xavier Glorot; Yoshua Bengio"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Delving deep into rectifiers: Surpassing human-level performance on imagenet classification",
+            "journal": "",
+            "year": "2015",
+            "authors": "Kaiming He; Xiangyu Zhang; Shaoqing Ren; Jian Sun"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Quantized neural networks: Training neural networks with low precision weights and activations",
+            "journal": "The Journal of Machine Learning Research",
+            "year": "2017",
+            "authors": "Itay Hubara; Matthieu Courbariaux; Daniel Soudry"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Block pruning for faster transformers",
+            "journal": "",
+            "year": "2021",
+            "authors": "Fran\u00e7ois Lagunas; Ella Charlaix; Victor Sanh; Alexander M Rush"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Bart: Denoising sequence-to-sequence pre-training for natural language generation, translation, and comprehension",
+            "journal": "",
+            "year": "2019",
+            "authors": "Mike Lewis; Yinhan Liu; Naman Goyal; Marjan Ghazvininejad; Abdelrahman Mohamed; Omer Levy; Ves Stoyanov; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Denoising sequence-to-sequence pre-training for natural language generation, translation, and comprehension",
+            "journal": "",
+            "year": "2020",
+            "authors": "Mike Lewis; Yinhan Liu; Naman Goyal; Marjan Ghazvininejad; Abdelrahman Mohamed; Omer Levy; Veselin Stoyanov; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Ternary weight networks",
+            "journal": "",
+            "year": "2016",
+            "authors": "Fengfu Li; Bo Zhang; Bin Liu"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Dq-bart: Efficient sequence-tosequence model via joint distillation and quantization",
+            "journal": "Short Papers",
+            "year": "2022",
+            "authors": "Zheng Li; Zijian Wang; Ming Tan; Ramesh Nallapati; Parminder Bhatia; Andrew Arnold; Bing Xiang; Dan Roth"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Multilingual denoising pre-training for neural machine translation",
+            "journal": "",
+            "year": "2020",
+            "authors": "Yinhan Liu; Jiatao Gu; Naman Goyal; Xian Li; Sergey Edunov; Marjan Ghazvininejad; Mike Lewis; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Bi-real net: Binarizing deep network towards real-network performance",
+            "journal": "International Journal of Computer Vision",
+            "year": "2020",
+            "authors": "Zechun Liu; Wenhan Luo; Baoyuan Wu; Xin Yang; Wei Liu; Kwang-Ting Cheng"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Bit: Robustly binarized multi-distilled transformer",
+            "journal": "",
+            "year": "2022",
+            "authors": "Zechun Liu; Barlas Oguz; Aasish Pappu; Lin Xiao; Scott Yih; Meng Li; Raghuraman Krishnamoorthi; Yashar Mehdad"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Bi-real net: Enhancing the performance of 1-bit cnns with improved representational capability and advanced training algorithm",
+            "journal": "",
+            "year": "2018",
+            "authors": "Zechun Liu; Baoyuan Wu; Wenhan Luo; Xin Yang; Wei Liu; Kwang-Ting Cheng"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Abstractive text summarization using sequence-to-sequence rnns and beyond",
+            "journal": "",
+            "year": "2016",
+            "authors": "Ramesh Nallapati; Bowen Zhou; Caglar Gulcehre; Bing Xiang"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Don't give me the details, just the summary! topic-aware convolutional neural networks for extreme summarization",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Shashi Narayan; Shay B Cohen; Mirella Lapata"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Fully quantized transformer for machine translation",
+            "journal": "",
+            "year": "2019",
+            "authors": "Gabriele Prato; Ella Charlaix; Mehdi Rezagholizadeh"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Bibert: Accurate fully binarized bert",
+            "journal": "",
+            "year": "2021",
+            "authors": "Haotong Qin; Yifu Ding; Mingyuan Zhang; Yan Qinghua; Aishan Liu; Qingqing Dang; Ziwei Liu; Xianglong Liu"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Improving language understanding by generative pre-training",
+            "journal": "",
+            "year": "2018",
+            "authors": "Alec Radford; Karthik Narasimhan"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Xnor-net: Imagenet classification using binary convolutional neural networks",
+            "journal": "Springer",
+            "year": "2016",
+            "authors": "Mohammad Rastegari; Vicente Ordonez; Joseph Redmon; Ali Farhadi"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Q-bert: Hessian based ultra low precision quantization of bert",
+            "journal": "",
+            "year": "2020",
+            "authors": "Sheng Shen; Zhen Dong; Jiayu Ye; Linjian Ma; Zhewei Yao; Amir Gholami; W Michael; Kurt Mahoney;  Keutzer"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Compression of generative pre-trained language models via quantization",
+            "journal": "Long Papers",
+            "year": "2022",
+            "authors": "Chaofan Tao; Lu Hou; Wei Zhang; Lifeng Shang; Xin Jiang; Qun Liu; Ping Luo; Ngai Wong"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Gobo: Quantizing attention-based nlp models for low latency and energy efficient inference",
+            "journal": "IEEE",
+            "year": "2020",
+            "authors": "Ali Hadi Zadeh; Isak Edo"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Q8bert: Quantized 8bit bert",
+            "journal": "IEEE",
+            "year": "2019",
+            "authors": "Ofir Zafrir; Guy Boudoukh; Peter Izsak; Moshe Wasserblat"
+        },
+        {
+            "ref_id": "b37",
+            "title": "Ternarybert: Distillation-aware ultra-low bit BERT",
+            "journal": "",
+            "year": "2020",
+            "authors": "Wei Zhang; Lu Hou; Yichun Yin; Lifeng Shang; Xiao Chen; Xin Jiang; Qun Liu"
+        },
+        {
+            "ref_id": "b38",
+            "title": "Dorefa-net: Training low bitwidth convolutional neural networks with low bitwidth gradients",
+            "journal": "",
+            "year": "2016",
+            "authors": "Shuchang Zhou; Yuxin Wu; Zekun Ni; Xinyu Zhou; He Wen; Yuheng Zou"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Did you discuss the experimental setup, including hyperparameter search and best-found hyperparameter values? section 3",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b40",
+            "title": "error bars around results, summary statistics from sets of experiments), and is it transparent whether you are reporting the max, mean, etc",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b41",
+            "title": "for preprocessing, for normalization, or for evaluation",
+            "journal": "",
+            "year": "",
+            "authors": " Nltk;  Spacy;  Rouge"
+        },
+        {
+            "ref_id": "b42",
+            "title": "crowdworkers) or research with human participants? Left blank",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b43",
+            "title": "Did you report the full text of instructions given to participants, including e.g., screenshots, disclaimers of any risks to participants or annotators",
+            "journal": "",
+            "year": "",
+            "authors": " D1"
+        },
+        {
+            "ref_id": "b44",
+            "title": "crowdsourcing platform, students) and paid participants, and discuss if such payment is adequate given the participants' demographic",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b45",
+            "title": "Did you discuss whether and how consent was obtained from people whose data you're using/curating? For example, if you collected data via crowdsourcing, did your instructions to crowdworkers explain how the data would be used?",
+            "journal": "",
+            "year": "",
+            "authors": " D3"
+        },
+        {
+            "ref_id": "b46",
+            "title": "Was the data collection protocol approved (or determined exempt) by an ethics review board? No response",
+            "journal": "",
+            "year": "",
+            "authors": " D4"
+        },
+        {
+            "ref_id": "b47",
+            "title": "Did you report the basic demographic and geographic characteristics of the annotator population that is the source of the data? No response",
+            "journal": "",
+            "year": "",
+            "authors": " D5"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Overview of TBT. A transformer block contains the multi-head self-attention and feed-forward network.We propose a statistic-based quantization method for weights ternarization/binarization and adopt a learning-based asymmetric quantization method for activation in ReLU/Softmax output (X \u2208 R n + ) and learning-based asymmetric quantization method for activations that contain both positive and negative values in other layers (X \u2208 R n ).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure 2: Weight and activation histogram comparison between the baseline TWN method and TBT method for ternarizing BART model on CNN/DailyMail benchmark. The weights are taken from the fully-connected layer of the value matrix in 1 st self-attention block in the decoder and activations are the attention outputs of the same layer.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "you discuss any potential risks of your work? Section 7 A3. Do the abstract and introduction summarize the paper's main claims? Section 1 A4. Have you used AI writing assistants when working on this paper? Left blank. B Did you use or create scientific artifacts? section 4 B1. Did you cite the creators of artifacts you used? section 4 B2. Did you discuss the license or terms for use and / or distribution of any artifacts? section 4",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Comparison of quantization methods for text summarization on XSUM and CNN/DailyMail benchmarks. We use the \"E-W-A (#bits)\" notation referring to the number of bits of embeddings, weights and activations, (specifically, 1 denotes binary, 2 denotes ternary). The results of QuantBart, DQ-BART and BlockPruning are quoted from their paper. Additionally, we implement the algorithm developed in BinaryBert, BiBert and TernaryBert to the BART model and report the results, denoted with * . We use the rouge-{1,2,L} as evaluation metrics.",
+            "figure_data": "XSUMCNN/DailyMail"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Comparison of quantization methods on mBART-large model for translation on WMT16 En-Ro.",
+            "figure_data": "Method#Bits (E-W-A) Size (GB) BLEUmBART (Liu et al., 2020a) 32-32-32 DQ-BART (Li et al., 2022) 8 -8 -8 DQ-BART (Li et al., 2022) 2 -2 -82.44 0.61 0.3126.82 25.91 23.48TBT TBT TBT TBT2 -2 -8 2 -2 -2 1 -1 -8 1 -1 -10.31 0.31 0.16 0.1624.63 21.70 24.30 17.59"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Ablation study on the effects of the proposed learning-based activation quantization method and stats-based weight quantization method on XSUM and CNN/DailyMail benchmark.",
+            "figure_data": "Method#Bits (E-W-A) R1XSUM R2RL1 Baseline (TWN) 2 + Activation(learning-based) 2 -2 -2 15.05 1.38 12.13 2 -2 -2 12.80 1.21 11.4 3 + Weight(stats-based) 2 -2 -2 13.79 0.87 12.74 4 + Both 2 -2 -2 36.21 14.38 29.075 Baseline (BWN) 6 + Activation(learning-based) 1 -1 -1 1 -1 -1 7 + Weight(stats-based) 1 -1 -1 10.96 0.29 10.00 1.90 0.01 1.78 1.90 0.01 1.78 8 + Both 1 -1 -1 31.68 11.19 25.29CNN/DailyMail R1 R2 RL9 Baseline (TWN) 10 + Activation(learning-based) 2 -2 -2 13.34 0.99 12.58 2 -2 -2 12.92 0.32 12.42 11 + Weight(stats-based) 2 -2 -2 19.34 0.42 18.42 12 + Both 2 -2 -2 41.03 18.18 38.3013 Baseline (BWN) 14 + Activation(learning-based) 1 -1 -1 1 -1 -1 15 + Weight(stats-based) 1 -1 -1 15.05 0.35 14.01 2.78 0.08 2.48 2.78 0.08 2.48 16 + Both 1 -1 -1 35.56 11.71 33.23"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "Generated average sequence length comparison between baseline method and our method.",
+            "figure_data": "Method#Bits (E-W-A)XSUMCNN/DailyMailBART-base32-32-3230.7399.89Baseline TBT2 -2 -8 2 -2 -828.53 32.0493.63 95.78Baseline TBT2 -2 -2 2 -2 -248.41 30.7114.88 88.38Baseline TBT1 -1 -8 1 -1 -862.0 31.57128.0 97.08Baseline TBT1 -1 -1 1 -1 -162.0 29.81128.0 67.51"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "X i T = \uf8f1 \uf8f4 \uf8f2 \uf8f4 \uf8f3 \u2212\u03b1 T , if X i R < \u2212\u2206 0, if \u2212 \u2206 \u2a7d X i R \u2a7d \u2206 +\u03b1 T , if X i R > \u2206 (1) \u2206 = 0.7 \u2022 ||X R || l1 n X R (2) \u03b1 T = i X i R \u2022 1 |X i R |>\u2206 i 1 |X i R |>\u2206(3)",
+            "formula_coordinates": [
+                2.0,
+                326.78,
+                223.61,
+                198.37,
+                140.13
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "X i B = \u03b1 B \u2022Sign(X i R ) = \u2212\u03b1 B , if X i R < 0 +\u03b1 B , if X i R \u2a7e 0 (4) \u03b1 B = ||X R || l1 n X R(5)",
+            "formula_coordinates": [
+                2.0,
+                304.86,
+                561.74,
+                220.29,
+                73.74
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "\u03b1 * = arg min ||\u03b1 \u0174Q \u2212 W R || l2(6)",
+            "formula_coordinates": [
+                3.0,
+                107.57,
+                476.12,
+                182.29,
+                21.44
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "max p i H = \u2212p i log(p i ), s.t. N i=1 p i = 1 (7)",
+            "formula_coordinates": [
+                3.0,
+                331.5,
+                148.69,
+                193.65,
+                34.7
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "W i T = \u03b1 T \u230aClip( W i R \u2212 \u00b5 T \u03b1 T , \u22121, 1)\u2309 where \u00b5 T = W R , \u03b1 T = 4 3 \u2022 ||W R \u2212 \u00b5 T || l1 n W R(8)",
+            "formula_coordinates": [
+                3.0,
+                332.5,
+                481.27,
+                192.65,
+                79.2
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "W i R \u03b1 T to [\u22121.",
+            "formula_coordinates": [
+                3.0,
+                306.14,
+                741.66,
+                216.58,
+                32.45
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "W i B = \u03b1 B \u2022 Sign( W i R \u2212 \u00b5 B \u03b1 B )",
+            "formula_coordinates": [
+                4.0,
+                112.2,
+                521.93,
+                135.59,
+                29.42
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "\u00b5 B = W R , \u03b1 B = ||W R \u2212 \u00b5 B || l1 n W R(9)",
+            "formula_coordinates": [
+                4.0,
+                144.93,
+                553.75,
+                144.94,
+                47.38
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": "W i B = \u03b1 B \u2022 Sign( W i R \u2212\u00b5 B \u03b1 B ) = \u03b1 B \u2022 Sign(W i R \u2212 \u00b5 B )",
+            "formula_coordinates": [
+                4.0,
+                70.86,
+                701.29,
+                218.28,
+                37.93
+            ]
+        },
+        {
+            "formula_id": "formula_9",
+            "formula_text": "\u2202W i B \u2202W i R ST E \u2248 1 | W i R \u2212\u00b5 B \u03b1 B |<1 (10)",
+            "formula_coordinates": [
+                4.0,
+                361.13,
+                437.22,
+                164.02,
+                33.1
+            ]
+        },
+        {
+            "formula_id": "formula_10",
+            "formula_text": "X i T = \u03b1 T Xi T = \uf8f1 \uf8f2 \uf8f3 \u03b1 T \u230aClip( X i R \u03b1 T , 0, 2)\u2309, if X R \u2208 R + \u03b1 T \u230aClip( X \u2032i R \u03b1 T , \u22121, 1)\u2309, if X R \u2208 R(11)",
+            "formula_coordinates": [
+                5.0,
+                71.68,
+                314.1,
+                218.19,
+                65.17
+            ]
+        },
+        {
+            "formula_id": "formula_11",
+            "formula_text": "\u2202X i T \u2202\u03b1 T ST E \u2248 \uf8f1 \uf8f2 \uf8f3 Xi T \u2212 X i R \u03b1 T \u20221 0\u2a7dX i R \u2a7d2\u03b1 T , if X R \u2208 R + Xi T \u2212 X \u2032i R \u03b1 T \u20221 |X \u2032i R |\u2a7d\u03b1 T , if X R \u2208 R(12)",
+            "formula_coordinates": [
+                5.0,
+                68.86,
+                534.47,
+                221.0,
+                78.3
+            ]
+        },
+        {
+            "formula_id": "formula_12",
+            "formula_text": "X i B = \u03b1 B Xi B = \uf8f1 \uf8f4 \uf8f2 \uf8f4 \uf8f3 \u03b1 B \u230aClip( X i R \u03b1 B , 0, 1)\u2309, if X R \u2208 R + \u03b1 B \u2022 Sign( X \u2032i R \u03b1 B ), if X R \u2208 R(13)",
+            "formula_coordinates": [
+                5.0,
+                71.11,
+                684.98,
+                218.76,
+                67.86
+            ]
+        },
+        {
+            "formula_id": "formula_13",
+            "formula_text": "\u2202X i B \u2202\u03b1 B ST E \u2248 \uf8f1 \uf8f2 \uf8f3 Xi B \u2212 X i R \u03b1 B \u20221 0\u2a7dX i R \u2a7d\u03b1 B , if X R \u2208 R + Sign(X \u2032i R ), if X R \u2208 R(14)",
+            "formula_coordinates": [
+                5.0,
+                307.44,
+                111.21,
+                217.71,
+                76.21
+            ]
+        },
+        {
+            "formula_id": "formula_14",
+            "formula_text": "! ! in 1 \"# row Real-valued activations (# $ ) (f) (e) (h) (g)",
+            "formula_coordinates": [
+                8.0,
+                136.69,
+                91.96,
+                358.79,
+                188.92
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/W16-2301"
+}
