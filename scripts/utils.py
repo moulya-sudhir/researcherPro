@@ -57,6 +57,13 @@ def calculate_similarity(vec1, vec2):
     return cosine_similarity(vec1, vec2)
 
 def preprocess_dataset(csv_path, vectorizer_save_path, tfidf_save_path):
+    '''
+    Function to vectorize abstract of dataset and save vectorizer and TFIDF matrix
+    Params:
+    - csv_path (str): The path of the dataset (in CSV)
+    - vectorizer_save_path (str): The path to save the TFIDF vectorizer
+    - tfidf_save_path (str): The path to save the TFIDF matrix    
+    '''
     # Load the dataset
     dataset = pd.read_csv(csv_path)
     # Preprocess all abstracts
