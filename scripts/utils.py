@@ -1,5 +1,6 @@
 import nltk
 import pandas as pd
+import pickle
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -54,3 +55,19 @@ def calculate_similarity(vec1, vec2):
 
     '''
     return cosine_similarity(vec1, vec2)
+
+def preprocess_dataset(csv_path, vectorizer_save_path, tfidf_save_path):
+    # Load the dataset
+    dataset = pd.read_csv(csv_path)
+    # Preprocess all abstracts
+    dataset['processed'] = dataset['abstract'].apply(preprocess)
+    # Vectorize the dataset
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(dataset['processed'])
+    print(f'Saved preprocessed dataset back to {csv_path}.')
+    with open(vectorizer_save_path, 'wb') as file:
+        pickle.dump(vectorizer, file)
+    print(f'Saved TFIDF Vectorizer to {vectorizer_save_path}.')
+    with open(tfidf_save_path, 'wb') as file:
+        pickle.dump(tfidf_matrix, file)
+    print(f'Saved TFIDF Matrix to {tfidf_save_path}.')
