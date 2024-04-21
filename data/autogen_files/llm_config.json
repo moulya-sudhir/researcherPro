@@ -1,0 +1,20 @@
+{
+    "functions": [
+        {
+            "name": "get_documents",
+            "description": "Retrieves relevant articles and their information related to user's query. Returns a Pandas DataFrame.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "The search query for identifying relevant articles pages whose information to extract."
+                    }
+                },
+                "required": [
+                    "hops"
+                ]
+            }
+        }
+    ]
+}
